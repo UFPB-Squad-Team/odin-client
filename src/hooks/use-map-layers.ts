@@ -209,18 +209,26 @@ function buildStateDataCandidates(
   layer: Extract<ObservatoryLayer, "bairro" | "escola">,
   estadoUf: string | null,
 ) {
-  const basePath = layer === "bairro" ? "bairros" : "escolas";
+  if (!estadoUf) {
+    return [] as string[];
+  }
 
   return [
-    `/data/${basePath}.json`,
-    ...(estadoUf ? [`/data/${basePath}/${estadoUf}.json`] : []),
+    `/data/${layer === "bairro" ? "bairros" : "escolas"}/${estadoUf}.json`,
+    `/data/${layer === "bairro" ? "bairros" : "escolas"}.json`,
   ];
 }
 
 function buildMunicipalityFallbackCandidates(estadoUf: string | null) {
-  const code = estadoUf ? UF_TO_IBGE_STATE_CODE[estadoUf] : null;
+  if (!estadoUf) {
+    return [] as string[];
+  }
 
-  return [code ? `/data/geojs-${code}-mun.json` : ""].filter(Boolean);
+  const code = UF_TO_IBGE_STATE_CODE[estadoUf];
+  return [
+    `/data/municipios/${estadoUf}.json`,
+    code ? `/data/geojs-${code}-mun.json` : "",
+  ].filter(Boolean);
 }
 
 async function fetchStaticLayerCollection(
@@ -241,10 +249,8 @@ async function fetchStaticLayerCollection(
 async function fetchIbgeMunicipalities(
   estadoUf: string,
 ): Promise<GeoJSONFeatureCollection> {
-  const code = UF_TO_IBGE_STATE_CODE[estadoUf.toLowerCase()] || "25";
-
   const response = await fetch(
-    `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${code}?resolucao=5&formato=application/vnd.geo+json`,
+    `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${estadoUf.toUpperCase()}/municipios?formato=application/vnd.geo+json`,
   );
 
   if (!response.ok) {
@@ -252,11 +258,6 @@ async function fetchIbgeMunicipalities(
   }
 
   const rawCollection = (await response.json()) as RawGeoJSONCollection;
-
-  if (!rawCollection.features?.length || rawCollection.features.length <= 1) {
-    throw new Error("Malha estadual sem recorte municipal.");
-  }
-
   return normalizeCollection(rawCollection, "municipio");
 }
 
@@ -399,25 +400,10 @@ export function useMapLayers({
 
         if (!nextCollection && resolvedLayer === "bairro") {
           nextCollection = await fetchStaticLayerCollection("bairro", estadoUf);
-
-          if (!nextCollection || nextCollection.features.length === 0) {
-            nextCollection = await fetchMunicipalityCollection(estadoUf);
-          }
         }
 
         if (!nextCollection && resolvedLayer === "escola") {
           nextCollection = await fetchStaticLayerCollection("escola", estadoUf);
-
-          if (!nextCollection || nextCollection.features.length === 0) {
-            nextCollection = await fetchStaticLayerCollection(
-              "bairro",
-              estadoUf,
-            );
-          }
-
-          if (!nextCollection || nextCollection.features.length === 0) {
-            nextCollection = await fetchMunicipalityCollection(estadoUf);
-          }
         }
 
         if (!nextCollection) {
@@ -425,9 +411,14 @@ export function useMapLayers({
             resolvedLayer,
             currentBackendRecorteId,
           );
-          nextCollection =
-            remoteCollection ??
-            buildMockCollection(resolvedLayer, currentBackendRecorteId);
+          if (remoteCollection) {
+            nextCollection = remoteCollection;
+          } else {
+            nextCollection = buildMockCollection(
+              resolvedLayer,
+              currentBackendRecorteId,
+            );
+          }
         }
 
         cacheRef.current[currentCacheKey] = nextCollection;

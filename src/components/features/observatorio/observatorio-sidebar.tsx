@@ -216,6 +216,112 @@ export function ObservatorioSidebar({
         </div>
       </div>
 
+      <div className="mt-7 rounded-lg border border-dashed border-cyan-300/70 bg-cyan-50/60 p-4 shadow-sm dark:border-cyan-900/50 dark:bg-cyan-950/20">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-cyan-700 dark:text-cyan-300">
+              🧩 Filtros futuros
+            </p>
+            <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+              Apenas placeholder visual para prototipação.
+            </p>
+          </div>
+          <span className="rounded-full border border-cyan-300 bg-white px-2 py-0.5 text-[10px] font-medium text-cyan-700 dark:border-cyan-900/60 dark:bg-zinc-950 dark:text-cyan-300">
+            Sidebar
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
+                  Filtro por rede
+                </p>
+                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Municipal, estadual, privada
+                </p>
+              </div>
+              <span className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                Placeholder
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
+                Zona
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                  Urbana
+                </span>
+                <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                  Rural
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
+                Ano
+              </p>
+              <div className="mt-2 h-2 rounded-full bg-zinc-200 dark:bg-zinc-700">
+                <div className="h-2 w-3/4 rounded-full bg-cyan-500/80" />
+              </div>
+              <p className="mt-2 text-[10px] text-zinc-500 dark:text-zinc-400">
+                Slider visual para recorte temporal.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
+              Infraestrutura
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {[
+                "Internet",
+                "Biblioteca",
+                "Lab. informática",
+                "Acessibilidade",
+              ].map((label) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-2 py-2 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950/50 dark:text-zinc-400"
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
+              Indicadores
+            </p>
+            <div className="mt-2 space-y-2">
+              {[
+                "Taxa de abandono",
+                "Taxa de reprovação",
+                "Docentes com superior",
+              ].map((label) => (
+                <div key={label}>
+                  <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
+                    <span>{label}</span>
+                    <span>0% — 100%</span>
+                  </div>
+                  <div className="mt-1 h-2 rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div className="h-2 w-1/2 rounded-full bg-violet-500/70" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-7 rounded-lg border border-zinc-200/80 bg-gradient-to-br from-zinc-50 to-white p-4 shadow-sm dark:border-zinc-700/50 dark:from-zinc-900/50 dark:to-zinc-900/30">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-700 dark:text-zinc-200">
           ⚡ Status do Sistema

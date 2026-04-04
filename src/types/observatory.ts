@@ -13,6 +13,10 @@ export type ObservatorySelection = {
   kind: ObservatoryLayer;
   subtitle: string;
   metrics?: Array<{ label: string; value: string }>;
+  sections?: Array<{
+    title: string;
+    rows: Array<{ label: string; value: string }>;
+  }>;
 };
 
 export type SearchSuggestionKind =

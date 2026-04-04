@@ -8,7 +8,9 @@ import Map, {
   type MapLayerMouseEvent,
   type MapRef,
 } from "react-map-gl/maplibre";
+import type { StyleSpecification } from "maplibre-gl";
 import { useMapLayers } from "@/hooks/use-map-layers";
+import { ObservatorioMapTooltip } from "@/components/features/observatorio/observatorio-map-tooltip";
 import {
   LAYER_STYLES,
   type GeoJSONFeature,
@@ -55,137 +57,102 @@ type PointFeatureCollection = {
   features: PointFeature[];
 };
 
-type MapStyleId = "demo" | "light" | "dark" | "voyager";
+type HoverTooltipState = {
+  x: number;
+  y: number;
+  layer: ObservatoryLayer;
+  subtitle: string;
+  title: string;
+  selected: boolean;
+};
 
-type MapControlsState = {
+type MapStyleId = "demo" | "light" | "dark" | "voyager" | "satellite";
+type MapStyleValue = string | StyleSpecification;
+
+type MapVisualControls = {
   styleId: MapStyleId;
-  showHeatmap: boolean;
-  showPolygons: boolean;
-  showPoints: boolean;
   fillOpacity: number;
   pointScale: number;
-  enableDragPan: boolean;
-  enableScrollZoom: boolean;
-  enableHover: boolean;
-  lockRotation: boolean;
-  resetViewOnLayerChange: boolean;
 };
 
-const MAP_STYLE_OPTIONS: Array<{ id: MapStyleId; label: string; url: string }> =
-  [
-    {
-      id: "demo",
-      label: "Padrão",
-      url: "https://demotiles.maplibre.org/style.json",
-    },
-    {
-      id: "light",
-      label: "Claro",
-      url: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-    },
-    {
-      id: "dark",
-      label: "Escuro",
-      url: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-    },
-    {
-      id: "voyager",
-      label: "Voyager",
-      url: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-    },
-  ];
+type MapCardVisibilityState = {
+  info: boolean;
+  visual: boolean;
+  entities: boolean;
+};
 
-const MAP_CONTROLS_STORAGE_KEY = "observatorio.map.controls.v2";
+const SATELLITE_STYLE: StyleSpecification = {
+  version: 8,
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  sources: {
+    esri: {
+      type: "raster",
+      tiles: [
+        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution: "Tiles © Esri",
+    },
+  },
+  layers: [
+    {
+      id: "satellite",
+      type: "raster",
+      source: "esri",
+      minzoom: 0,
+      maxzoom: 22,
+    },
+  ],
+};
 
-const DEFAULT_MAP_CONTROLS: MapControlsState = {
-  styleId: "demo",
-  showHeatmap: false,
-  showPolygons: true,
-  showPoints: true,
+type MapStyleOption = {
+  id: MapStyleId;
+  label: string;
+  style: MapStyleValue;
+};
+
+const MAP_STYLE_OPTIONS: MapStyleOption[] = [
+  {
+    id: "demo",
+    label: "Padrão",
+    style: "https://demotiles.maplibre.org/style.json",
+  },
+  {
+    id: "light",
+    label: "Claro",
+    style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  },
+  {
+    id: "dark",
+    label: "Escuro",
+    style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  },
+  {
+    id: "voyager",
+    label: "Voyager",
+    style: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+  },
+  {
+    id: "satellite",
+    label: "Satélite",
+    style: SATELLITE_STYLE,
+  },
+];
+
+const DEFAULT_VISUAL_CONTROLS: MapVisualControls = {
+  styleId: "light",
   fillOpacity: 100,
   pointScale: 100,
-  enableDragPan: true,
-  enableScrollZoom: true,
-  enableHover: true,
-  lockRotation: true,
-  resetViewOnLayerChange: true,
 };
-
-function isMapStyleId(value: unknown): value is MapStyleId {
-  return (
-    typeof value === "string" &&
-    MAP_STYLE_OPTIONS.some((option) => option.id === value)
-  );
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function normalizeMapControls(
-  value: Partial<MapControlsState> | null | undefined,
-): MapControlsState {
-  if (!value) {
-    return DEFAULT_MAP_CONTROLS;
-  }
-
-  const normalized: MapControlsState = {
-    styleId: isMapStyleId(value.styleId)
-      ? value.styleId
-      : DEFAULT_MAP_CONTROLS.styleId,
-    showHeatmap:
-      typeof value.showHeatmap === "boolean"
-        ? value.showHeatmap
-        : DEFAULT_MAP_CONTROLS.showHeatmap,
-    showPolygons:
-      typeof value.showPolygons === "boolean"
-        ? value.showPolygons
-        : DEFAULT_MAP_CONTROLS.showPolygons,
-    showPoints:
-      typeof value.showPoints === "boolean"
-        ? value.showPoints
-        : DEFAULT_MAP_CONTROLS.showPoints,
-    fillOpacity:
-      typeof value.fillOpacity === "number"
-        ? clamp(value.fillOpacity, 0, 100)
-        : DEFAULT_MAP_CONTROLS.fillOpacity,
-    pointScale:
-      typeof value.pointScale === "number"
-        ? clamp(value.pointScale, 50, 220)
-        : DEFAULT_MAP_CONTROLS.pointScale,
-    enableDragPan:
-      typeof value.enableDragPan === "boolean"
-        ? value.enableDragPan
-        : DEFAULT_MAP_CONTROLS.enableDragPan,
-    enableScrollZoom:
-      typeof value.enableScrollZoom === "boolean"
-        ? value.enableScrollZoom
-        : DEFAULT_MAP_CONTROLS.enableScrollZoom,
-    enableHover:
-      typeof value.enableHover === "boolean"
-        ? value.enableHover
-        : DEFAULT_MAP_CONTROLS.enableHover,
-    lockRotation:
-      typeof value.lockRotation === "boolean"
-        ? value.lockRotation
-        : DEFAULT_MAP_CONTROLS.lockRotation,
-    resetViewOnLayerChange:
-      typeof value.resetViewOnLayerChange === "boolean"
-        ? value.resetViewOnLayerChange
-        : DEFAULT_MAP_CONTROLS.resetViewOnLayerChange,
-  };
-
-  if (!normalized.showPolygons && !normalized.showPoints) {
-    normalized.showPolygons = true;
-  }
-
-  return normalized;
-}
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection" as const,
   features: [],
 };
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
 
 function initialViewForLayer(layer: ObservatoryLayer): ViewState {
   if (layer === "escola") {
@@ -256,6 +223,62 @@ function getCentroid(feature: GeoJSONFeature): Point | null {
   return [totals.longitude / points.length, totals.latitude / points.length];
 }
 
+function getLayerSubtitle(layer: ObservatoryLayer, entityName: string) {
+  if (layer === "municipio") {
+    return `Limite municipal · ${entityName}`;
+  }
+
+  if (layer === "bairro") {
+    return `Limite de bairro · ${entityName}`;
+  }
+
+  return `Ponto escolar · ${entityName}`;
+}
+
+function resolveEntityFromFeature(
+  feature: NonNullable<MapLayerMouseEvent["features"]>[number],
+  entities: MapEntity[],
+) {
+  const entityId = String(feature.id ?? feature.properties?.id ?? "");
+  const normalizedEntityId = slugify(entityId);
+
+  return entities.find(
+    (item) =>
+      item.data.id === entityId ||
+      slugify(item.data.id) === normalizedEntityId ||
+      slugify(item.data.nome) === normalizedEntityId,
+  );
+}
+
+function resolveFeatureLayer(
+  feature: NonNullable<MapLayerMouseEvent["features"]>[number],
+  fallback: ObservatoryLayer,
+): ObservatoryLayer {
+  const rawLayer = String(feature.properties?.nivel ?? "");
+
+  if (
+    rawLayer === "municipio" ||
+    rawLayer === "bairro" ||
+    rawLayer === "escola"
+  ) {
+    return rawLayer;
+  }
+
+  return fallback;
+}
+
+function resolveFeatureTitle(
+  feature: NonNullable<MapLayerMouseEvent["features"]>[number],
+) {
+  const rawName =
+    feature.properties?.nome ??
+    feature.properties?.name ??
+    feature.properties?.description ??
+    feature.properties?.id;
+
+  return String(rawName ?? "Sem nome");
+}
+
 export function MapboxObservatorioMap({
   activeLayer,
   entities,
@@ -269,9 +292,17 @@ export function MapboxObservatorioMap({
   const mapRef = useRef<MapRef | null>(null);
   const previousActiveLayerRef = useRef(activeLayer);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [controlsOpen, setControlsOpen] = useState(false);
-  const [controls, setControls] =
-    useState<MapControlsState>(DEFAULT_MAP_CONTROLS);
+  const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(
+    null,
+  );
+  const [visualControls, setVisualControls] = useState<MapVisualControls>(
+    DEFAULT_VISUAL_CONTROLS,
+  );
+  const [collapsedCards, setCollapsedCards] = useState<MapCardVisibilityState>({
+    info: false,
+    visual: false,
+    entities: false,
+  });
   const [viewState, setViewState] = useState<ViewState>(() =>
     initialViewForLayer(activeLayer),
   );
@@ -294,112 +325,124 @@ export function MapboxObservatorioMap({
   const geojsonData = collection ?? EMPTY_COLLECTION;
   const mapStyleUrl = useMemo(() => {
     const style = MAP_STYLE_OPTIONS.find(
-      (option) => option.id === controls.styleId,
+      (option) => option.id === visualControls.styleId,
     );
-    return style?.url ?? MAP_STYLE_OPTIONS[0].url;
-  }, [controls.styleId]);
-  const pointScaleFactor = controls.pointScale / 100;
+
+    return style?.style ?? MAP_STYLE_OPTIONS[0].style;
+  }, [visualControls.styleId]);
+  const fillOpacityFactor = clamp(visualControls.fillOpacity / 100, 0.2, 1);
   const effectiveFillOpacity = clamp(
-    layerStyle.opacity * (controls.fillOpacity / 100),
-    0,
-    0.85,
+    Math.min(layerStyle.opacity, 0.2) * fillOpacityFactor,
+    0.04,
+    0.32,
   );
-  const interactiveLayerIds = useMemo(() => {
-    const list = [] as string[];
-
-    if (controls.showPolygons) {
-      list.push(ids.fill, ids.hoverFill, ids.selectedFill);
-    }
-
-    if (controls.showPoints) {
-      list.push(ids.points, ids.hoverPoint, ids.selectedPoint);
-    }
-
-    return list;
-  }, [
-    controls.showPoints,
-    controls.showPolygons,
-    ids.fill,
-    ids.hoverFill,
-    ids.hoverPoint,
-    ids.points,
-    ids.selectedFill,
-    ids.selectedPoint,
-  ]);
-
-  useEffect(() => {
-    try {
-      const rawValue = localStorage.getItem(MAP_CONTROLS_STORAGE_KEY);
-      if (!rawValue) {
-        return;
-      }
-
-      const parsed = JSON.parse(rawValue) as Partial<MapControlsState>;
-      setControls(normalizeMapControls(parsed));
-    } catch {
-      setControls(DEFAULT_MAP_CONTROLS);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(MAP_CONTROLS_STORAGE_KEY, JSON.stringify(controls));
-    } catch {
-      // silent: localStorage unavailable
-    }
-  }, [controls]);
+  const pointScaleFactor = clamp(visualControls.pointScale / 100, 0.7, 1.6);
+  const areAllCardsCollapsed =
+    collapsedCards.info && collapsedCards.visual && collapsedCards.entities;
 
   const heatmapData = useMemo<PointFeatureCollection>(() => {
     const features = geojsonData.features ?? [];
-    const sourceFeatures: PointFeature[] = features.flatMap(
-      (feature, index) => {
-        const coordinates =
-          feature.geometry.type === "Point"
-            ? feature.geometry.coordinates
-            : getCentroid(feature);
+    const fallbackPreviewPoints: Array<{
+      coordinates: Point;
+      id: string;
+      nome: string;
+      nivel: ObservatoryLayer;
+      intensity: number;
+    }> = [
+      {
+        id: "preview-recife",
+        nome: "Recife",
+        nivel: resolvedLayer,
+        coordinates: [-34.9011, -8.0476],
+        intensity: 1,
+      },
+      {
+        id: "preview-joao-pessoa",
+        nome: "João Pessoa",
+        nivel: resolvedLayer,
+        coordinates: [-34.8731, -7.1195],
+        intensity: 0.82,
+      },
+      {
+        id: "preview-campina-grande",
+        nome: "Campina Grande",
+        nivel: resolvedLayer,
+        coordinates: [-35.8811, -7.2291],
+        intensity: 0.68,
+      },
+      {
+        id: "preview-fortaleza",
+        nome: "Fortaleza",
+        nivel: resolvedLayer,
+        coordinates: [-38.5267, -3.7319],
+        intensity: 0.55,
+      },
+      {
+        id: "preview-natal",
+        nome: "Natal",
+        nivel: resolvedLayer,
+        coordinates: [-35.2099, -5.7793],
+        intensity: 0.5,
+      },
+    ];
 
-        if (!coordinates) {
-          return [];
-        }
+    const sourceFeatures: PointFeature[] =
+      features.length > 0
+        ? features.flatMap((feature, index) => {
+            const centroid = getCentroid(feature);
+            if (!centroid) {
+              return [];
+            }
 
-        const rawProperties = feature.properties as Record<string, unknown>;
-        const rawIdeb = rawProperties.ideb;
-        const intensity =
-          typeof rawIdeb === "number"
-            ? Math.max(0.35, Math.min(1, rawIdeb / 10))
-            : 0.5 + Math.abs(Math.sin(index)) * 0.5;
+            const rawProperties = feature.properties as Record<string, unknown>;
+            const rawIdeb = rawProperties.ideb;
+            const intensity =
+              typeof rawIdeb === "number"
+                ? Math.max(0.35, Math.min(1, rawIdeb / 10))
+                : Math.max(0.35, 1 - index * 0.08);
 
-        return [
-          {
+            return [
+              {
+                type: "Feature",
+                id: String(feature.id),
+                properties: {
+                  id: feature.properties.id,
+                  nome: feature.properties.nome,
+                  nivel: feature.properties.nivel,
+                  intensity,
+                },
+                geometry: {
+                  type: "Point",
+                  coordinates: centroid,
+                },
+              },
+            ];
+          })
+        : fallbackPreviewPoints.map((point) => ({
             type: "Feature",
-            id: String(feature.id),
+            id: point.id,
             properties: {
-              id: feature.properties.id,
-              nome: feature.properties.nome,
-              nivel: feature.properties.nivel,
-              intensity,
+              id: point.id,
+              nome: point.nome,
+              nivel: point.nivel,
+              intensity: point.intensity,
             },
             geometry: {
               type: "Point",
-              coordinates,
+              coordinates: point.coordinates,
             },
-          },
-        ];
-      },
-    );
+          }));
 
     return { type: "FeatureCollection", features: sourceFeatures };
-  }, [geojsonData]);
+  }, [geojsonData, resolvedLayer]);
 
   useEffect(() => {
     if (previousActiveLayerRef.current !== activeLayer) {
       previousActiveLayerRef.current = activeLayer;
-      if (controls.resetViewOnLayerChange) {
-        setViewState(initialViewForLayer(activeLayer));
-      }
+      setViewState(initialViewForLayer(activeLayer));
       setHoveredId(null);
     }
-  }, [activeLayer, controls.resetViewOnLayerChange]);
+  }, [activeLayer]);
 
   const handleFeatureClick = (event: MapLayerMouseEvent) => {
     const feature = event.features?.[0];
@@ -407,14 +450,7 @@ export function MapboxObservatorioMap({
       return;
     }
 
-    const entityId = String(feature.id ?? feature.properties?.id ?? "");
-    const normalizedEntityId = slugify(entityId);
-    const entity = entities.find(
-      (item) =>
-        item.data.id === entityId ||
-        slugify(item.data.id) === normalizedEntityId ||
-        slugify(item.data.nome) === normalizedEntityId,
-    );
+    const entity = resolveEntityFromFeature(feature, entities);
 
     if (entity) {
       onEntityClick(entity);
@@ -422,71 +458,53 @@ export function MapboxObservatorioMap({
   };
 
   const handleHover = (event: MapLayerMouseEvent) => {
-    if (!controls.enableHover) {
-      setHoveredId(null);
-      return;
-    }
-
     const feature = event.features?.[0];
     if (!feature) {
       setHoveredId(null);
+      setHoverTooltip(null);
       return;
     }
 
+    const entity = resolveEntityFromFeature(feature, entities);
     const entityId = String(feature.id ?? feature.properties?.id ?? "");
+    const layer = resolveFeatureLayer(feature, resolvedLayer);
+    const title = entity?.data.nome ?? resolveFeatureTitle(feature);
+
     setHoveredId(entityId || null);
-  };
 
-  const setControl = <K extends keyof MapControlsState>(
-    key: K,
-    value: MapControlsState[K],
-  ) => {
-    setControls((current) => {
-      const next = { ...current, [key]: value } as MapControlsState;
-
-      if (!next.showPolygons && !next.showPoints) {
-        if (key === "showPolygons") {
-          next.showPoints = true;
-        } else if (key === "showPoints") {
-          next.showPolygons = true;
-        }
-      }
-
-      return next;
+    setHoverTooltip({
+      x: event.point.x,
+      y: event.point.y,
+      layer,
+      subtitle: getLayerSubtitle(layer, title),
+      title,
+      selected: Boolean(entity && entity.data.id === selectedId),
     });
   };
 
-  const applyFocusPreset = (preset: "limites" | "heatmap") => {
-    if (preset === "limites") {
-      setViewState((current) => ({
-        ...current,
-        zoom: 6.2,
-      }));
+  const handleRecenter = () => {
+    setViewState(initialViewForLayer(resolvedLayer));
+  };
 
-      setControls((current) => ({
-        ...current,
-        showHeatmap: false,
-        showPolygons: true,
-        showPoints: false,
-        fillOpacity: 95,
-        pointScale: 100,
-      }));
-      return;
-    }
+  const handleResetVisual = () => {
+    setVisualControls(DEFAULT_VISUAL_CONTROLS);
+  };
 
-    setViewState((current) => ({
+  const toggleCard = (card: keyof MapCardVisibilityState) => {
+    setCollapsedCards((current) => ({
       ...current,
-      zoom: Math.max(current.zoom, 10),
+      [card]: !current[card],
     }));
+  };
 
-    setControls((current) => ({
-      ...current,
-      showHeatmap: true,
-      showPolygons: false,
-      showPoints: true,
-      fillOpacity: 40,
-      pointScale: 120,
-    }));
+  const toggleAllCards = () => {
+    const nextCollapsed = !areAllCardsCollapsed;
+
+    setCollapsedCards({
+      info: nextCollapsed,
+      visual: nextCollapsed,
+      entities: nextCollapsed,
+    });
   };
 
   return (
@@ -529,100 +547,107 @@ export function MapboxObservatorioMap({
           onMove={(event) => setViewState(event.viewState)}
           mapStyle={mapStyleUrl}
           attributionControl={false}
-          interactiveLayerIds={interactiveLayerIds}
+          interactiveLayerIds={[
+            ids.fill,
+            ids.points,
+            ids.hoverFill,
+            ids.hoverPoint,
+            ids.selectedFill,
+            ids.selectedPoint,
+          ]}
           onClick={handleFeatureClick}
           onMouseMove={handleHover}
-          onMouseLeave={() => setHoveredId(null)}
-          dragPan={controls.enableDragPan}
-          scrollZoom={controls.enableScrollZoom}
+          onMouseLeave={() => {
+            setHoveredId(null);
+            setHoverTooltip(null);
+          }}
+          dragPan
+          scrollZoom
           doubleClickZoom
-          dragRotate={!controls.lockRotation}
-          touchZoomRotate={!controls.lockRotation}
+          touchZoomRotate
           cursor={hoveredId || selectedId ? "pointer" : "grab"}
           style={{ width: "100%", height: "100%" }}
         >
           <NavigationControl position="bottom-right" visualizePitch={false} />
 
-          {controls.showHeatmap ? (
-            <Source
-              key={ids.heatSource}
-              id={ids.heatSource}
-              type="geojson"
-              data={heatmapData as never}
-            >
-              <Layer
-                id={ids.heatHalo}
-                type="heatmap"
-                paint={{
-                  "heatmap-weight": [
-                    "interpolate",
-                    ["linear"],
-                    ["get", "intensity"],
-                    0,
-                    0,
-                    1,
-                    1,
-                  ],
-                  "heatmap-intensity": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    0.6,
-                    9,
-                    1,
-                    13,
-                    1.4,
-                  ],
-                  "heatmap-radius": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    5,
-                    18,
-                    9,
-                    30,
-                    13,
-                    42,
-                  ],
-                  "heatmap-opacity": controls.showPolygons ? 0.3 : 0.85,
-                  "heatmap-color": [
-                    "interpolate",
-                    ["linear"],
-                    ["heatmap-density"],
-                    0,
-                    "rgba(255,255,255,0)",
-                    0.2,
-                    "rgba(120, 203, 255, 0.28)",
-                    0.4,
-                    "rgba(45, 212, 191, 0.48)",
-                    0.65,
-                    "rgba(168, 85, 247, 0.68)",
-                    1,
-                    "rgba(14, 165, 233, 0.9)",
-                  ],
-                }}
-              />
-              <Layer
-                id={ids.heat}
-                type="circle"
-                paint={{
-                  "circle-radius": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    8,
-                    5,
-                    13,
-                    10,
-                  ],
-                  "circle-color": "#ffffff",
-                  "circle-opacity": controls.showPolygons ? 0.1 : 0.18,
-                  "circle-blur": 0.8,
-                }}
-              />
-            </Source>
-          ) : null}
+          <Source
+            key={ids.heatSource}
+            id={ids.heatSource}
+            type="geojson"
+            data={heatmapData as never}
+          >
+            <Layer
+              id={ids.heatHalo}
+              type="heatmap"
+              paint={{
+                "heatmap-weight": [
+                  "interpolate",
+                  ["linear"],
+                  ["get", "intensity"],
+                  0,
+                  0,
+                  1,
+                  1,
+                ],
+                "heatmap-intensity": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  5,
+                  0.6,
+                  9,
+                  1,
+                  13,
+                  1.4,
+                ],
+                "heatmap-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  5,
+                  18,
+                  9,
+                  30,
+                  13,
+                  42,
+                ],
+                "heatmap-opacity": 0.85,
+                "heatmap-color": [
+                  "interpolate",
+                  ["linear"],
+                  ["heatmap-density"],
+                  0,
+                  "rgba(255,255,255,0)",
+                  0.2,
+                  "rgba(120, 203, 255, 0.28)",
+                  0.4,
+                  "rgba(45, 212, 191, 0.48)",
+                  0.65,
+                  "rgba(168, 85, 247, 0.68)",
+                  1,
+                  "rgba(14, 165, 233, 0.9)",
+                ],
+              }}
+            />
+            <Layer
+              id={ids.heat}
+              type="circle"
+              paint={{
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  8,
+                  5,
+                  13,
+                  10,
+                ],
+                "circle-color": "#ffffff",
+                "circle-opacity": 0.18,
+                "circle-blur": 0.8,
+              }}
+            />
+          </Source>
 
           <Source
             key={ids.source}
@@ -630,224 +655,243 @@ export function MapboxObservatorioMap({
             type="geojson"
             data={geojsonData as never}
           >
-            {controls.showPolygons ? (
-              <>
-                <Layer
-                  id={ids.fill}
-                  type="fill"
-                  filter={["!=", ["geometry-type"], "Point"]}
-                  paint={{
-                    "fill-color": [
-                      "interpolate",
-                      ["linear"],
-                      ["length", ["get", "nome"]],
-                      5,
-                      "#e0f2fe",
-                      12,
-                      "#0ea5e9",
-                      20,
-                      "#1e1b4b",
-                    ],
-                    "fill-opacity": effectiveFillOpacity,
-                  }}
-                />
-                <Layer
-                  id={ids.line}
-                  type="line"
-                  paint={{
-                    "line-color": "#1f2937",
-                    "line-width": 1.6,
-                    "line-opacity": 0.92,
-                  }}
-                  filter={["!=", ["geometry-type"], "Point"]}
-                />
-                <Layer
-                  id={ids.hoverFill}
-                  type="fill"
-                  filter={
-                    controls.enableHover && hoveredId
-                      ? [
-                          "all",
-                          ["!=", ["geometry-type"], "Point"],
-                          ["==", ["id"], hoveredId],
-                        ]
-                      : ["==", ["id"], "__none__"]
-                  }
-                  paint={{
-                    "fill-color": layerStyle.hoverColor,
-                    "fill-opacity": 0.52,
-                  }}
-                />
-                <Layer
-                  id={ids.hoverLine}
-                  type="line"
-                  filter={
-                    controls.enableHover && hoveredId
-                      ? [
-                          "all",
-                          ["!=", ["geometry-type"], "Point"],
-                          ["==", ["id"], hoveredId],
-                        ]
-                      : ["==", ["id"], "__none__"]
-                  }
-                  paint={{
-                    "line-color": layerStyle.selectedColor,
-                    "line-width": 2.5,
-                  }}
-                />
-                <Layer
-                  id={ids.selectedFill}
-                  type="fill"
-                  filter={
-                    selectedId
-                      ? [
-                          "all",
-                          ["!=", ["geometry-type"], "Point"],
-                          ["==", ["id"], selectedId],
-                        ]
-                      : ["==", ["id"], "__none__"]
-                  }
-                  paint={{
-                    "fill-color": layerStyle.selectedColor,
-                    "fill-opacity": 0.65,
-                  }}
-                />
-                <Layer
-                  id={ids.selectedLine}
-                  type="line"
-                  filter={
-                    selectedId
-                      ? [
-                          "all",
-                          ["!=", ["geometry-type"], "Point"],
-                          ["==", ["id"], selectedId],
-                        ]
-                      : ["==", ["id"], "__none__"]
-                  }
-                  paint={{
-                    "line-color": "#ffffff",
-                    "line-width": 3,
-                  }}
-                />
-              </>
-            ) : null}
-
-            {controls.showPoints ? (
-              <>
-                <Layer
-                  id={ids.points}
-                  type="circle"
-                  filter={["==", ["geometry-type"], "Point"]}
-                  paint={{
-                    "circle-radius": [
-                      "interpolate",
-                      ["linear"],
-                      ["zoom"],
-                      9,
-                      3.5 * pointScaleFactor,
-                      12,
-                      5.5 * pointScaleFactor,
-                      15,
-                      8 * pointScaleFactor,
-                    ],
-                    "circle-color": layerStyle.color,
-                    "circle-stroke-color": "#ffffff",
-                    "circle-stroke-width": 1.25,
-                    "circle-opacity": 0.92,
-                  }}
-                />
-                <Layer
-                  id={ids.hoverPoint}
-                  type="circle"
-                  filter={
-                    controls.enableHover && hoveredId
-                      ? [
-                          "all",
-                          ["==", ["geometry-type"], "Point"],
-                          ["==", ["id"], hoveredId],
-                        ]
-                      : ["==", ["id"], "__none__"]
-                  }
-                  paint={{
-                    "circle-radius": [
-                      "interpolate",
-                      ["linear"],
-                      ["zoom"],
-                      9,
-                      5 * pointScaleFactor,
-                      12,
-                      8 * pointScaleFactor,
-                      15,
-                      10 * pointScaleFactor,
-                    ],
-                    "circle-color": layerStyle.hoverColor,
-                    "circle-stroke-color": "#ffffff",
-                    "circle-stroke-width": 2,
-                    "circle-opacity": 1,
-                  }}
-                />
-                <Layer
-                  id={ids.selectedPoint}
-                  type="circle"
-                  filter={
-                    selectedId
-                      ? [
-                          "all",
-                          ["==", ["geometry-type"], "Point"],
-                          ["==", ["id"], selectedId],
-                        ]
-                      : ["==", ["id"], "__none__"]
-                  }
-                  paint={{
-                    "circle-radius": [
-                      "interpolate",
-                      ["linear"],
-                      ["zoom"],
-                      9,
-                      6 * pointScaleFactor,
-                      12,
-                      9 * pointScaleFactor,
-                      15,
-                      12 * pointScaleFactor,
-                    ],
-                    "circle-color": layerStyle.selectedColor,
-                    "circle-stroke-color": "#ffffff",
-                    "circle-stroke-width": 2.5,
-                    "circle-opacity": 1,
-                  }}
-                />
-              </>
-            ) : null}
+            <Layer
+              id={ids.fill}
+              type="fill"
+              filter={["!=", ["geometry-type"], "Point"]}
+              paint={{
+                "fill-color": layerStyle.color,
+                "fill-opacity": effectiveFillOpacity,
+              }}
+            />
+            <Layer
+              id={ids.points}
+              type="circle"
+              filter={["==", ["geometry-type"], "Point"]}
+              paint={{
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  9,
+                  3.5 * pointScaleFactor,
+                  12,
+                  5.5 * pointScaleFactor,
+                  15,
+                  8 * pointScaleFactor,
+                ],
+                "circle-color": layerStyle.color,
+                "circle-stroke-color": "#ffffff",
+                "circle-stroke-width": 1.25,
+                "circle-opacity": 0.92,
+              }}
+            />
+            <Layer
+              id={ids.line}
+              type="line"
+              paint={{
+                "line-color": layerStyle.hoverColor,
+                "line-width": 1.25,
+                "line-opacity": 0.85,
+              }}
+              filter={["!=", ["geometry-type"], "Point"]}
+            />
+            <Layer
+              id={ids.hoverFill}
+              type="fill"
+              filter={
+                hoveredId
+                  ? [
+                      "all",
+                      ["!=", ["geometry-type"], "Point"],
+                      ["==", ["get", "id"], hoveredId],
+                    ]
+                  : ["==", ["id"], "__none__"]
+              }
+              paint={{
+                "fill-color": layerStyle.hoverColor,
+                "fill-opacity": 0.52,
+              }}
+            />
+            <Layer
+              id={ids.hoverPoint}
+              type="circle"
+              filter={
+                hoveredId
+                  ? [
+                      "all",
+                      ["==", ["geometry-type"], "Point"],
+                      ["==", ["get", "id"], hoveredId],
+                    ]
+                  : ["==", ["id"], "__none__"]
+              }
+              paint={{
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  9,
+                  5 * pointScaleFactor,
+                  12,
+                  8 * pointScaleFactor,
+                  15,
+                  10 * pointScaleFactor,
+                ],
+                "circle-color": layerStyle.hoverColor,
+                "circle-stroke-color": "#ffffff",
+                "circle-stroke-width": 2,
+                "circle-opacity": 1,
+              }}
+            />
+            <Layer
+              id={ids.hoverLine}
+              type="line"
+              filter={
+                hoveredId
+                  ? [
+                      "all",
+                      ["!=", ["geometry-type"], "Point"],
+                      ["==", ["get", "id"], hoveredId],
+                    ]
+                  : ["==", ["id"], "__none__"]
+              }
+              paint={{
+                "line-color": layerStyle.selectedColor,
+                "line-width": 2.5,
+              }}
+            />
+            <Layer
+              id={ids.selectedFill}
+              type="fill"
+              filter={
+                selectedId
+                  ? [
+                      "all",
+                      ["!=", ["geometry-type"], "Point"],
+                      ["==", ["get", "id"], selectedId],
+                    ]
+                  : ["==", ["id"], "__none__"]
+              }
+              paint={{
+                "fill-color": layerStyle.selectedColor,
+                "fill-opacity": 0.65,
+              }}
+            />
+            <Layer
+              id={ids.selectedPoint}
+              type="circle"
+              filter={
+                selectedId
+                  ? [
+                      "all",
+                      ["==", ["geometry-type"], "Point"],
+                      ["==", ["get", "id"], selectedId],
+                    ]
+                  : ["==", ["id"], "__none__"]
+              }
+              paint={{
+                "circle-radius": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  9,
+                  6 * pointScaleFactor,
+                  12,
+                  9 * pointScaleFactor,
+                  15,
+                  12 * pointScaleFactor,
+                ],
+                "circle-color": layerStyle.selectedColor,
+                "circle-stroke-color": "#ffffff",
+                "circle-stroke-width": 2.5,
+                "circle-opacity": 1,
+              }}
+            />
+            <Layer
+              id={ids.selectedLine}
+              type="line"
+              filter={
+                selectedId
+                  ? [
+                      "all",
+                      ["!=", ["geometry-type"], "Point"],
+                      ["==", ["get", "id"], selectedId],
+                    ]
+                  : ["==", ["id"], "__none__"]
+              }
+              paint={{
+                "line-color": "#ffffff",
+                "line-width": 3,
+              }}
+            />
           </Source>
         </Map>
       </div>
 
-      <div className="absolute right-2 top-2 z-30 w-[18rem] rounded-xl border border-zinc-300/90 bg-white/95 p-2 text-xs shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90 sm:right-4 sm:top-4 sm:w-[20rem]">
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-semibold text-zinc-800 dark:text-zinc-100">
-            Controles do mapa
+      <div className="absolute right-2 top-2 z-30 flex gap-2 sm:right-4 sm:top-4">
+        <button
+          type="button"
+          onClick={toggleAllCards}
+          className="rounded-md border border-zinc-300/90 bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 shadow-sm backdrop-blur transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-100 dark:hover:bg-zinc-800"
+        >
+          {areAllCardsCollapsed ? "Expandir todos" : "Minimizar todos"}
+        </button>
+      </div>
+
+      <div className="absolute left-2 top-4 z-20 min-w-[12rem] rounded-lg border border-zinc-300/90 bg-white/90 px-2 py-2 text-xs text-zinc-700 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-200 sm:left-4 sm:top-4 sm:px-3 sm:py-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-semibold text-cyan-600 dark:text-cyan-400">
+            Mapa interativo
           </p>
           <button
             type="button"
-            onClick={() => setControlsOpen((value) => !value)}
-            className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            onClick={() => toggleCard("info")}
+            className="rounded border border-zinc-300 px-2 py-0.5 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
-            {controlsOpen ? "Ocultar" : "Mostrar"}
+            {collapsedCards.info ? "Expandir" : "Minimizar"}
+          </button>
+        </div>
+        {!collapsedCards.info ? (
+          <>
+            <p className="mt-0.5 text-[11px] sm:text-xs">
+              Camada: {resolvedLayer}
+            </p>
+            <p className="mt-1 text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
+              Features: {collection?.features.length ?? 0}
+            </p>
+          </>
+        ) : null}
+      </div>
+
+      <div className="absolute right-2 top-16 z-20 w-72 rounded-xl border border-zinc-300/90 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90 sm:right-4 sm:top-16">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
+            Visual do mapa
+          </p>
+          <button
+            type="button"
+            onClick={() => toggleCard("visual")}
+            className="rounded border border-zinc-300 px-2 py-0.5 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            {collapsedCards.visual ? "Expandir" : "Minimizar"}
           </button>
         </div>
 
-        {controlsOpen ? (
-          <div className="mt-2 space-y-3">
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {!collapsedCards.visual ? (
+          <>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
                 Estilo base
               </span>
               <select
-                value={controls.styleId}
+                value={visualControls.styleId}
                 onChange={(event) =>
-                  setControl("styleId", event.target.value as MapStyleId)
+                  setVisualControls((current) => ({
+                    ...current,
+                    styleId: event.target.value as MapStyleId,
+                  }))
                 }
-                className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
               >
                 {MAP_STYLE_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>
@@ -857,219 +901,126 @@ export function MapboxObservatorioMap({
               </select>
             </label>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => applyFocusPreset("limites")}
-                className="rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-              >
-                Foco em limites
-              </button>
-              <button
-                type="button"
-                onClick={() => applyFocusPreset("heatmap")}
-                className="rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-              >
-                Foco em heatmap
-              </button>
-
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={controls.showHeatmap}
-                  onChange={(event) =>
-                    setControl("showHeatmap", event.target.checked)
-                  }
-                />
-                <span>Heatmap</span>
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={controls.showPolygons}
-                  onChange={(event) =>
-                    setControl("showPolygons", event.target.checked)
-                  }
-                />
-                <span>Polígonos</span>
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={controls.showPoints}
-                  onChange={(event) =>
-                    setControl("showPoints", event.target.checked)
-                  }
-                />
-                <span>Pontos</span>
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={controls.enableHover}
-                  onChange={(event) =>
-                    setControl("enableHover", event.target.checked)
-                  }
-                />
-                <span>Hover</span>
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-1 block text-[11px] text-zinc-500 dark:text-zinc-400">
-                Opacidade dos polígonos ({controls.fillOpacity}%)
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+                Opacidade dos limites ({visualControls.fillOpacity}%)
               </span>
               <input
                 type="range"
-                min={0}
+                min={20}
                 max={100}
-                value={controls.fillOpacity}
+                value={visualControls.fillOpacity}
                 onChange={(event) =>
-                  setControl("fillOpacity", Number(event.target.value))
+                  setVisualControls((current) => ({
+                    ...current,
+                    fillOpacity: Number(event.target.value),
+                  }))
                 }
                 className="w-full"
               />
             </label>
 
-            <label className="block">
-              <span className="mb-1 block text-[11px] text-zinc-500 dark:text-zinc-400">
-                Escala dos pontos ({controls.pointScale}%)
+            <label className="mt-3 block">
+              <span className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
+                Tamanho dos pontos ({visualControls.pointScale}%)
               </span>
               <input
                 type="range"
-                min={50}
-                max={220}
-                value={controls.pointScale}
+                min={70}
+                max={160}
+                value={visualControls.pointScale}
                 onChange={(event) =>
-                  setControl("pointScale", Number(event.target.value))
+                  setVisualControls((current) => ({
+                    ...current,
+                    pointScale: Number(event.target.value),
+                  }))
                 }
                 className="w-full"
               />
             </label>
 
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={controls.enableDragPan}
-                  onChange={(event) =>
-                    setControl("enableDragPan", event.target.checked)
-                  }
-                />
-                <span>Arrastar</span>
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={controls.enableScrollZoom}
-                  onChange={(event) =>
-                    setControl("enableScrollZoom", event.target.checked)
-                  }
-                />
-                <span>Scroll zoom</span>
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={controls.lockRotation}
-                  onChange={(event) =>
-                    setControl("lockRotation", event.target.checked)
-                  }
-                />
-                <span>Travar rotação</span>
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-zinc-300 px-2 py-1.5 dark:border-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={controls.resetViewOnLayerChange}
-                  onChange={(event) =>
-                    setControl("resetViewOnLayerChange", event.target.checked)
-                  }
-                />
-                <span>Reset por camada</span>
-              </label>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleRecenter}
+                className="rounded-md border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                Centralizar
+              </button>
+              <button
+                type="button"
+                onClick={handleResetVisual}
+                className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-2 py-1.5 text-xs font-medium text-cyan-700 transition hover:bg-cyan-500/20 dark:border-cyan-600 dark:text-cyan-300"
+              >
+                Reset visual
+              </button>
             </div>
+          </>
+        ) : null}
+      </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setViewState(initialViewForLayer(resolvedLayer))}
-                className="rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-              >
-                Recentrar
-              </button>
-              <button
-                type="button"
-                onClick={() => setControls(DEFAULT_MAP_CONTROLS)}
-                className="rounded-md border border-cyan-400 bg-cyan-500/10 px-2 py-1.5 text-[11px] font-medium text-cyan-700 hover:bg-cyan-500/20 dark:border-cyan-600 dark:text-cyan-300"
-              >
-                Resetar painel
-              </button>
-            </div>
+      <div className="absolute inset-x-2 bottom-2 z-20 rounded-xl border border-zinc-300/90 bg-white/90 p-2 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 sm:inset-x-4 sm:bottom-4 sm:p-3 md:inset-x-auto md:right-4 md:w-[28rem]">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400 sm:text-xs">
+            Camada {resolvedLayer} · {collection?.features.length ?? 0} features
+          </p>
+          <button
+            type="button"
+            onClick={() => toggleCard("entities")}
+            className="rounded border border-zinc-300 px-2 py-0.5 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            {collapsedCards.entities ? "Expandir" : "Minimizar"}
+          </button>
+        </div>
+
+        {!collapsedCards.entities ? (
+          <div className="mt-2 max-h-40 space-y-1 overflow-auto sm:max-h-48">
+            {entities.length === 0 ? (
+              <p className="rounded-md border border-dashed border-zinc-300 px-2 py-2 text-[12px] text-zinc-600 dark:border-zinc-700 dark:text-zinc-300 sm:px-3 sm:text-sm">
+                Nenhuma entidade no recorte.
+              </p>
+            ) : (
+              <div className="grid gap-1">
+                {entities.map((entity) => {
+                  const entityId = entity.data.id;
+                  const isSelected = entityId === selectedId;
+                  const isHovered = entityId === hoveredId;
+
+                  return (
+                    <button
+                      key={entityId}
+                      type="button"
+                      onClick={() => onEntityClick(entity)}
+                      onMouseEnter={() => setHoveredId(entityId)}
+                      onMouseLeave={() => setHoveredId(null)}
+                      className={`rounded-md border px-2 py-1 text-left text-[12px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 sm:px-3 sm:py-2 sm:text-sm ${isSelected ? "border-cyan-500 bg-cyan-50 text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200" : isHovered ? "border-zinc-400 bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800" : "border-zinc-300 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"}`}
+                      aria-label={`Selecionar ${entity.data.nome}`}
+                    >
+                      <div className="font-medium">{entity.data.nome}</div>
+                      {entity.kind === "escola" &&
+                      typeof entity.data.ideb === "number" ? (
+                        <div className="text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
+                          IDEB: {entity.data.ideb.toFixed(1)}
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : null}
       </div>
 
-      <div className="absolute left-2 top-4 z-20 rounded-lg border border-zinc-300/90 bg-white/90 px-2 py-1 text-xs text-zinc-700 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-200 sm:left-4 sm:top-4 sm:px-3 sm:py-2">
-        <p className="font-semibold text-cyan-600 dark:text-cyan-400">
-          Mapa interativo
-        </p>
-        <p className="mt-0.5 text-[11px] sm:text-xs">Camada: {resolvedLayer}</p>
-        <p className="mt-1 text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
-          Features: {collection?.features.length ?? 0}
-        </p>
-      </div>
-
-      <div className="absolute inset-x-2 bottom-2 z-20 rounded-xl border border-zinc-300/90 bg-white/90 p-2 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 sm:inset-x-4 sm:bottom-4 sm:p-3 md:inset-x-auto md:right-4 md:w-[28rem]">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400 sm:text-xs">
-          Camada {resolvedLayer} · {collection?.features.length ?? 0} features
-        </p>
-        <div className="mt-2 max-h-40 space-y-1 overflow-auto sm:max-h-48">
-          {entities.length === 0 ? (
-            <p className="rounded-md border border-dashed border-zinc-300 px-2 py-2 text-[12px] text-zinc-600 dark:border-zinc-700 dark:text-zinc-300 sm:px-3 sm:text-sm">
-              Nenhuma entidade no recorte.
-            </p>
-          ) : (
-            <div className="grid gap-1">
-              {entities.map((entity) => {
-                const entityId = entity.data.id;
-                const isSelected = entityId === selectedId;
-                const isHovered = entityId === hoveredId;
-
-                return (
-                  <button
-                    key={entityId}
-                    type="button"
-                    onClick={() => onEntityClick(entity)}
-                    onMouseEnter={() => setHoveredId(entityId)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    className={`rounded-md border px-2 py-1 text-left text-[12px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 sm:px-3 sm:py-2 sm:text-sm ${isSelected ? "border-cyan-500 bg-cyan-50 text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200" : isHovered ? "border-zinc-400 bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800" : "border-zinc-300 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"}`}
-                    aria-label={`Selecionar ${entity.data.nome}`}
-                  >
-                    <div className="font-medium">{entity.data.nome}</div>
-                    {entity.kind === "escola" &&
-                    typeof entity.data.ideb === "number" ? (
-                      <div className="text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
-                        IDEB: {entity.data.ideb.toFixed(1)}
-                      </div>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="pointer-events-none absolute right-2 top-20 z-10 rounded-lg border border-zinc-300/80 bg-white/80 px-3 py-2 text-[11px] text-zinc-700 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/75 dark:text-zinc-200 sm:right-4 sm:top-24 sm:px-4 sm:py-3 sm:text-xs">
-        <p className="font-semibold text-cyan-600 dark:text-cyan-400">
-          Preview simulado
-        </p>
-        <p className="mt-0.5 max-w-[16rem] leading-snug">
-          Arraste, dê zoom e explore. As camadas reais entram pelo hook e só
-          caem em mock se a fonte falhar.
-        </p>
-      </div>
+      <ObservatorioMapTooltip
+        visible={Boolean(hoverTooltip)}
+        x={hoverTooltip?.x ?? 0}
+        y={hoverTooltip?.y ?? 0}
+        layer={hoverTooltip?.layer ?? resolvedLayer}
+        subtitle={hoverTooltip?.subtitle ?? ""}
+        title={hoverTooltip?.title ?? ""}
+        selected={hoverTooltip?.selected}
+      />
 
       <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-violet-500/10" />
     </section>

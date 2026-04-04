@@ -49,7 +49,7 @@ export function ObservatorioDetailPanel({
 
       <aside
         aria-label="Painel de detalhes"
-        className={`fixed bottom-0 right-0 top-auto z-[60] w-full border-t border-zinc-300 bg-white/95 p-3 shadow-xl backdrop-blur transition-transform duration-200 dark:border-zinc-700 dark:bg-zinc-900/95 sm:top-0 sm:w-[22rem] sm:border-l sm:border-t-0 sm:p-4 ${
+        className={`fixed bottom-0 right-0 top-auto z-[60] max-h-[92dvh] w-full overflow-y-auto border-t border-zinc-300 bg-white/95 p-3 shadow-xl backdrop-blur transition-transform duration-200 dark:border-zinc-700 dark:bg-zinc-900/95 sm:top-0 sm:max-h-[100dvh] sm:w-[22rem] sm:border-l sm:border-t-0 sm:p-4 ${
           isOpen
             ? "translate-y-0 sm:translate-x-0"
             : "translate-y-[105%] sm:translate-x-[105%]"
@@ -95,6 +95,30 @@ export function ObservatorioDetailPanel({
                 </span>
                 <strong className="truncate">{metric.value}</strong>
               </div>
+            ))}
+
+            {selection.sections?.map((section) => (
+              <section
+                key={section.title}
+                className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-950/70 sm:p-3"
+              >
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-600 dark:text-zinc-300">
+                  {section.title}
+                </h3>
+                <div className="mt-2 space-y-1.5">
+                  {section.rows.map((row) => (
+                    <div
+                      key={`${section.title}-${row.label}`}
+                      className="flex items-center justify-between gap-2 text-[12px] sm:text-sm"
+                    >
+                      <span className="text-zinc-600 dark:text-zinc-300">
+                        {row.label}
+                      </span>
+                      <strong className="text-right">{row.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         ) : (

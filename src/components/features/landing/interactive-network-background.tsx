@@ -223,10 +223,10 @@ export function InteractiveNetworkBackground() {
       ref={containerRef}
       className="pointer-events-none absolute inset-0 z-0 w-full h-full"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(34,211,238,0.16),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(139,92,246,0.16),transparent_45%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(34,211,238,0.24),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(139,92,246,0.22),transparent_45%)] dark:bg-[radial-gradient(circle_at_20%_25%,rgba(34,211,238,0.32),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(139,92,246,0.30),transparent_45%)]" />
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full opacity-80"
+        className="absolute inset-0 h-full w-full opacity-95 dark:opacity-100"
         aria-hidden
       />
     </div>
