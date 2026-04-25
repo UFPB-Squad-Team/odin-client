@@ -1,3 +1,37 @@
 {
-  "extends": ["next/core-web-vitals", "next/typescript"]
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "import/no-restricted-paths": [
+      "error",
+      {
+        "zones": [
+          {
+            "target": "./src/core",
+            "from": "./src/modules",
+            "message": "[ARCH] Core não pode depender de módulos. Mova o código compartilhado para src/core/."
+          },
+          {
+            "target": "./src/core",
+            "from": "./src/shell",
+            "message": "[ARCH] Core não pode depender do Shell. Mova o código compartilhado para src/core/."
+          },
+          {
+            "target": "./src/shell",
+            "from": "./src/modules",
+            "message": "[ARCH] Shell não pode importar módulos diretamente. Use getModule() ou listModules() do ModuleRegistry."
+          },
+          {
+            "target": "./src/modules/educacao",
+            "from": "./src/modules/socioeconomico",
+            "message": "[ARCH] Módulos não podem depender de outros módulos. Use src/core/ para código compartilhado."
+          },
+          {
+            "target": "./src/modules/socioeconomico",
+            "from": "./src/modules/educacao",
+            "message": "[ARCH] Módulos não podem depender de outros módulos. Use src/core/ para código compartilhado."
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ObservatorioShell } from "@/components/features/observatorio/observatorio-shell";
+import { ObservatorioShell } from "@/shell/components/observatorio-shell";
 
 function ObservatorioFallback() {
   return (
