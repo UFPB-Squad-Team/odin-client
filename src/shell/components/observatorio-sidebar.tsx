@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { SearchableCombobox } from "@/shell/components/searchable-combobox";
 import { ModuleTabSidebar } from "@/shell/components/module-tab-sidebar";
 import type { Bairro, Estado, Municipio } from "@/core/types/territory";
 import type { ObservatoryLayer } from "@/core/types/territory";
-import type { SearchSuggestion, ShellContextType } from "@/core/types/shell";
+import type { ShellContextType } from "@/core/types/shell";
 
 type SidebarProps = {
   activeLayer: ObservatoryLayer;
@@ -13,22 +13,13 @@ type SidebarProps = {
   bairros: Bairro[];
   estadoId: string | null;
   estados: Estado[];
-  loading: {
-    estados: boolean;
-    municipios: boolean;
-    bairros: boolean;
-    escolas: boolean;
-  };
   municipioId: string | null;
   municipios: Municipio[];
   onLayerChange: (layer: ObservatoryLayer) => void;
   onSetBairro: (bairroId: string | null) => void;
   onSetEstado: (estadoId: string | null) => void;
   onSetMunicipio: (municipioId: string | null) => void;
-  onApplySuggestion: (suggestion: SearchSuggestion) => void;
-  searchSuggestions: (query: string) => SearchSuggestion[];
   sidebarCollapsed: boolean;
-  // Módulo ativo — passado para o ModuleTabSidebar
   shellContext?: ShellContextType;
   activeIndicatorId?: string | null;
   onIndicatorChange?: (indicatorId: string | null) => void;
@@ -40,349 +31,190 @@ const LAYERS: Array<{ id: ObservatoryLayer; label: string }> = [
   { id: "escola", label: "Escola" },
 ];
 
+const MIN_WIDTH = 300;
+const MAX_WIDTH = 550;
+const DEFAULT_WIDTH = 340;
+const STORAGE_KEY = "odin-sidebar-width";
+
 export function ObservatorioSidebar({
   activeLayer,
   bairroId,
   bairros,
   estadoId,
   estados,
-  loading,
   municipioId,
   municipios,
   onLayerChange,
   onSetBairro,
   onSetEstado,
   onSetMunicipio,
-  onApplySuggestion,
-  searchSuggestions,
   sidebarCollapsed,
   shellContext,
   activeIndicatorId = null,
   onIndicatorChange,
 }: SidebarProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSuggestionLabel, setSelectedSuggestionLabel] = useState<
-    string | null
-  >(null);
-  const smartSuggestions = useMemo(
-    () => searchSuggestions(searchQuery),
-    [searchQuery, searchSuggestions],
-  );
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [isDragging, setIsDragging] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
-  const estadoOptions = estados.map((estado) => ({
-    id: estado.id,
-    label: estado.nome,
-  }));
-  const municipioOptions = municipios.map((municipio) => ({
-    id: municipio.id,
-    label: municipio.nome,
-  }));
-  const bairroOptions = bairros.map((bairro) => ({
-    id: bairro.id,
-    label: bairro.nome,
-  }));
+  useLayoutEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const n = parseInt(saved, 10);
+      if (!isNaN(n) && n >= MIN_WIDTH && n <= MAX_WIDTH) setSidebarWidth(n);
+    }
+  }, []);
 
-  return (
-    <aside
-      className={`border-b border-zinc-300/70 bg-white/90 backdrop-blur transition-all dark:border-zinc-800/70 dark:bg-zinc-900/70 md:border-b-0 md:border-r ${
-        sidebarCollapsed
-          ? "md:w-0 md:overflow-hidden md:p-0 md:opacity-0"
-          : "overflow-y-auto p-3 sm:p-4 md:w-auto md:overflow-y-auto md:p-6 md:opacity-100"
-      }`}
-    >
-      <div className="rounded-2xl border border-zinc-200/80 bg-gradient-to-br from-white to-zinc-50 px-4 py-4 shadow-sm dark:border-zinc-800/70 dark:from-zinc-900/80 dark:to-zinc-950/50 sm:px-5 sm:py-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-600 dark:text-cyan-400">
-          Painel de filtros
-        </p>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-          Explore território por estado, município, bairro e camada.
-        </p>
-        <p className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-500">
-          Busca inteligente, filtros em cascata e contexto salvo.
-        </p>
-      </div>
+  useEffect(() => {
+    if (!isDragging) return;
 
-      {/* Slot de módulo — abas dinâmicas geradas pelo ModuleRegistry */}
-      {shellContext && onIndicatorChange && (
-        <div className="mt-4 rounded-lg border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700/50 dark:bg-zinc-900/50 overflow-hidden">
-          <ModuleTabSidebar
-            shellContext={shellContext}
-            activeIndicatorId={activeIndicatorId}
-            onIndicatorChange={onIndicatorChange}
-            collapsed={sidebarCollapsed}
-          />
-        </div>
-      )}
+    const handleMouseMove = (e: MouseEvent) => {
+      window.requestAnimationFrame(() => {
+        const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
+        setSidebarWidth(newWidth);
+      });
+    };
 
-      <div className="mt-6 rounded-lg border border-zinc-200/80 bg-gradient-to-br from-zinc-50 to-white p-4 shadow-sm dark:border-zinc-700/50 dark:from-zinc-900/50 dark:to-zinc-900/30 sm:mt-7">
-        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-700 dark:text-zinc-200">
-          🔍 Busca Inteligente
-        </p>
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      localStorage.setItem(STORAGE_KEY, String(sidebarWidth));
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
 
-        <input
-          id="observatorio-smart-search"
-          aria-label="Buscar rua, bairro ou escola"
-          value={searchQuery}
-          onChange={(event) => {
-            setSearchQuery(event.target.value);
-            if (selectedSuggestionLabel) {
-              setSelectedSuggestionLabel(null);
-            }
-          }}
-          placeholder="Ex.: Av. Epitácio Pessoa"
-          className="mt-3 w-full rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-cyan-500/60 transition focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-        />
-        <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-          Dica: pressione <strong>/</strong> para focar a busca.
-        </p>
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
 
-        <div className="mt-2 max-h-36 space-y-1 overflow-auto">
-          {searchQuery.trim().length > 0 ? (
-            smartSuggestions.length > 0 ? (
-              <div className="grid gap-1">
-                {smartSuggestions.map((item) => (
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+  }, [isDragging, sidebarWidth]);
+
+  const estadoOptions = estados.map((e) => ({ id: e.id, label: e.nome }));
+  const municipioOptions = municipios.map((m) => ({ id: m.id, label: m.nome }));
+  const bairroOptions = bairros.map((b) => ({ id: b.id, label: b.nome }));
+
+return (
+    <>
+      <style>{`
+        .odin-scroll::-webkit-scrollbar { width: 6px; }
+        .odin-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        .odin-scroll::-webkit-scrollbar-thumb {
+          background: #06b6d4;
+          border-radius: 10px;
+        }
+        .odin-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #06b6d4 transparent;
+        }
+        /* Garante que nada dentro da sidebar seja selecionado durante o drag */
+        .dragging-active * {
+          user-select: none !important;
+          pointer-events: none !important;
+        }
+      `}</style>
+
+      <div
+        ref={sidebarRef}
+        className={`absolute left-0 top-0 bottom-0 z-[40] flex bg-zinc-950/95 backdrop-blur-md border-r border-zinc-800 transition-transform duration-300 ${
+          sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
+        } ${isDragging ? "dragging-active" : ""}`}
+        style={{ width: sidebarWidth }}
+      >
+        <div className="relative flex flex-col w-full h-full min-h-0">
+          {!sidebarCollapsed && (
+            <div
+              onMouseDown={() => setIsDragging(true)}
+              className={`absolute -right-1 top-0 w-2 h-full cursor-col-resize z-50 hover:bg-cyan-500/30 transition-colors ${
+                isDragging ? 'bg-cyan-500/50' : ''
+              }`}
+            />
+          )}
+
+          <aside className="odin-scroll flex-1 overflow-y-auto p-5 flex flex-col gap-5">
+            <div className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-500">Painel de Filtros</p>
+              <p className="text-xs text-zinc-400 mt-1">Explore território por estado, município, bairro e escola.</p>
+            </div>
+
+            {shellContext && onIndicatorChange && (
+              <div className="shrink-0">
+                <ModuleTabSidebar
+                  shellContext={shellContext}
+                  activeIndicatorId={activeIndicatorId}
+                  onIndicatorChange={onIndicatorChange}
+                  collapsed={sidebarCollapsed}
+                />
+              </div>
+            )}
+
+            <div className="shrink-0 flex flex-col gap-2 p-1">
+              <div className="flex items-center gap-2">
+                <span className="text-cyan-500 text-xs">🔍</span>
+                <label className="text-[10px] font-bold uppercase text-zinc-500 tracking-wider">Busca Inteligente</label>
+              </div>
+              <input
+                placeholder="Ex.: Av. Epitácio Pessoa"
+                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-cyan-500/50 transition-colors"
+              />
+              <p className="text-[9px] text-zinc-600">Dica: pressione / para focar a busca.</p>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <SearchableCombobox 
+                ariaLabel="Selecionar Estado"
+                label="ESTADO" 
+                value={estadoId} 
+                options={estadoOptions} 
+                onSelect={onSetEstado} 
+              />
+              <SearchableCombobox 
+                ariaLabel="Selecionar Município"
+                label="MUNICÍPIO" 
+                value={municipioId} 
+                options={municipioOptions} 
+                onSelect={onSetMunicipio} 
+                disabled={!estadoId} 
+              />
+              <SearchableCombobox 
+                ariaLabel="Selecionar Bairro"
+                label="BAIRRO" 
+                value={bairroId} 
+                options={bairroOptions} 
+                onSelect={onSetBairro} 
+                disabled={!municipioId} 
+              />
+            </div>
+
+            <div className="shrink-0 pt-4 border-t border-zinc-800/50 pb-6">
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                📍 Camada de Análise
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {LAYERS.map((layer) => (
                   <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      onApplySuggestion(item);
-                      setSelectedSuggestionLabel(item.label);
-                      setSearchQuery("");
-                    }}
-                    className="rounded-md border border-zinc-200 bg-white px-2.5 py-2 text-left text-xs text-zinc-700 transition hover:bg-cyan-50 hover:border-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-cyan-950/30"
+                    key={layer.id}
+                    onClick={() => onLayerChange(layer.id)}
+                    className={`py-2 text-[10px] font-bold rounded-lg border transition-all ${
+                      activeLayer === layer.id 
+                      ? "bg-cyan-600 border-cyan-500 text-white shadow-[0_0_10px_rgba(8,145,178,0.2)]" 
+                      : "bg-zinc-900/50 border-zinc-800 text-zinc-500 hover:border-zinc-700"
+                    }`}
                   >
-                    <strong className="font-medium">{item.label}</strong>
-                    <span className="ml-1 text-zinc-500 dark:text-zinc-400">
-                      {item.subtitle}
-                    </span>
+                    {layer.label}
                   </button>
                 ))}
               </div>
-            ) : (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Nenhuma sugestão encontrada.
-              </p>
-            )
-          ) : null}
-
-          {selectedSuggestionLabel ? (
-            <div className="mt-2 flex items-center justify-between rounded-md border border-cyan-300/80 bg-cyan-50 px-3 py-2 text-xs text-cyan-700 dark:border-cyan-900/60 dark:bg-cyan-950/40 dark:text-cyan-300">
-              <span>✓ {selectedSuggestionLabel}</span>
-              <button
-                type="button"
-                onClick={() => setSelectedSuggestionLabel(null)}
-                className="rounded px-2 py-0.5 transition hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:hover:bg-cyan-900/40"
-              >
-                ✕
-              </button>
             </div>
-          ) : null}
+          </aside>
         </div>
       </div>
-
-      <div className="mt-6 space-y-3.5 sm:mt-7 sm:space-y-4">
-        <SearchableCombobox
-          ariaLabel="Buscar e selecionar estado"
-          label="Estado"
-          value={estadoId}
-          options={estadoOptions}
-          onSelect={onSetEstado}
-          placeholder="Digite o estado"
-        />
-
-        <SearchableCombobox
-          ariaLabel="Buscar e selecionar município"
-          label="Município"
-          value={municipioId}
-          options={municipioOptions}
-          onSelect={onSetMunicipio}
-          placeholder="Digite o município"
-          disabled={!estadoId}
-        />
-
-        <SearchableCombobox
-          ariaLabel="Buscar e selecionar bairro"
-          label="Bairro"
-          value={bairroId}
-          options={bairroOptions}
-          onSelect={onSetBairro}
-          placeholder="Digite o bairro"
-          disabled={!municipioId}
-        />
-      </div>
-
-      <div className="mt-7 border-t border-zinc-200 pt-6 dark:border-zinc-700">
-        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-700 dark:text-zinc-200">
-          📍 Camada de Análise
-        </p>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {LAYERS.map((layer) => {
-            const active = layer.id === activeLayer;
-
-            return (
-              <button
-                key={layer.id}
-                type="button"
-                onClick={() => onLayerChange(layer.id)}
-                className={`rounded-lg px-3 py-2.5 text-xs font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 ${
-                  active
-                    ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/30"
-                    : "border border-zinc-300 text-zinc-700 hover:border-cyan-400 hover:text-cyan-600 dark:border-zinc-600 dark:text-zinc-200 dark:hover:border-cyan-500 dark:hover:bg-zinc-800"
-                }`}
-              >
-                {layer.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="mt-7 rounded-lg border border-dashed border-cyan-300/70 bg-cyan-50/60 p-4 shadow-sm dark:border-cyan-900/50 dark:bg-cyan-950/20">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-cyan-700 dark:text-cyan-300">
-              🧩 Filtros futuros
-            </p>
-            <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
-              Apenas placeholder visual para prototipação.
-            </p>
-          </div>
-          <span className="rounded-full border border-cyan-300 bg-white px-2 py-0.5 text-[10px] font-medium text-cyan-700 dark:border-cyan-900/60 dark:bg-zinc-950 dark:text-cyan-300">
-            Sidebar
-          </span>
-        </div>
-
-        <div className="mt-4 grid gap-3">
-          <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
-                  Filtro por rede
-                </p>
-                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                  Municipal, estadual, privada
-                </p>
-              </div>
-              <span className="rounded-md border border-zinc-200 bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                Placeholder
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
-                Zona
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                  Urbana
-                </span>
-                <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                  Rural
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
-                Ano
-              </p>
-              <div className="mt-2 h-2 rounded-full bg-zinc-200 dark:bg-zinc-700">
-                <div className="h-2 w-3/4 rounded-full bg-cyan-500/80" />
-              </div>
-              <p className="mt-2 text-[10px] text-zinc-500 dark:text-zinc-400">
-                Slider visual para recorte temporal.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
-              Infraestrutura
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {[
-                "Internet",
-                "Biblioteca",
-                "Lab. informática",
-                "Acessibilidade",
-              ].map((label) => (
-                <div
-                  key={label}
-                  className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-2 py-2 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950/50 dark:text-zinc-400"
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-zinc-200 bg-white/85 p-3 dark:border-zinc-700 dark:bg-zinc-900/80">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
-              Indicadores
-            </p>
-            <div className="mt-2 space-y-2">
-              {[
-                "Taxa de abandono",
-                "Taxa de reprovação",
-                "Docentes com superior",
-              ].map((label) => (
-                <div key={label}>
-                  <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
-                    <span>{label}</span>
-                    <span>0% — 100%</span>
-                  </div>
-                  <div className="mt-1 h-2 rounded-full bg-zinc-200 dark:bg-zinc-700">
-                    <div className="h-2 w-1/2 rounded-full bg-violet-500/70" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-7 rounded-lg border border-zinc-200/80 bg-gradient-to-br from-zinc-50 to-white p-4 shadow-sm dark:border-zinc-700/50 dark:from-zinc-900/50 dark:to-zinc-900/30">
-        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-700 dark:text-zinc-200">
-          ⚡ Status do Sistema
-        </p>
-        <ul className="mt-3 space-y-2 text-sm">
-          <li className="flex items-center justify-between">
-            <span className="text-zinc-600 dark:text-zinc-300">Estados</span>
-            <span
-              className={`text-xs font-semibold ${loading.estados ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}
-            >
-              {loading.estados ? "⟳ Carregando" : "✓ Pronto"}
-            </span>
-          </li>
-          <li className="flex items-center justify-between">
-            <span className="text-zinc-600 dark:text-zinc-300">Municípios</span>
-            <span
-              className={`text-xs font-semibold ${loading.municipios ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}
-            >
-              {loading.municipios ? "⟳ Carregando" : "✓ Pronto"}
-            </span>
-          </li>
-          <li className="flex items-center justify-between">
-            <span className="text-zinc-600 dark:text-zinc-300">Bairros</span>
-            <span
-              className={`text-xs font-semibold ${loading.bairros ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}
-            >
-              {loading.bairros ? "⟳ Carregando" : "✓ Pronto"}
-            </span>
-          </li>
-          <li className="flex items-center justify-between">
-            <span className="text-zinc-600 dark:text-zinc-300">Escolas</span>
-            <span
-              className={`text-xs font-semibold ${loading.escolas ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}
-            >
-              {loading.escolas ? "⟳ Carregando" : "✓ Pronto"}
-            </span>
-          </li>
-        </ul>
-      </div>
-      <div className="h-4 sm:h-6" />
-    </aside>
+    </>
   );
 }

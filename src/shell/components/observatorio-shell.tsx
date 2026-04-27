@@ -181,11 +181,11 @@ export function ObservatorioShell() {
     return () => { window.removeEventListener("keydown", onKeyDown); };
   }, [detailsOpen, setDetailsOpen, setSidebarCollapsed]);
 
-  return (
+ return (
     <ShellProvider value={shellContext}>
       <ModuleBootstrap />
-      <main className="grid h-screen w-screen grid-rows-[auto_1fr] overflow-hidden bg-zinc-50 text-zinc-900 transition-colors dark:bg-zinc-950 dark:text-zinc-100">
-        <header className="border-b border-zinc-200/80 bg-white/90 px-3 py-3 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/85 sm:px-4">
+      <main className="relative h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-900 transition-colors dark:text-zinc-100">
+        <header className="relative z-[50] border-b border-zinc-200/80 bg-white/90 px-3 py-3 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/85 sm:px-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
               <button
@@ -215,9 +215,8 @@ export function ObservatorioShell() {
           </div>
         </header>
 
-        <div className={`grid min-h-0 w-full grid-cols-1 transition-all duration-200 ${
-          sidebarCollapsed ? "md:grid-cols-[0_1fr]" : "md:grid-cols-[320px_1fr] lg:grid-cols-[360px_1fr]"
-        }`}>
+        <div className="relative h-[calc(100vh-65px)] w-full overflow-hidden">
+          
           <ObservatorioSidebar
             activeLayer={activeLayer}
             bairroId={filters.bairroId}
@@ -239,7 +238,8 @@ export function ObservatorioShell() {
             onIndicatorChange={setActiveIndicatorId}
           />
 
-          <div className="relative h-full min-h-0">
+          {/* O MAPA AGORA OCUPA 100% SEMPRE */}
+          <div className="absolute inset-0 z-[10]">
             <MapboxObservatorioMap
               activeLayer={activeLayer}
               entities={mapEntities}
@@ -250,15 +250,16 @@ export function ObservatorioShell() {
               municipioId={filters.municipioId}
               bairroId={filters.bairroId}
             />
-            <ObservatorioDetailPanel
-              isOpen={detailsOpen}
-              onClose={() => setDetailsOpen(false)}
-              selection={selected}
-              activeModuleId={activeModuleId}
-              shellContext={shellContext}
-              onNavigate={selectEntity}
-            />
           </div>
+
+          <ObservatorioDetailPanel
+            isOpen={detailsOpen}
+            onClose={() => setDetailsOpen(false)}
+            selection={selected}
+            activeModuleId={activeModuleId}
+            shellContext={shellContext}
+            onNavigate={selectEntity}
+          />
         </div>
       </main>
     </ShellProvider>
