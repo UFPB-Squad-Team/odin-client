@@ -100,7 +100,7 @@ export function ObservatorioSidebar({
   const municipioOptions = municipios.map((m) => ({ id: m.id, label: m.nome }));
   const bairroOptions = bairros.map((b) => ({ id: b.id, label: b.nome }));
 
-return (
+  return (
     <>
       <style>{`
         .odin-scroll::-webkit-scrollbar { width: 6px; }
@@ -113,7 +113,6 @@ return (
           scrollbar-width: thin;
           scrollbar-color: #06b6d4 transparent;
         }
-        /* Garante que nada dentro da sidebar seja selecionado durante o drag */
         .dragging-active * {
           user-select: none !important;
           pointer-events: none !important;
@@ -122,7 +121,7 @@ return (
 
       <div
         ref={sidebarRef}
-        className={`absolute left-0 top-0 bottom-0 z-[40] flex bg-zinc-950/95 backdrop-blur-md border-r border-zinc-800 transition-transform duration-300 ${
+        className={`absolute left-0 top-0 bottom-0 z-[40] flex bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-r border-zinc-200 dark:border-zinc-800 transition-transform duration-300 ${
           sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
         } ${isDragging ? "dragging-active" : ""}`}
         style={{ width: sidebarWidth }}
@@ -138,9 +137,9 @@ return (
           )}
 
           <aside className="odin-scroll flex-1 overflow-y-auto p-5 flex flex-col gap-5">
-            <div className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-500">Painel de Filtros</p>
-              <p className="text-xs text-zinc-400 mt-1">Explore território por estado, município, bairro e escola.</p>
+            <div className="shrink-0 rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-600 dark:text-cyan-500">Painel de Filtros</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">Explore território por estado, município, bairro e escola.</p>
             </div>
 
             {shellContext && onIndicatorChange && (
@@ -156,14 +155,14 @@ return (
 
             <div className="shrink-0 flex flex-col gap-2 p-1">
               <div className="flex items-center gap-2">
-                <span className="text-cyan-500 text-xs">🔍</span>
+                <span className="text-cyan-600 dark:text-cyan-500 text-xs">🔍</span>
                 <label className="text-[10px] font-bold uppercase text-zinc-500 tracking-wider">Busca Inteligente</label>
               </div>
               <input
                 placeholder="Ex.: Av. Epitácio Pessoa"
-                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-cyan-500/50 transition-colors"
+                className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-200 outline-none focus:border-cyan-500/50 transition-colors"
               />
-              <p className="text-[9px] text-zinc-600">Dica: pressione / para focar a busca.</p>
+              <p className="text-[9px] text-zinc-500 dark:text-zinc-600">Dica: pressione / para focar a busca.</p>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -192,7 +191,7 @@ return (
               />
             </div>
 
-            <div className="shrink-0 pt-4 border-t border-zinc-800/50 pb-6">
+            <div className="shrink-0 pt-4 border-t border-zinc-200 dark:border-zinc-800/50 pb-6">
               <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                 📍 Camada de Análise
               </p>
@@ -204,7 +203,7 @@ return (
                     className={`py-2 text-[10px] font-bold rounded-lg border transition-all ${
                       activeLayer === layer.id 
                       ? "bg-cyan-600 border-cyan-500 text-white shadow-[0_0_10px_rgba(8,145,178,0.2)]" 
-                      : "bg-zinc-900/50 border-zinc-800 text-zinc-500 hover:border-zinc-700"
+                      : "bg-zinc-100 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-500 hover:border-zinc-400 dark:hover:border-zinc-700"
                     }`}
                   >
                     {layer.label}

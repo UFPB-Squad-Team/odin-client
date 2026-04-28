@@ -10,13 +10,20 @@ export function LandingPage() {
   return (
     <main
       id="conteudo-principal"
-      className="min-h-screen overflow-x-clip bg-zinc-50 text-zinc-900 transition-colors dark:bg-zinc-950 dark:text-zinc-100"
+      className="relative min-h-screen bg-zinc-50 text-zinc-900 transition-colors dark:bg-zinc-950 dark:text-zinc-100"
     >
       <LandingNavbar />
       <LandingHero />
       <LandingWowFactor />
-      <LandingBentoFeatures />
-      <LandingGovernance />
+      
+      <div id="diferencial" className="scroll-mt-24">
+        <LandingBentoFeatures />
+      </div>
+
+      <div id="governanca" className="scroll-mt-24">
+        <LandingGovernance />
+      </div>
+
       <LandingCta />
       <LandingFooter />
     </main>

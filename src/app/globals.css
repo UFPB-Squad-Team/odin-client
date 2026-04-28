@@ -4,6 +4,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html {
+    scroll-behavior: smooth !important;
+  }
+}
+
 :root {
   --background: #f4f4f5;
   --foreground: #18181b;
