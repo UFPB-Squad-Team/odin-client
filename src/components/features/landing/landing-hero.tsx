@@ -5,7 +5,7 @@ import { PageContainer } from "@/components/layout/page-container";
 
 export function LandingHero() {
   return (
-    <section className="relative overflow-hidden py-16 sm:py-24 lg:py-32">
+    <section className="relative overflow-hidden py-16 sm:py-24 lg:py-32" id="tour-logo">
       <InteractiveNetworkBackground />
 
       <PageContainer className="relative z-10 flex flex-col justify-center">
