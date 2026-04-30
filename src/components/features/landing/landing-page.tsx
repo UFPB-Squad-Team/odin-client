@@ -5,6 +5,7 @@ import { LandingGovernance } from "@/components/features/landing/landing-governa
 import { LandingHero } from "@/components/features/landing/landing-hero";
 import { LandingNavbar } from "@/components/features/landing/landing-navbar";
 import { LandingWowFactor } from "@/components/features/landing/landing-wow-factor";
+import { LandingSources } from "@/components/features/landing/landing-sources";
 
 export function LandingPage() {
   return (
@@ -23,6 +24,8 @@ export function LandingPage() {
       <div id="governanca" className="scroll-mt-24">
         <LandingGovernance />
       </div>
+
+      <LandingSources />
 
       <LandingCta />
       <LandingFooter />
