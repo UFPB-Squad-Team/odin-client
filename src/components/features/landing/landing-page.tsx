@@ -6,7 +6,6 @@ import { LandingHero } from "@/components/features/landing/landing-hero";
 import { LandingNavbar } from "@/components/features/landing/landing-navbar";
 import { LandingWowFactor } from "@/components/features/landing/landing-wow-factor";
 import { LandingSources } from "@/components/features/landing/landing-sources";
-import TourProvider from "@/shell/components/tour/tour-provider";
 
 export function LandingPage() {
   return (
@@ -30,8 +29,6 @@ export function LandingPage() {
 
       <LandingCta />
       <LandingFooter />
-
-      <TourProvider />
     </main>
   );
 }
