@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ObservatorioDetailPanel } from "@/shell/components/observatorio-detail-panel";
 import { MapboxObservatorioMap } from "@/shell/components/mapbox-observatorio-map-v2";
 import { ObservatorioSidebar } from "@/shell/components/observatorio-sidebar";
+import { ShareLinkButton } from "@/shell/components/share-link-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ShellProvider } from "@/shell/context/shell-context";
 import { ModuleBootstrap } from "@/shell/components/module-bootstrap";
@@ -19,18 +20,128 @@ function isLayer(value: string | null): value is ObservatoryLayer {
   return value === "municipio" || value === "bairro" || value === "escola";
 }
 
+type MapViewState = {
+  longitude: number;
+  latitude: number;
+  zoom: number;
+};
+
+type MapStyleId = "demo" | "light" | "dark" | "voyager" | "satellite";
+
+type MapVisualControls = {
+  styleId: MapStyleId;
+  fillOpacity: number;
+  pointScale: number;
+};
+
+const DEFAULT_MAP_VISUAL_CONTROLS: MapVisualControls = {
+  styleId: "light",
+  fillOpacity: 100,
+  pointScale: 100,
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function initialViewForLayer(layer: ObservatoryLayer): MapViewState {
+  if (layer === "escola") {
+    return { longitude: -34.86, latitude: -7.12, zoom: 13.5 };
+  }
+
+  if (layer === "bairro") {
+    return { longitude: -34.86, latitude: -7.12, zoom: 9.5 };
+  }
+
+  return { longitude: -34.86, latitude: -7.12, zoom: 6.1 };
+}
+
+function isMapStyleId(value: string | null): value is MapStyleId {
+  return value === "demo" || value === "light" || value === "dark" || value === "voyager" || value === "satellite";
+}
+
+function parseNumber(value: string | null) {
+  if (value === null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readMapViewState(
+  searchParams: URLSearchParams,
+  fallbackLayer: ObservatoryLayer,
+): MapViewState {
+  const fallback = initialViewForLayer(fallbackLayer);
+  const longitude = parseNumber(searchParams.get("lng"));
+  const latitude = parseNumber(searchParams.get("lat"));
+  const zoom = parseNumber(searchParams.get("zoom"));
+
+  return {
+    longitude: longitude ?? fallback.longitude,
+    latitude: latitude ?? fallback.latitude,
+    zoom: clamp(zoom ?? fallback.zoom, 0, 22),
+  };
+}
+
+function readMapVisualControls(searchParams: URLSearchParams) {
+  const styleId = searchParams.get("style");
+  const fillOpacity = parseNumber(searchParams.get("fillOpacity"));
+  const pointScale = parseNumber(searchParams.get("pointScale"));
+
+  return {
+    styleId: isMapStyleId(styleId) ? styleId : DEFAULT_MAP_VISUAL_CONTROLS.styleId,
+    fillOpacity: clamp(fillOpacity ?? DEFAULT_MAP_VISUAL_CONTROLS.fillOpacity, 20, 100),
+    pointScale: clamp(pointScale ?? DEFAULT_MAP_VISUAL_CONTROLS.pointScale, 70, 160),
+  } satisfies MapVisualControls;
+}
+
+function buildShareableSearchParams(state: {
+  activeLayer: ObservatoryLayer;
+  activeModuleId: string | null;
+  bairroId: string | null;
+  estadoId: string | null;
+  fillOpacity: number;
+  latitude: number;
+  longitude: number;
+  mapStyleId: MapStyleId;
+  municipioId: string | null;
+  pointScale: number;
+  sidebarCollapsed: boolean;
+  zoom: number;
+}) {
+  const params = new URLSearchParams();
+  if (state.estadoId) params.set("estado", state.estadoId);
+  if (state.municipioId) params.set("municipio", state.municipioId);
+  if (state.bairroId) params.set("bairro", state.bairroId);
+  params.set("layer", state.activeLayer);
+  if (state.activeModuleId) params.set("modulo", state.activeModuleId);
+  if (state.sidebarCollapsed) params.set("sidebar", "collapsed");
+  params.set("lng", state.longitude.toFixed(6));
+  params.set("lat", state.latitude.toFixed(6));
+  params.set("zoom", state.zoom.toFixed(2));
+  params.set("style", state.mapStyleId);
+  params.set("fillOpacity", String(state.fillOpacity));
+  params.set("pointScale", String(state.pointScale));
+  return params;
+}
+
 export function ObservatorioShell() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const initializedRef = useRef(false);
+  const previousActiveLayerRef = useRef<ObservatoryLayer>("bairro");
 
   const [activeIndicatorId, setActiveIndicatorId] = useState<string | null>(null);
+  const [mapViewState, setMapViewState] = useState<MapViewState>(() =>
+    initialViewForLayer("bairro"),
+  );
+  const [mapVisualControls, setMapVisualControls] = useState<MapVisualControls>(
+    DEFAULT_MAP_VISUAL_CONTROLS,
+  );
 
   const {
     activeLayer,
     applyFilterPath,
-    applySuggestion,
     bairros,
     detailsOpen,
     disableBootstrapDefaults,
@@ -39,7 +150,6 @@ export function ObservatorioShell() {
     loading,
     mapEntities,
     municipios,
-    searchSuggestions,
     selected,
     selectEntity,
     setActiveLayer,
@@ -72,24 +182,40 @@ export function ObservatorioShell() {
 
     const queryLayer = searchParams.get("layer");
     const queryState = {
+      activeModuleId: searchParams.get("modulo"),
       bairroId: searchParams.get("bairro"),
       estadoId: searchParams.get("estado"),
       layer: isLayer(queryLayer) ? queryLayer : null,
       municipioId: searchParams.get("municipio"),
       sidebarCollapsed: searchParams.get("sidebar") === "collapsed",
+      viewState: readMapViewState(searchParams, isLayer(queryLayer) ? queryLayer : activeLayer),
+      visualControls: readMapVisualControls(searchParams),
     };
 
     const hasQueryState = Boolean(
-      queryState.estadoId || queryState.municipioId || queryState.bairroId ||
-      queryState.layer || searchParams.get("sidebar"),
+      queryState.activeModuleId ||
+        queryState.estadoId ||
+        queryState.municipioId ||
+        queryState.bairroId ||
+        queryState.layer ||
+        searchParams.get("sidebar") ||
+        searchParams.get("lng") ||
+        searchParams.get("lat") ||
+        searchParams.get("zoom") ||
+        searchParams.get("style") ||
+        searchParams.get("fillOpacity") ||
+        searchParams.get("pointScale"),
     );
 
     let storageState: {
+      activeModuleId?: string | null;
       bairroId?: string | null;
       estadoId?: string | null;
       layer?: ObservatoryLayer;
       municipioId?: string | null;
       sidebarCollapsed?: boolean;
+      viewState?: MapViewState;
+      visualControls?: MapVisualControls;
     } | null = null;
 
     if (!hasQueryState) {
@@ -97,18 +223,35 @@ export function ObservatorioShell() {
         const raw = window.localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw) as {
+            activeModuleId?: string | null;
             bairroId?: string | null;
             estadoId?: string | null;
             layer?: string;
             municipioId?: string | null;
             sidebarCollapsed?: boolean;
+            viewState?: Partial<MapViewState>;
+            visualControls?: Partial<MapVisualControls>;
           };
+          const parsedLayer = isLayer(parsed.layer ?? null) ? (parsed.layer as ObservatoryLayer) : undefined;
           storageState = {
+            activeModuleId: parsed.activeModuleId ?? null,
             bairroId: parsed.bairroId ?? null,
             estadoId: parsed.estadoId ?? null,
-            layer: isLayer(parsed.layer ?? null) ? (parsed.layer as ObservatoryLayer) : undefined,
+            layer: parsedLayer,
             municipioId: parsed.municipioId ?? null,
             sidebarCollapsed: Boolean(parsed.sidebarCollapsed),
+            viewState: {
+              longitude: parsed.viewState?.longitude ?? initialViewForLayer(parsedLayer ?? activeLayer).longitude,
+              latitude: parsed.viewState?.latitude ?? initialViewForLayer(parsedLayer ?? activeLayer).latitude,
+              zoom: clamp(parsed.viewState?.zoom ?? initialViewForLayer(parsedLayer ?? activeLayer).zoom, 0, 22),
+            },
+            visualControls: {
+              styleId: isMapStyleId(parsed.visualControls?.styleId ?? null)
+                ? parsed.visualControls!.styleId!
+                : DEFAULT_MAP_VISUAL_CONTROLS.styleId,
+              fillOpacity: clamp(parsed.visualControls?.fillOpacity ?? DEFAULT_MAP_VISUAL_CONTROLS.fillOpacity, 20, 100),
+              pointScale: clamp(parsed.visualControls?.pointScale ?? DEFAULT_MAP_VISUAL_CONTROLS.pointScale, 70, 160),
+            },
           };
         }
       } catch {
@@ -117,45 +260,132 @@ export function ObservatorioShell() {
     }
 
     const initial = hasQueryState
-      ? { bairroId: queryState.bairroId, estadoId: queryState.estadoId, layer: queryState.layer ?? undefined, municipioId: queryState.municipioId, sidebarCollapsed: queryState.sidebarCollapsed }
+      ? {
+          activeModuleId: queryState.activeModuleId ?? undefined,
+          bairroId: queryState.bairroId,
+          estadoId: queryState.estadoId,
+          layer: queryState.layer ?? undefined,
+          municipioId: queryState.municipioId,
+          sidebarCollapsed: queryState.sidebarCollapsed,
+          viewState: queryState.viewState,
+          visualControls: queryState.visualControls,
+        }
       : storageState;
 
     if (initial) {
       disableBootstrapDefaults();
+
+      previousActiveLayerRef.current = initial.layer ?? activeLayer;
       if (initial.layer) setActiveLayer(initial.layer);
+
+      if (initial.activeModuleId) {
+        setActiveModule(initial.activeModuleId);
+      }
+
       setSidebarCollapsed(Boolean(initial.sidebarCollapsed));
-      applyFilterPath({ bairroId: initial.bairroId, estadoId: initial.estadoId, municipioId: initial.municipioId });
+      applyFilterPath({
+        bairroId: initial.bairroId,
+        estadoId: initial.estadoId,
+        municipioId: initial.municipioId,
+      });
+
+      setMapViewState(
+        initial.viewState ?? initialViewForLayer(initial.layer ?? activeLayer),
+      );
+      setMapVisualControls(
+        initial.visualControls ?? DEFAULT_MAP_VISUAL_CONTROLS,
+      );
     }
 
     initializedRef.current = true;
-  }, [applyFilterPath, disableBootstrapDefaults, searchParams, setActiveLayer, setSidebarCollapsed]);
+  }, [
+    activeLayer,
+    applyFilterPath,
+    disableBootstrapDefaults,
+    searchParams,
+    setActiveLayer,
+    setActiveModule,
+    setSidebarCollapsed,
+  ]);
+
+  useEffect(() => {
+    if (!initializedRef.current) return;
+
+    if (previousActiveLayerRef.current === activeLayer) {
+      return;
+    }
+
+    previousActiveLayerRef.current = activeLayer;
+    setMapViewState(initialViewForLayer(activeLayer));
+  }, [activeLayer]);
 
   // Persiste em localStorage
   useEffect(() => {
     if (!initializedRef.current) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        activeLayer, bairroId: filters.bairroId, estadoId: filters.estadoId,
-        municipioId: filters.municipioId, sidebarCollapsed,
-      }));
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          activeLayer,
+          activeModuleId,
+          bairroId: filters.bairroId,
+          estadoId: filters.estadoId,
+          fillOpacity: mapVisualControls.fillOpacity,
+          layer: activeLayer,
+          municipioId: filters.municipioId,
+          pointScale: mapVisualControls.pointScale,
+          sidebarCollapsed,
+          viewState: mapViewState,
+          visualControls: mapVisualControls,
+        }),
+      );
     } catch { /* ignore */ }
-  }, [activeLayer, filters.bairroId, filters.estadoId, filters.municipioId, sidebarCollapsed]);
+  }, [
+    activeLayer,
+    activeModuleId,
+    filters.bairroId,
+    filters.estadoId,
+    filters.municipioId,
+    mapViewState,
+    mapVisualControls,
+    sidebarCollapsed,
+  ]);
 
   // Sincroniza URL
   useEffect(() => {
     if (!initializedRef.current) return;
-    const params = new URLSearchParams();
-    if (filters.estadoId) params.set("estado", filters.estadoId);
-    if (filters.municipioId) params.set("municipio", filters.municipioId);
-    if (filters.bairroId) params.set("bairro", filters.bairroId);
-    params.set("layer", activeLayer);
-    if (sidebarCollapsed) params.set("sidebar", "collapsed");
+    const params = buildShareableSearchParams({
+      activeLayer,
+      activeModuleId,
+      bairroId: filters.bairroId,
+      estadoId: filters.estadoId,
+      fillOpacity: mapVisualControls.fillOpacity,
+      latitude: mapViewState.latitude,
+      longitude: mapViewState.longitude,
+      mapStyleId: mapVisualControls.styleId,
+      municipioId: filters.municipioId,
+      pointScale: mapVisualControls.pointScale,
+      sidebarCollapsed,
+      zoom: mapViewState.zoom,
+    });
     const next = params.toString();
     const current = searchParams.toString();
     if (next !== current) {
       router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
     }
-  }, [activeLayer, filters.bairroId, filters.estadoId, filters.municipioId, pathname, router, searchParams, sidebarCollapsed]);
+  }, [
+    activeLayer,
+    activeModuleId,
+    filters.bairroId,
+    filters.estadoId,
+    filters.municipioId,
+    mapViewState,
+    mapVisualControls,
+    pathname,
+    router,
+    searchParams,
+    sidebarCollapsed,
+  ]);
 
   // Atalhos de teclado
   useEffect(() => {
@@ -180,6 +410,25 @@ export function ObservatorioShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => { window.removeEventListener("keydown", onKeyDown); };
   }, [detailsOpen, setDetailsOpen, setSidebarCollapsed]);
+
+  const buildShareUrl = () => {
+    const params = buildShareableSearchParams({
+      activeLayer,
+      activeModuleId,
+      bairroId: filters.bairroId,
+      estadoId: filters.estadoId,
+      fillOpacity: mapVisualControls.fillOpacity,
+      latitude: mapViewState.latitude,
+      longitude: mapViewState.longitude,
+      mapStyleId: mapVisualControls.styleId,
+      municipioId: filters.municipioId,
+      pointScale: mapVisualControls.pointScale,
+      sidebarCollapsed,
+      zoom: mapViewState.zoom,
+    });
+
+    return `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+  };
 
  return (
     <ShellProvider value={shellContext}>
@@ -207,6 +456,7 @@ export function ObservatorioShell() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ShareLinkButton getUrl={buildShareUrl} />
               <Link href="/" className="inline-flex items-center rounded-md border border-zinc-300 bg-white/90 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-200 dark:hover:bg-zinc-800">
                 Voltar
               </Link>
@@ -223,15 +473,12 @@ export function ObservatorioShell() {
             bairros={bairros}
             estadoId={filters.estadoId}
             estados={estados}
-            loading={loading}
             municipioId={filters.municipioId}
             municipios={municipios}
             onLayerChange={setActiveLayer}
-            onApplySuggestion={applySuggestion}
             onSetBairro={filters.setBairro}
             onSetEstado={filters.setEstado}
             onSetMunicipio={filters.setMunicipio}
-            searchSuggestions={searchSuggestions}
             sidebarCollapsed={sidebarCollapsed}
             shellContext={shellContext}
             activeIndicatorId={activeIndicatorId}
@@ -245,10 +492,16 @@ export function ObservatorioShell() {
               entities={mapEntities}
               isLoading={loading.escolas || loading.bairros || loading.municipios}
               onEntityClick={selectEntity}
+              onRecenter={() => setMapViewState(initialViewForLayer(activeLayer))}
+              onResetVisual={() => setMapVisualControls(DEFAULT_MAP_VISUAL_CONTROLS)}
+              onViewStateChange={setMapViewState}
+              onVisualControlsChange={setMapVisualControls}
               selectedId={selected?.id}
               estadoId={filters.estadoId}
               municipioId={filters.municipioId}
               bairroId={filters.bairroId}
+              viewState={mapViewState}
+              visualControls={mapVisualControls}
             />
           </div>
 

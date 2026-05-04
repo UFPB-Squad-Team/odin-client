@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Map, {
   Layer,
   NavigationControl,
   Source,
   type MapLayerMouseEvent,
-  type MapRef,
 } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
 import { useMapLayers } from "@/core/geospatial/use-map-layers";
@@ -19,8 +18,14 @@ type MapboxObservatorioMapProps = {
   activeLayer: ObservatoryLayer;
   entities: MapEntity[];
   isLoading: boolean;
+  viewState: ViewState;
+  visualControls: MapVisualControls;
+  onRecenter: () => void;
   selectedId?: string;
   onEntityClick: (entity: MapEntity) => void;
+  onViewStateChange: (viewState: ViewState) => void;
+  onVisualControlsChange: (controls: MapVisualControls) => void;
+  onResetVisual: () => void;
   estadoId?: string | null;
   municipioId?: string | null;
   bairroId?: string | null;
@@ -136,12 +141,6 @@ const MAP_STYLE_OPTIONS: MapStyleOption[] = [
   },
 ];
 
-const DEFAULT_VISUAL_CONTROLS: MapVisualControls = {
-  styleId: "light",
-  fillOpacity: 100,
-  pointScale: 100,
-};
-
 const EMPTY_COLLECTION = {
   type: "FeatureCollection" as const,
   features: [],
@@ -149,18 +148,6 @@ const EMPTY_COLLECTION = {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function initialViewForLayer(layer: ObservatoryLayer): ViewState {
-  if (layer === "escola") {
-    return { longitude: -34.86, latitude: -7.12, zoom: 13.5 };
-  }
-
-  if (layer === "bairro") {
-    return { longitude: -34.86, latitude: -7.12, zoom: 9.5 };
-  }
-
-  return { longitude: -34.86, latitude: -7.12, zoom: 6.1 };
 }
 
 function slugify(value: string) {
@@ -280,29 +267,27 @@ export function MapboxObservatorioMap({
   activeLayer,
   entities,
   isLoading,
+  viewState,
+  visualControls,
+  onRecenter,
+  onResetVisual,
   selectedId,
   onEntityClick,
+  onViewStateChange,
+  onVisualControlsChange,
   estadoId,
   municipioId,
   bairroId,
 }: MapboxObservatorioMapProps) {
-  const mapRef = useRef<MapRef | null>(null);
-  const previousActiveLayerRef = useRef(activeLayer);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(
     null,
-  );
-  const [visualControls, setVisualControls] = useState<MapVisualControls>(
-    DEFAULT_VISUAL_CONTROLS,
   );
   const [collapsedCards, setCollapsedCards] = useState<MapCardVisibilityState>({
     info: false,
     visual: false,
     entities: false,
   });
-  const [viewState, setViewState] = useState<ViewState>(() =>
-    initialViewForLayer(activeLayer),
-  );
 
   const {
     activeLayer: resolvedLayer,
@@ -433,14 +418,6 @@ export function MapboxObservatorioMap({
     return { type: "FeatureCollection", features: sourceFeatures };
   }, [geojsonData, resolvedLayer]);
 
-  useEffect(() => {
-    if (previousActiveLayerRef.current !== activeLayer) {
-      previousActiveLayerRef.current = activeLayer;
-      setViewState(initialViewForLayer(activeLayer));
-      setHoveredId(null);
-    }
-  }, [activeLayer]);
-
   const handleFeatureClick = (event: MapLayerMouseEvent) => {
     const feature = event.features?.[0];
     if (!feature) {
@@ -480,11 +457,13 @@ export function MapboxObservatorioMap({
   };
 
   const handleRecenter = () => {
-    setViewState(initialViewForLayer(resolvedLayer));
+    onRecenter();
+    setHoveredId(null);
+    setHoverTooltip(null);
   };
 
   const handleResetVisual = () => {
-    setVisualControls(DEFAULT_VISUAL_CONTROLS);
+    onResetVisual();
   };
 
   const toggleCard = (card: keyof MapCardVisibilityState) => {
@@ -539,9 +518,8 @@ export function MapboxObservatorioMap({
 
       <div className="absolute inset-0 z-0">
         <Map
-          ref={mapRef}
           {...viewState}
-          onMove={(event) => setViewState(event.viewState)}
+          onMove={(event) => onViewStateChange(event.viewState)}
           mapStyle={mapStyleUrl}
           attributionControl={false}
           interactiveLayerIds={[
@@ -883,10 +861,10 @@ export function MapboxObservatorioMap({
               <select
                 value={visualControls.styleId}
                 onChange={(event) =>
-                  setVisualControls((current) => ({
-                    ...current,
+                  onVisualControlsChange({
+                    ...visualControls,
                     styleId: event.target.value as MapStyleId,
-                  }))
+                  })
                 }
                 className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
               >
@@ -908,10 +886,10 @@ export function MapboxObservatorioMap({
                 max={100}
                 value={visualControls.fillOpacity}
                 onChange={(event) =>
-                  setVisualControls((current) => ({
-                    ...current,
+                  onVisualControlsChange({
+                    ...visualControls,
                     fillOpacity: Number(event.target.value),
-                  }))
+                  })
                 }
                 className="w-full"
               />
@@ -927,10 +905,10 @@ export function MapboxObservatorioMap({
                 max={160}
                 value={visualControls.pointScale}
                 onChange={(event) =>
-                  setVisualControls((current) => ({
-                    ...current,
+                  onVisualControlsChange({
+                    ...visualControls,
                     pointScale: Number(event.target.value),
-                  }))
+                  })
                 }
                 className="w-full"
               />
