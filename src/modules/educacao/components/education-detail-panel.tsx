@@ -2,6 +2,7 @@
 
 import type { ModuleDetailPanelProps } from "@/core/types/module";
 import { buildEducationSelection } from "@/modules/educacao/hooks/use-education-selection";
+import { IndicatorTooltip } from "@/components/ui/indicator-tooltip";
 
 export function EducationDetailPanel({
   entity,
@@ -27,7 +28,11 @@ export function EducationDetailPanel({
               key={metric.label}
               className="rounded-md bg-muted px-3 py-2"
             >
-              <p className="text-xs text-muted-foreground">{metric.label}</p>
+              <IndicatorTooltip description={metric.description || "Descrição não disponível"}>
+                <p className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 cursor-help">
+                  {metric.label}
+                </p>
+              </IndicatorTooltip>
               <p className="text-sm font-semibold">{metric.value}</p>
             </div>
           ))}
@@ -35,44 +40,42 @@ export function EducationDetailPanel({
       )}
 
       {/* Seções de detalhes */}
-      {selection.sections?.map((section) => (
-        <div key={section.title}>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            {section.title}
-          </p>
-          <div className="flex flex-col gap-1">
-            {section.rows.map((row) => (
-              <div
-                key={row.label}
-                className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0"
-              >
-                <span className="text-muted-foreground">{row.label}</span>
-                <span className="font-medium">{row.value}</span>
-              </div>
-            ))}
+      <div className="flex flex-col gap-4">
+        {selection.sections?.map((section) => (
+          <div key={section.title}>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              {section.title}
+            </p>
+            <div className="flex flex-col gap-1">
+              {section.rows.map((row) => (
+                <div
+                  key={row.label}
+                  className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0"
+                >
+                  {row.description ? (
+                    <IndicatorTooltip description={row.description}>
+                      <span className="text-muted-foreground underline decoration-dotted underline-offset-2 cursor-help">
+                        {row.label}
+                      </span>
+                    </IndicatorTooltip>
+                  ) : (
+                    <span className="text-muted-foreground">{row.label}</span>
+                  )}
+                  <span className="font-medium">{row.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
-      {/* Navegação para entidades relacionadas */}
-      {entity.kind === "municipio" && (
+      {/* Botões de Navegação */}
+      {(entity.kind === "municipio" || entity.kind === "bairro") && (
         <button
-          className="mt-2 w-full rounded-md border border-border px-3 py-2 text-sm hover:bg-muted transition-colors"
-          onClick={() => {
-            // Navegar para camada escola deste município — o Shell trata via onNavigate
-            onNavigate(entity);
-          }}
-        >
-          Ver escolas deste município
-        </button>
-      )}
-
-      {entity.kind === "bairro" && (
-        <button
-          className="mt-2 w-full rounded-md border border-border px-3 py-2 text-sm hover:bg-muted transition-colors"
+          className="mt-2 w-full rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
           onClick={() => onNavigate(entity)}
         >
-          Ver escolas deste bairro
+          Ver escolas deste {entity.kind === "municipio" ? "município" : "bairro"}
         </button>
       )}
     </div>

@@ -9,8 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@types/mapbox-gl": "^3.4.1",
+    "clsx": "^2.1.1",
     "fuse.js": "^7.2.0",
+    "lucide-react": "^1.14.0",
     "mapbox-gl": "^3.21.0",
     "maplibre-gl": "^5.21.1",
     "next": "^14.2.35",
@@ -19,6 +22,7 @@
     "react-dom": "^18",
     "react-map-gl": "^8.1.0",
     "react-particles": "^2.12.2",
+    "tailwind-merge": "^3.5.0",
     "tsparticles": "^3.9.1",
     "tsparticles-slim": "^2.12.0"
   },
