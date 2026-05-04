@@ -1,19 +1,28 @@
 "use client";
 
-export async function startOdinTour() {
-  const { driver } = await import("driver.js");
-  await import("driver.js/dist/driver.css");
-  
+import { driver, type Driver } from "driver.js";
+import "driver.js/dist/driver.css";
+
+
+let driverInstance: Driver | null = null;
+
+export function startOdinTour() {
+  if (driverInstance) {
+    driverInstance.drive();
+    return;
+  }
+
   const isDark = document.documentElement.classList.contains("dark");
 
-  const driverObj = driver({
+  driverInstance = driver({
     showProgress: true,
-    nextBtnText: "Próximo",
-    prevBtnText: "Anterior",
-    doneBtnText: "Finalizar",
+    animate: true,
     stageRadius: 8,
     overlayColor: isDark ? "#000" : "#222",
     popoverClass: "odin-tour-popover",
+    nextBtnText: "Próximo",
+    prevBtnText: "Anterior",
+    doneBtnText: "Finalizar",
     steps: [
       { 
         element: "#tour-logo", 
@@ -67,7 +76,7 @@ export async function startOdinTour() {
     ]
   });
 
-  driverObj.drive();
+  driverInstance.drive();
 }
 
 export default function TourProvider() {
