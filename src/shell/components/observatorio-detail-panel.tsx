@@ -12,7 +12,6 @@ type DetailPanelProps = {
   isOpen: boolean;
   onClose: () => void;
   selection: ObservatorySelection | null;
-  // DetailPanelSlot — módulo ativo injeta seu próprio painel
   activeModuleId?: string | null;
   shellContext?: ShellContextType;
   onNavigate?: (entity: MapEntity) => void;
@@ -93,14 +92,20 @@ export function ObservatorioDetailPanel({
 
         {selection ? (
           (() => {
-            // DetailPanelSlot — usa o DetailPanel do módulo ativo se disponível
             const activeModule = activeModuleId
               ? getModule(activeModuleId)
               : undefined;
             if (activeModule?.DetailPanel && shellContext && onNavigate) {
               const entity: MapEntity = {
                 kind: selection.kind,
-                data: { id: selection.id, nome: selection.nome },
+                data: {
+                  id: selection.id,
+                  nome: selection.nome,
+                  ...(shellContext.selectedEntity?.kind === selection.kind &&
+                  shellContext.selectedEntity.kind === "municipio"
+                    ? { geoProps: shellContext.selectedEntity.data.geoProps }
+                    : {}),
+                },
               } as MapEntity;
               return (
                 <activeModule.DetailPanel
@@ -110,7 +115,6 @@ export function ObservatorioDetailPanel({
                 />
               );
             }
-            // Fallback genérico
             return (
               <div className="mt-3 space-y-2 sm:mt-4">
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950/70 dark:text-zinc-300 sm:px-3 sm:text-xs">

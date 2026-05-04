@@ -168,7 +168,15 @@ export function useObservatorioShell() {
   }, [activeLayer, municipios, bairros, escolas]);
 
   function selectEntity(entity: MapEntity) {
-    setSelected(buildEducationSelection(entity));
+    // Se é município sem geoProps, tenta enriquecer com dados da lista
+    let enriched = entity;
+    if (entity.kind === "municipio" && !entity.data.geoProps) {
+      const found = municipios.find((m) => m.id === entity.data.id);
+      if (found?.geoProps) {
+        enriched = { ...entity, data: { ...entity.data, geoProps: found.geoProps } };
+      }
+    }
+    setSelected(buildEducationSelection(enriched));
     setDetailsOpen(true);
   }
 

@@ -16,6 +16,7 @@ type SearchableComboboxProps = {
   options: Option[];
   placeholder?: string;
   value: string | null;
+  isLoading?: boolean;
 };
 
 export function SearchableCombobox({
@@ -27,6 +28,7 @@ export function SearchableCombobox({
   options,
   placeholder = "Digite para buscar",
   value,
+  isLoading = false,
 }: SearchableComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -86,7 +88,11 @@ export function SearchableCombobox({
         />
 
         <div className="absolute inset-y-0 right-1 flex items-center gap-1">
-          {value ? (
+          {isLoading ? (
+            <div className="px-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+            </div>
+          ) : value ? (
             <button
               type="button"
               aria-label={`Limpar seleção de ${label.toLowerCase()}`}
@@ -104,7 +110,7 @@ export function SearchableCombobox({
           <button
             type="button"
             aria-label={`Abrir opções de ${label.toLowerCase()}`}
-            disabled={disabled}
+            disabled={disabled || isLoading}
             onClick={() => setOpen((prev) => !prev)}
             className="rounded p-1 text-xs text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
           >

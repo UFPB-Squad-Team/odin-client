@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { listCamadas } from "@/core/geospatial/geospatial-api";
+import { listCamadas, fetchMunicipiosGeoJSON } from "@/core/geospatial/geospatial-api";
 import { buildMockCollection } from "@/core/geospatial/geospatial-mock-data";
 import type {
   GeoJSONFeatureCollection,
@@ -228,15 +228,79 @@ async function fetchMunicipalityCollection(
   estadoUf: string | null,
 ): Promise<GeoJSONFeatureCollection | null> {
   if (!estadoUf) return null;
-  try {
-    return await fetchIbgeMunicipalities(estadoUf);
-  } catch {
-    const fallbackRaw = await fetchJsonFromCandidates(
-      buildMunicipalityFallbackCandidates(estadoUf),
-    );
-    if (!fallbackRaw) return null;
-    return normalizeCollection(fallbackRaw, "municipio");
+
+  const sgUf = estadoUf.toUpperCase();
+
+  const [malhasResult, odinResult] = await Promise.allSettled([
+    (async () => {
+      try {
+        return await fetchIbgeMunicipalities(estadoUf);
+      } catch {
+        const fallbackRaw = await fetchJsonFromCandidates(
+          buildMunicipalityFallbackCandidates(estadoUf),
+        );
+        if (!fallbackRaw) return null;
+        return normalizeCollection(fallbackRaw, "municipio");
+      }
+    })(),
+    fetchMunicipiosGeoJSON(sgUf),
+  ]);
+
+  const baseCollection =
+    malhasResult.status === "fulfilled" ? malhasResult.value : null;
+
+  if (!baseCollection) return null;
+
+  // Se ODIN falhou, retorna só as malhas sem indicadores
+  if (
+    odinResult.status !== "fulfilled" ||
+    !odinResult.value?.features?.length
+  ) {
+    return baseCollection;
   }
+
+  // Monta índice ODIN por código IBGE normalizado (remove ".0" do final)
+  const odinByCode = new Map<string, Record<string, unknown>>();
+  for (const feature of odinResult.value.features) {
+    const props = feature.properties as Record<string, unknown>;
+    const rawId = String(
+      props.municipioIdIbge ?? props.co_municipio ?? feature.id ?? "",
+    );
+    const normalizedId = rawId.replace(/\.0$/, "");
+    if (normalizedId) odinByCode.set(normalizedId, props);
+  }
+
+  // Merge: geometria das malhas + indicadores do ODIN
+  const mergedFeatures = baseCollection.features.map((feature) => {
+    // O arquivo local usa properties.id como código IBGE
+    const featureId = String(
+      feature.properties.codarea ??
+        feature.properties.id ??
+        feature.id ??
+        "",
+    ).replace(/\.0$/, "");
+
+    const odinProps = odinByCode.get(featureId) ?? {};
+    const hasOdin = Object.keys(odinProps).length > 0;
+
+    return {
+      ...feature,
+      properties: {
+        ...feature.properties,
+        ...(hasOdin ? odinProps : {}),
+        // Garante que id e nome do mapa prevalecem
+        id: featureId || feature.properties.id,
+        nome:
+          feature.properties.nome ??
+          String(odinProps.municipio ?? feature.properties.name ?? featureId),
+        nivel: "municipio" as const,
+        // Marca se tem dados reais do ODIN
+        _hasOdinData: hasOdin,
+      },
+    };
+  });
+
+  return { type: "FeatureCollection", features: mergedFeatures };
 }
 
 function resolveLayerByZoom(

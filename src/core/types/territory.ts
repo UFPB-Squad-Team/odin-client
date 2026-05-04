@@ -1,6 +1,3 @@
-// Entidades territoriais e tipos de camada compartilhados por todos os módulos.
-// Nenhum módulo deve redefinir estes tipos localmente.
-
 export type ObservatoryLayer = "municipio" | "bairro" | "escola";
 
 export interface Estado {
@@ -13,6 +10,7 @@ export interface Municipio {
   id: string;
   nome: string;
   estadoId: string;
+  geoProps?: Record<string, unknown>;
 }
 
 export interface Bairro {
