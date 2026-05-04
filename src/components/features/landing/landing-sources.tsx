@@ -18,7 +18,7 @@ export function LandingSources() {
     <section className="py-14 sm:py-20 border-t border-zinc-200 dark:border-zinc-900">
       <PageContainer>
         <div className="mb-12 text-center flex flex-col items-center">
-          <h2 className="text-3xl font-semibold sm:text-4xl">Fontes e Metodologia</h2>
+          <h2 id="tour-fontes" className="text-3xl font-semibold sm:text-4xl">Fontes e Metodologia</h2>
           <p className="mt-4 text-zinc-600 dark:text-zinc-400 max-w-2xl text-balance">
             A transparência é o pilar do ODIN. Utilizamos bases de dados oficiais e
             metodologias validadas para garantir a precisão de cada indicador.

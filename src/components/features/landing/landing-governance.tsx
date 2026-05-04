@@ -13,7 +13,7 @@ export function LandingGovernance() {
       <PageContainer>
         <div className="grid gap-4 lg:grid-cols-2">
           <article className="rounded-2xl border border-zinc-300/90 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/70 sm:p-7">
-            <p className="text-xs uppercase tracking-[0.16em] text-cyan-500 dark:text-cyan-400">
+            <p id="tour-governanca" className="text-xs uppercase tracking-[0.16em] text-cyan-500 dark:text-cyan-400">
               Governança de dados
             </p>
             <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">
@@ -40,7 +40,7 @@ export function LandingGovernance() {
             <p className="text-xs uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-300">
               Feito por quem
             </p>
-            <h3 className="mt-2 text-2xl font-semibold sm:text-3xl">
+            <h3 id="tour-lema" className="mt-2 text-2xl font-semibold sm:text-3xl">
               Laboratório LEMA · UFPB
             </h3>
             <p className="mt-3 text-zinc-700 dark:text-zinc-300">

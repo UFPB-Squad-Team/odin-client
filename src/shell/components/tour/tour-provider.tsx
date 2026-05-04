@@ -2,7 +2,6 @@
 
 export async function startOdinTour() {
   const { driver } = await import("driver.js");
-  
   await import("driver.js/dist/driver.css");
   
   const isDark = document.documentElement.classList.contains("dark");
@@ -20,7 +19,7 @@ export async function startOdinTour() {
         element: "#tour-logo", 
         popover: { 
           title: "Bem-vindo ao ODIN", 
-          description: "Sua plataforma de indicadores socioeconômicos e educacionais da Paraíba.", 
+          description: "Sua nova central de inteligência territorial para o Nordeste.", 
           side: "bottom", 
           align: "start" 
         } 
@@ -29,15 +28,39 @@ export async function startOdinTour() {
         element: "#tour-governanca", 
         popover: { 
           title: "Transparência", 
-          description: "Entenda como tratamos os dados e nossa política de governança.", 
+          description: "Acesso rápido às nossas políticas de uso e tratamento de dados.", 
           side: "bottom" 
+        } 
+      },
+      { 
+        element: "#tour-lema", 
+        popover: { 
+          title: "Ciência e Pesquisa", 
+          description: "Desenvolvido pelo Laboratório LEMA da UFPB com foco em impacto social.", 
+          side: "left" 
+        } 
+      },
+      { 
+        element: "#tour-fontes", 
+        popover: { 
+          title: "Fontes Oficiais", 
+          description: "Cruzamos dados do INEP, IBGE e outras bases para gerar insights precisos.", 
+          side: "top" 
+        } 
+      },
+      { 
+        element: "#tour-cta", 
+        popover: { 
+          title: "Tudo pronto?", 
+          description: "Explore o módulo de Educação e veja a Paraíba em detalhes.", 
+          side: "top" 
         } 
       },
       { 
         element: "#tour-entrar", 
         popover: { 
-          title: "Explorar Dados", 
-          description: "Acesse o observatório completo com mapas interativos e filtros avançados.", 
+          title: "Começar Agora", 
+          description: "Clique aqui para entrar direto no observatório interativo.", 
           side: "left" 
         } 
       }
