@@ -1,7 +1,9 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import type { ModuleSidebarPanelProps } from "@/core/types/module";
 import type { EducationIndicatorId } from "@/modules/educacao/types/education";
+import { IndicatorTooltip } from "@/components/ui/indicator-tooltip"; 
 
 const EDUCATION_INDICATORS: Array<{
   id: EducationIndicatorId;
@@ -49,21 +51,20 @@ export function EducationSidebarPanel({
         return (
           <button
             key={indicator.id}
-            onClick={() =>
-              onIndicatorChange(isActive ? null : indicator.id)
-            }
-            title={indicator.description}
+            onClick={() => onIndicatorChange(isActive ? null : indicator.id)}
             aria-pressed={isActive}
-            className={[
-              "flex items-start gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+            className={cn(
+              "flex items-start gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors w-full",
               isActive
                 ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-foreground",
-            ].join(" ")}
+                : "hover:bg-muted text-foreground"
+            )}
           >
-            <span className="flex-1 leading-snug">{indicator.label}</span>
+            <IndicatorTooltip description={indicator.description}>
+              <span className="flex-1 leading-snug">{indicator.label}</span>
+            </IndicatorTooltip>
             {isActive && (
-              <span className="shrink-0 text-xs opacity-70 mt-0.5">✓</span>
+              <span className="shrink-0 text-xs opacity-70 mt-0.5 ml-auto">✓</span>
             )}
           </button>
         );

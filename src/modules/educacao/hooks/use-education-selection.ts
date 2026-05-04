@@ -70,12 +70,16 @@ export function buildEducationSelection(entity: MapEntity): ObservatorySelection
       kind: "municipio",
       subtitle: "Visão agregada por município",
       metrics: [
-        { label: "Escolas no recorte", value: String(municipioEscolaDetails.length) },
+        {
+          label: "Escolas no recorte", value: String(municipioEscolaDetails.length),
+          description: ""
+        },
         {
           label: "% internet para alunos",
           value: municipioEscolaDetails.length
             ? `${((internetCount / municipioEscolaDetails.length) * 100).toFixed(1)}%`
             : "—",
+          description: ""
         },
       ],
       sections: [
@@ -85,14 +89,17 @@ export function buildEducationSelection(entity: MapEntity): ObservatorySelection
             {
               label: "Taxa média de abandono",
               value: `${average(municipioEscolaDetails.map((e) => e.indicadores.taxaAbandono ?? 0).filter((v) => v > 0)).toFixed(1)}%`,
+              description: ""
             },
             {
               label: "Taxa média de reprovação",
               value: `${average(municipioEscolaDetails.map((e) => e.indicadores.taxaReprovacao ?? 0).filter((v) => v > 0)).toFixed(1)}%`,
+              description: ""
             },
             {
               label: "Docentes com superior (média)",
               value: `${average(municipioEscolaDetails.map((e) => e.indicadores.docentesSuperior ?? 0).filter((v) => v > 0)).toFixed(1)}%`,
+              description: ""
             },
           ],
         },
@@ -109,8 +116,11 @@ export function buildEducationSelection(entity: MapEntity): ObservatorySelection
       kind: "bairro",
       subtitle: "Visão territorial detalhada por bairro",
       metrics: [
-        { label: "Escolas no bairro", value: String(bairroEscolaDetails.length) },
-        { label: "Nível de análise", value: "Granular" },
+        {
+          label: "Escolas no bairro", value: String(bairroEscolaDetails.length),
+          description: ""
+        },
+        { label: "Nível de análise", value: "Granular", description: "" },
       ],
       sections: [
         {
@@ -119,14 +129,17 @@ export function buildEducationSelection(entity: MapEntity): ObservatorySelection
             {
               label: "Escolas com biblioteca",
               value: `${bairroEscolaDetails.filter((e) => e.infraestrutura.possuiBiblioteca).length}/${bairroEscolaDetails.length}`,
+              description: "",
             },
             {
               label: "Escolas com lab. informática",
               value: `${bairroEscolaDetails.filter((e) => e.infraestrutura.possuiLaboratorioInformatica).length}/${bairroEscolaDetails.length}`,
+              description: "",
             },
             {
               label: "Escolas com internet p/ alunos",
               value: `${bairroEscolaDetails.filter((e) => e.infraestrutura.internetParaAlunos).length}/${bairroEscolaDetails.length}`,
+              description: "",
             },
           ],
         },
@@ -143,51 +156,52 @@ export function buildEducationSelection(entity: MapEntity): ObservatorySelection
     kind: "escola",
     subtitle: "Visão micro em unidade escolar",
     metrics: [
-      { label: "IDEB", value: entity.data.ideb?.toFixed(1) ?? "—" },
-      { label: "INSE", value: entity.data.inse?.toFixed(1) ?? "—" },
+      { label: "IDEB", value: entity.data.ideb?.toFixed(1) ?? "—", description: "" },
+      { label: "INSE", value: entity.data.inse?.toFixed(1) ?? "—", description: "" },
     ],
     sections: detail
       ? [
           {
             title: "Identificação",
             rows: [
-              { label: "Dependência", value: detail.dependenciaAdm },
-              { label: "Ano referência", value: String(detail.anoReferencia) },
-              { label: "Zona", value: detail.zonaLocalizacao },
+              { label: "Dependência", value: detail.dependenciaAdm, description: "" },
+              { label: "Ano referência", value: String(detail.anoReferencia), description: "" },
+              { label: "Zona", value: detail.zonaLocalizacao, description: "" },
             ],
           },
           {
             title: "Endereço",
             rows: [
-              { label: "Município", value: detail.endereco.municipio },
-              { label: "Bairro", value: detail.endereco.bairro },
-              { label: "Logradouro", value: detail.endereco.logradouro },
-              { label: "UF", value: detail.endereco.uf },
+              { label: "Município", value: detail.endereco.municipio, description: "" },
+              { label: "Bairro", value: detail.endereco.bairro, description: "" },
+              { label: "Logradouro", value: detail.endereco.logradouro, description: "" },
+              { label: "UF", value: detail.endereco.uf, description: "" },
             ],
           },
           {
             title: "Indicadores (mock)",
             rows: [
-              { label: "Taxa abandono", value: `${detail.indicadores.taxaAbandono ?? "—"}%` },
-              { label: "Taxa reprovação", value: `${detail.indicadores.taxaReprovacao ?? "—"}%` },
-              { label: "Docentes superior", value: `${detail.indicadores.docentesSuperior ?? "—"}%` },
+              { label: "Taxa abandono", value: `${detail.indicadores.taxaAbandono ?? "—"}%`, description: "" },
+              { label: "Taxa reprovação", value: `${detail.indicadores.taxaReprovacao ?? "—"}%`, description: "" },
+              { label: "Docentes superior", value: `${detail.indicadores.docentesSuperior ?? "—"}%`, description: "" },
               {
                 label: "Horas aula diárias",
                 value: detail.indicadores.horasAulaDiarias
                   ? `${detail.indicadores.horasAulaDiarias.toFixed(1)}h`
                   : "—",
+                description: "",
               },
-              { label: "TDI", value: String(detail.indicadores.tdi ?? "—") },
-              { label: "TNR", value: String(detail.indicadores.tnr ?? "—") },
+              { label: "TDI", value: String(detail.indicadores.tdi ?? "—"), description: "" },
+              { label: "TNR", value: String(detail.indicadores.tnr ?? "—"), description: "" },
             ],
           },
           {
             title: "Infraestrutura",
             rows: [
-              { label: "Internet para alunos", value: detail.infraestrutura.internetParaAlunos ? "Sim" : "Não" },
-              { label: "Biblioteca", value: detail.infraestrutura.possuiBiblioteca ? "Sim" : "Não" },
-              { label: "Lab. informática", value: detail.infraestrutura.possuiLaboratorioInformatica ? "Sim" : "Não" },
-              { label: "Acessibilidade PCD", value: detail.infraestrutura.possuiAcessibilidadePcd ? "Sim" : "Não" },
+              { label: "Internet para alunos", value: detail.infraestrutura.internetParaAlunos ? "Sim" : "Não", description: "" },
+              { label: "Biblioteca", value: detail.infraestrutura.possuiBiblioteca ? "Sim" : "Não", description: "" },
+              { label: "Lab. informática", value: detail.infraestrutura.possuiLaboratorioInformatica ? "Sim" : "Não", description: "" },
+              { label: "Acessibilidade PCD", value: detail.infraestrutura.possuiAcessibilidadePcd ? "Sim" : "Não", description: "" },
             ],
           },
         ]

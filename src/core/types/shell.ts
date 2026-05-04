@@ -10,10 +10,14 @@ export type ObservatorySelection = {
   nome: string;
   kind: ObservatoryLayer;
   subtitle: string;
-  metrics?: Array<{ label: string; value: string }>;
+  metrics?: Array<{
+    description: string; label: string; value: string 
+}>;
   sections?: Array<{
     title: string;
-    rows: Array<{ label: string; value: string }>;
+    rows: Array<{
+      description: string; label: string; value: string 
+}>;
   }>;
 };
 
