@@ -1,7 +1,20 @@
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { InteractiveNetworkBackground } from "@/components/features/landing/interactive-network-background";
 import { OdinLogoPlaceholder } from "@/components/features/landing/odin-logo-placeholder";
 import { PageContainer } from "@/components/layout/page-container";
+
+const InteractiveNetworkBackground = dynamic(
+  () =>
+    import("@/components/features/landing/interactive-network-background").then(
+      (module) => module.InteractiveNetworkBackground,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_20%_25%,rgba(34,211,238,0.18),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(139,92,246,0.16),transparent_45%)] dark:bg-[radial-gradient(circle_at_20%_25%,rgba(34,211,238,0.24),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(139,92,246,0.22),transparent_45%)]" />
+    ),
+  },
+);
 
 export function LandingHero() {
   return (

@@ -6,7 +6,7 @@ export function LandingCta() {
     <section className="py-16">
       <PageContainer>
         <div className="rounded-2xl border border-cyan-300/70 bg-cyan-50 p-6 dark:border-cyan-900/50 dark:bg-cyan-950/30 sm:p-8">
-          <h2 className="text-2xl font-semibold sm:text-3xl">
+          <h2 id="tour-cta" className="text-2xl font-semibold sm:text-3xl">
             Pronto para explorar o ODIN em nível de detalhe real?
           </h2>
           <p className="mt-3 max-w-3xl text-zinc-700 dark:text-zinc-300">

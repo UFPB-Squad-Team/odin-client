@@ -1,11 +1,8 @@
-"use client";
-
 import Link from "next/link";
 import { OdinLogoPlaceholder } from "@/components/features/landing/odin-logo-placeholder";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageContainer } from "@/components/layout/page-container";
-import { HelpCircle } from "lucide-react"; 
-import { startOdinTour } from "@/shell/components/tour/tour-provider";
+import { LandingTourButton } from "@/components/features/landing/landing-tour-button";
 
 export function LandingNavbar() {
   return (
@@ -26,13 +23,7 @@ export function LandingNavbar() {
           aria-label="Navegação principal"
           className="flex items-center gap-2 sm:gap-3"
         >
-          <button
-            onClick={() => startOdinTour()} 
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
-          >
-            <HelpCircle className="h-4 w-4" />
-            <span className="hidden sm:inline">Como funciona</span>
-          </button>
+          <LandingTourButton />
 
           <a
             id="tour-governanca"
