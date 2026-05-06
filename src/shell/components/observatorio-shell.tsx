@@ -57,7 +57,13 @@ function initialViewForLayer(layer: ObservatoryLayer): MapViewState {
 }
 
 function isMapStyleId(value: string | null): value is MapStyleId {
-  return value === "demo" || value === "light" || value === "dark" || value === "voyager" || value === "satellite";
+  return (
+    value === "demo" ||
+    value === "light" ||
+    value === "dark" ||
+    value === "voyager" ||
+    value === "satellite"
+  );
 }
 
 function parseNumber(value: string | null) {
@@ -88,9 +94,19 @@ function readMapVisualControls(searchParams: URLSearchParams) {
   const pointScale = parseNumber(searchParams.get("pointScale"));
 
   return {
-    styleId: isMapStyleId(styleId) ? styleId : DEFAULT_MAP_VISUAL_CONTROLS.styleId,
-    fillOpacity: clamp(fillOpacity ?? DEFAULT_MAP_VISUAL_CONTROLS.fillOpacity, 20, 100),
-    pointScale: clamp(pointScale ?? DEFAULT_MAP_VISUAL_CONTROLS.pointScale, 70, 160),
+    styleId: isMapStyleId(styleId)
+      ? styleId
+      : DEFAULT_MAP_VISUAL_CONTROLS.styleId,
+    fillOpacity: clamp(
+      fillOpacity ?? DEFAULT_MAP_VISUAL_CONTROLS.fillOpacity,
+      20,
+      100,
+    ),
+    pointScale: clamp(
+      pointScale ?? DEFAULT_MAP_VISUAL_CONTROLS.pointScale,
+      70,
+      160,
+    ),
   } satisfies MapVisualControls;
 }
 
@@ -131,7 +147,9 @@ export function ObservatorioShell() {
   const initializedRef = useRef(false);
   const previousActiveLayerRef = useRef<ObservatoryLayer>("bairro");
 
-  const [activeIndicatorId, setActiveIndicatorId] = useState<string | null>(null);
+  const [activeIndicatorId, setActiveIndicatorId] = useState<string | null>(
+    null,
+  );
   const [mapViewState, setMapViewState] = useState<MapViewState>(() =>
     initialViewForLayer("bairro"),
   );
@@ -169,7 +187,24 @@ export function ObservatorioShell() {
       bairroId: filters.bairroId,
     },
     selectedEntity: selected
-      ? ({ kind: selected.kind, data: { id: selected.id, nome: selected.nome } } as import("@/core/types/shell").MapEntity)
+      ? (() => {
+          if (selected.kind === "municipio") {
+            const found = municipios.find((m) => m.id === selected.id);
+            return {
+              kind: "municipio" as const,
+              data: {
+                id: selected.id,
+                nome: selected.nome,
+                estadoId: found?.estadoId ?? "",
+                geoProps: found?.geoProps,
+              },
+            };
+          }
+          return {
+            kind: selected.kind,
+            data: { id: selected.id, nome: selected.nome },
+          } as import("@/core/types/shell").MapEntity;
+        })()
       : null,
     activeModuleId,
     setActiveLayer,
@@ -188,23 +223,26 @@ export function ObservatorioShell() {
       layer: isLayer(queryLayer) ? queryLayer : null,
       municipioId: searchParams.get("municipio"),
       sidebarCollapsed: searchParams.get("sidebar") === "collapsed",
-      viewState: readMapViewState(searchParams, isLayer(queryLayer) ? queryLayer : activeLayer),
+      viewState: readMapViewState(
+        searchParams,
+        isLayer(queryLayer) ? queryLayer : activeLayer,
+      ),
       visualControls: readMapVisualControls(searchParams),
     };
 
     const hasQueryState = Boolean(
       queryState.activeModuleId ||
-        queryState.estadoId ||
-        queryState.municipioId ||
-        queryState.bairroId ||
-        queryState.layer ||
-        searchParams.get("sidebar") ||
-        searchParams.get("lng") ||
-        searchParams.get("lat") ||
-        searchParams.get("zoom") ||
-        searchParams.get("style") ||
-        searchParams.get("fillOpacity") ||
-        searchParams.get("pointScale"),
+      queryState.estadoId ||
+      queryState.municipioId ||
+      queryState.bairroId ||
+      queryState.layer ||
+      searchParams.get("sidebar") ||
+      searchParams.get("lng") ||
+      searchParams.get("lat") ||
+      searchParams.get("zoom") ||
+      searchParams.get("style") ||
+      searchParams.get("fillOpacity") ||
+      searchParams.get("pointScale"),
     );
 
     let storageState: {
@@ -232,7 +270,9 @@ export function ObservatorioShell() {
             viewState?: Partial<MapViewState>;
             visualControls?: Partial<MapVisualControls>;
           };
-          const parsedLayer = isLayer(parsed.layer ?? null) ? (parsed.layer as ObservatoryLayer) : undefined;
+          const parsedLayer = isLayer(parsed.layer ?? null)
+            ? (parsed.layer as ObservatoryLayer)
+            : undefined;
           storageState = {
             activeModuleId: parsed.activeModuleId ?? null,
             bairroId: parsed.bairroId ?? null,
@@ -241,16 +281,35 @@ export function ObservatorioShell() {
             municipioId: parsed.municipioId ?? null,
             sidebarCollapsed: Boolean(parsed.sidebarCollapsed),
             viewState: {
-              longitude: parsed.viewState?.longitude ?? initialViewForLayer(parsedLayer ?? activeLayer).longitude,
-              latitude: parsed.viewState?.latitude ?? initialViewForLayer(parsedLayer ?? activeLayer).latitude,
-              zoom: clamp(parsed.viewState?.zoom ?? initialViewForLayer(parsedLayer ?? activeLayer).zoom, 0, 22),
+              longitude:
+                parsed.viewState?.longitude ??
+                initialViewForLayer(parsedLayer ?? activeLayer).longitude,
+              latitude:
+                parsed.viewState?.latitude ??
+                initialViewForLayer(parsedLayer ?? activeLayer).latitude,
+              zoom: clamp(
+                parsed.viewState?.zoom ??
+                  initialViewForLayer(parsedLayer ?? activeLayer).zoom,
+                0,
+                22,
+              ),
             },
             visualControls: {
               styleId: isMapStyleId(parsed.visualControls?.styleId ?? null)
                 ? parsed.visualControls!.styleId!
                 : DEFAULT_MAP_VISUAL_CONTROLS.styleId,
-              fillOpacity: clamp(parsed.visualControls?.fillOpacity ?? DEFAULT_MAP_VISUAL_CONTROLS.fillOpacity, 20, 100),
-              pointScale: clamp(parsed.visualControls?.pointScale ?? DEFAULT_MAP_VISUAL_CONTROLS.pointScale, 70, 160),
+              fillOpacity: clamp(
+                parsed.visualControls?.fillOpacity ??
+                  DEFAULT_MAP_VISUAL_CONTROLS.fillOpacity,
+                20,
+                100,
+              ),
+              pointScale: clamp(
+                parsed.visualControls?.pointScale ??
+                  DEFAULT_MAP_VISUAL_CONTROLS.pointScale,
+                70,
+                160,
+              ),
             },
           };
         }
@@ -339,7 +398,9 @@ export function ObservatorioShell() {
           visualControls: mapVisualControls,
         }),
       );
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [
     activeLayer,
     activeModuleId,
@@ -371,7 +432,9 @@ export function ObservatorioShell() {
     const next = params.toString();
     const current = searchParams.toString();
     if (next !== current) {
-      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+      router.replace(next ? `${pathname}?${next}` : pathname, {
+        scroll: false,
+      });
     }
   }, [
     activeLayer,
@@ -392,12 +455,23 @@ export function ObservatorioShell() {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const isTyping = Boolean(
-        target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" || target.isContentEditable),
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable),
       );
-      if (!isTyping && (event.key === "/" || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k"))) {
+      if (
+        !isTyping &&
+        (event.key === "/" ||
+          ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k"))
+      ) {
         event.preventDefault();
-        (document.getElementById("observatorio-smart-search") as HTMLInputElement | null)?.focus();
+        (
+          document.getElementById(
+            "observatorio-smart-search",
+          ) as HTMLInputElement | null
+        )?.focus();
         return;
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
@@ -408,7 +482,9 @@ export function ObservatorioShell() {
       if (event.key === "Escape" && detailsOpen) setDetailsOpen(false);
     }
     window.addEventListener("keydown", onKeyDown);
-    return () => { window.removeEventListener("keydown", onKeyDown); };
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [detailsOpen, setDetailsOpen, setSidebarCollapsed]);
 
   const buildShareUrl = () => {
@@ -430,7 +506,7 @@ export function ObservatorioShell() {
     return `${window.location.origin}${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
   };
 
- return (
+  return (
     <ShellProvider value={shellContext}>
       <ModuleBootstrap />
       <main className="relative h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-900 transition-colors dark:text-zinc-100">
@@ -441,23 +517,40 @@ export function ObservatorioShell() {
                 type="button"
                 onClick={() => setSidebarCollapsed((prev) => !prev)}
                 className="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white/90 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                aria-label={sidebarCollapsed ? "Expandir filtros" : "Recolher filtros"}
+                aria-label={
+                  sidebarCollapsed ? "Expandir filtros" : "Recolher filtros"
+                }
               >
-                <span className="text-sm leading-none">{sidebarCollapsed ? "☰" : "›"}</span>
-                <span className="hidden sm:inline">{sidebarCollapsed ? "Expandir" : "Recolher"}</span>
+                <span className="text-sm leading-none">
+                  {sidebarCollapsed ? "☰" : "›"}
+                </span>
+                <span className="hidden sm:inline">
+                  {sidebarCollapsed ? "Expandir" : "Recolher"}
+                </span>
               </button>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-600 dark:text-cyan-400">Observatório</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-600 dark:text-cyan-400">
+                  Observatório
+                </p>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-xl">ODIN</h1>
-                  <span className="hidden rounded-full border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 sm:inline-flex">{activeLayer}</span>
-                  <span className="hidden text-[11px] text-zinc-500 dark:text-zinc-400 md:inline-flex">• {mapEntities.length} entidades</span>
+                  <h1 className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-xl">
+                    ODIN
+                  </h1>
+                  <span className="hidden rounded-full border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 sm:inline-flex">
+                    {activeLayer}
+                  </span>
+                  <span className="hidden text-[11px] text-zinc-500 dark:text-zinc-400 md:inline-flex">
+                    • {mapEntities.length} entidades
+                  </span>
                 </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ShareLinkButton getUrl={buildShareUrl} />
-              <Link href="/" className="inline-flex items-center rounded-md border border-zinc-300 bg-white/90 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-200 dark:hover:bg-zinc-800">
+              <Link
+                href="/"
+                className="inline-flex items-center rounded-md border border-zinc-300 bg-white/90 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
                 Voltar
               </Link>
               <ThemeToggle />
@@ -466,7 +559,6 @@ export function ObservatorioShell() {
         </header>
 
         <div className="relative h-[calc(100vh-65px)] w-full overflow-hidden">
-          
           <ObservatorioSidebar
             activeLayer={activeLayer}
             bairroId={filters.bairroId}
@@ -489,11 +581,19 @@ export function ObservatorioShell() {
           <div className="absolute inset-0 z-[10]">
             <MapboxObservatorioMap
               activeLayer={activeLayer}
+              activeModuleId={activeModuleId}
+              activeIndicatorId={activeIndicatorId}
               entities={mapEntities}
-              isLoading={loading.escolas || loading.bairros || loading.municipios}
+              isLoading={
+                loading.escolas || loading.bairros || loading.municipios
+              }
               onEntityClick={selectEntity}
-              onRecenter={() => setMapViewState(initialViewForLayer(activeLayer))}
-              onResetVisual={() => setMapVisualControls(DEFAULT_MAP_VISUAL_CONTROLS)}
+              onRecenter={() =>
+                setMapViewState(initialViewForLayer(activeLayer))
+              }
+              onResetVisual={() =>
+                setMapVisualControls(DEFAULT_MAP_VISUAL_CONTROLS)
+              }
               onViewStateChange={setMapViewState}
               onVisualControlsChange={setMapVisualControls}
               selectedId={selected?.id}

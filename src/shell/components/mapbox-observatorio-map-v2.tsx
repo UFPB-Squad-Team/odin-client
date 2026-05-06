@@ -9,6 +9,7 @@ import Map, {
 } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
 import { useMapLayers } from "@/core/geospatial/use-map-layers";
+import { useChoropleth } from "@/core/choropleth/use-choropleth";
 import { ObservatorioMapTooltip } from "@/shell/components/observatorio-map-tooltip";
 import { LAYER_STYLES, type GeoJSONFeature } from "@/core/types/geospatial";
 import type { ObservatoryLayer } from "@/core/types/territory";
@@ -16,6 +17,8 @@ import type { MapEntity } from "@/core/types/shell";
 
 type MapboxObservatorioMapProps = {
   activeLayer: ObservatoryLayer;
+  activeModuleId: string | null;
+  activeIndicatorId: string | null;
   entities: MapEntity[];
   isLoading: boolean;
   viewState: ViewState;
@@ -265,6 +268,8 @@ function resolveFeatureTitle(
 
 export function MapboxObservatorioMap({
   activeLayer,
+  activeModuleId,
+  activeIndicatorId,
   entities,
   isLoading,
   viewState,
@@ -305,6 +310,30 @@ export function MapboxObservatorioMap({
   const layerStyle = LAYER_STYLES[resolvedLayer];
   const ids = useMemo(() => buildLayerIds(resolvedLayer), [resolvedLayer]);
   const geojsonData = collection ?? EMPTY_COLLECTION;
+
+  // ── Choropleth ──────────────────────────────────────────────────────────────
+  const { featureColors } = useChoropleth({
+    collection,
+    activeModuleId,
+    activeIndicatorId,
+  });
+
+  /**
+   * MapLibre `match` expression: mapeia cada feature.id para sua cor calculada.
+   * Fallback para a cor padrão da camada quando não há choropleth ativo.
+   * Formato: ["match", ["get", "id"], id1, cor1, id2, cor2, ..., fallback]
+   */
+  const fillColorExpression = useMemo(() => {
+    if (featureColors.size === 0) return layerStyle.color;
+    const pairs: (string | string[])[] = [];
+    featureColors.forEach((color, id) => {
+      pairs.push(id, color);
+    });
+    return ["match", ["get", "id"], ...pairs, layerStyle.color] as unknown as string;
+  }, [featureColors, layerStyle.color]);
+
+  const hasChoropleth = featureColors.size > 0;
+  // ────────────────────────────────────────────────────────────────────────────
   const mapStyleUrl = useMemo(() => {
     const style = MAP_STYLE_OPTIONS.find(
       (option) => option.id === visualControls.styleId,
@@ -635,8 +664,8 @@ export function MapboxObservatorioMap({
               type="fill"
               filter={["!=", ["geometry-type"], "Point"]}
               paint={{
-                "fill-color": layerStyle.color,
-                "fill-opacity": effectiveFillOpacity,
+                "fill-color": fillColorExpression,
+                "fill-opacity": hasChoropleth ? 0.82 : effectiveFillOpacity,
               }}
             />
             <Layer
@@ -655,7 +684,7 @@ export function MapboxObservatorioMap({
                   15,
                   8 * pointScaleFactor,
                 ],
-                "circle-color": layerStyle.color,
+                "circle-color": fillColorExpression,
                 "circle-stroke-color": "#ffffff",
                 "circle-stroke-width": 1.25,
                 "circle-opacity": 0.92,

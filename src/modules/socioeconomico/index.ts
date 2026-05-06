@@ -1,31 +1,25 @@
-// Módulo Socioeconômico — implementa ModuleContract.
-// Registrado no bootstrap: src/app/observatorio/page.tsx
-
-import type { ModuleContract, ModuleIndicator, ModuleLayerStyle } from "@/core/types/module";
+import type {
+  ModuleContract,
+  ModuleIndicator,
+  ModuleLayerStyle,
+} from "@/core/types/module";
 import type { ObservatoryLayer } from "@/core/types/territory";
 import { SocioeconomicoSidebarPanel } from "./components/socioeconomico-sidebar-panel";
 import { SocioeconomicoDetailPanel } from "./components/socioeconomico-detail-panel";
 import { buildSocioeconomicoSelection } from "./hooks/use-socioeconomico-selection";
+import { extractSocioeconomicoIndicatorValue } from "./hooks/use-socioeconomico-indicator-extractor";
+import { interpolateHex } from "@/lib/format";
 
-function interpolateHex(colorA: string, colorB: string, t: number): string {
-  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-  const parseHex = (hex: string) => ({
-    r: parseInt(hex.slice(1, 3), 16),
-    g: parseInt(hex.slice(3, 5), 16),
-    b: parseInt(hex.slice(5, 7), 16),
-  });
-  const toHex = (n: number) => n.toString(16).padStart(2, "0");
-  const a = parseHex(colorA);
-  const b = parseHex(colorB);
-  return `#${toHex(clamp(a.r + (b.r - a.r) * t))}${toHex(clamp(a.g + (b.g - a.g) * t))}${toHex(clamp(a.b + (b.b - a.b) * t))}`;
-}
-
-const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<ObservatoryLayer, ModuleIndicator[]> = {
+const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
+  ObservatoryLayer,
+  ModuleIndicator[]
+> = {
   municipio: [
     {
       id: "pct_preta_parda",
       label: "Pop. preta/parda",
-      description: "Percentual da população que se autodeclara preta ou parda — IBGE Censo 2022",
+      description:
+        "Percentual da população que se autodeclara preta ou parda — IBGE Censo 2022",
       unit: "%",
       colorScale: ["#FFF7ED", "#C2410C"],
       higherIsBetter: false,
@@ -33,7 +27,8 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<ObservatoryLayer, ModuleIndicat
     {
       id: "taxa_analfabetismo_15_mais",
       label: "Analfabetismo 15+",
-      description: "Taxa de analfabetismo da população com 15 anos ou mais — IBGE Censo 2022",
+      description:
+        "Taxa de analfabetismo da população com 15 anos ou mais — IBGE Censo 2022",
       unit: "%",
       colorScale: ["#F0FDF4", "#15803D"],
       higherIsBetter: false,
@@ -41,7 +36,8 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<ObservatoryLayer, ModuleIndicat
     {
       id: "pct_agua_rede_geral",
       label: "Água rede geral",
-      description: "Percentual de domicílios com abastecimento de água por rede geral — IBGE Censo 2022",
+      description:
+        "Percentual de domicílios com abastecimento de água por rede geral — IBGE Censo 2022",
       unit: "%",
       colorScale: ["#EFF6FF", "#1D4ED8"],
       higherIsBetter: true,
@@ -49,7 +45,8 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<ObservatoryLayer, ModuleIndicat
     {
       id: "pct_esgoto_rede_geral",
       label: "Esgoto rede geral",
-      description: "Percentual de domicílios com esgotamento sanitário por rede geral — IBGE Censo 2022",
+      description:
+        "Percentual de domicílios com esgotamento sanitário por rede geral — IBGE Censo 2022",
       unit: "%",
       colorScale: ["#F5F3FF", "#6D28D9"],
       higherIsBetter: true,
@@ -74,7 +71,8 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<ObservatoryLayer, ModuleIndicat
     {
       id: "pct_preta_parda",
       label: "Pop. preta/parda",
-      description: "Percentual da população que se autodeclara preta ou parda — IBGE Censo 2022",
+      description:
+        "Percentual da população que se autodeclara preta ou parda — IBGE Censo 2022",
       unit: "%",
       colorScale: ["#FFF7ED", "#C2410C"],
       higherIsBetter: false,
@@ -82,7 +80,8 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<ObservatoryLayer, ModuleIndicat
     {
       id: "taxa_analfabetismo_15_mais",
       label: "Analfabetismo 15+",
-      description: "Taxa de analfabetismo da população com 15 anos ou mais — IBGE Censo 2022",
+      description:
+        "Taxa de analfabetismo da população com 15 anos ou mais — IBGE Censo 2022",
       unit: "%",
       colorScale: ["#F0FDF4", "#15803D"],
       higherIsBetter: false,
@@ -94,7 +93,8 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<ObservatoryLayer, ModuleIndicat
 export const socioeconomicoModule: ModuleContract = {
   id: "socioeconomico",
   label: "Socioeconômico",
-  description: "Indicadores do IBGE Censo Demográfico 2022 — população, renda e saneamento",
+  description:
+    "Indicadores do IBGE Censo Demográfico 2022 — população, renda e saneamento",
   availableLayers: ["municipio", "bairro"],
 
   SidebarPanel: SocioeconomicoSidebarPanel,
@@ -104,19 +104,32 @@ export const socioeconomicoModule: ModuleContract = {
     return SOCIOECONOMICO_INDICATORS_BY_LAYER[layer] ?? [];
   },
 
-  getMapLayerStyle: (indicatorId: string | null, value: number): ModuleLayerStyle => {
-    const allIndicators = Object.values(SOCIOECONOMICO_INDICATORS_BY_LAYER).flat();
+  getMapLayerStyle: (
+    indicatorId: string | null,
+    value: number,
+  ): ModuleLayerStyle => {
+    const allIndicators = Object.values(
+      SOCIOECONOMICO_INDICATORS_BY_LAYER,
+    ).flat();
     const indicator = allIndicators.find((i) => i.id === indicatorId);
-    const [colorMin, colorMax] = indicator?.colorScale ?? ["#F5F3FF", "#6D28D9"];
+    const [colorMin, colorMax] = indicator?.colorScale ?? [
+      "#F5F3FF",
+      "#6D28D9",
+    ];
     const clampedValue = Math.max(0, Math.min(1, value));
     const color = interpolateHex(colorMin, colorMax, clampedValue);
     return {
       color,
       opacity: 0.75,
-      hoverColor: interpolateHex(colorMin, colorMax, Math.min(1, clampedValue + 0.15)),
+      hoverColor: interpolateHex(
+        colorMin,
+        colorMax,
+        Math.min(1, clampedValue + 0.15),
+      ),
       selectedColor: "#A78BFA",
     };
   },
 
   buildSelection: buildSocioeconomicoSelection,
+  indicatorValueExtractor: extractSocioeconomicoIndicatorValue,
 };

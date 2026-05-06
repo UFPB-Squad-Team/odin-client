@@ -4,7 +4,11 @@
 
 import type { ComponentType } from "react";
 import type { ObservatoryLayer } from "./territory";
-import type { MapEntity, ObservatorySelection, ShellContextType } from "./shell";
+import type {
+  MapEntity,
+  ObservatorySelection,
+  ShellContextType,
+} from "./shell";
 
 // Indicador temático de um módulo (ex.: pct_com_internet, taxa_analfabetismo)
 export interface ModuleIndicator {
@@ -13,7 +17,7 @@ export interface ModuleIndicator {
   description: string;
   unit?: string;
   colorScale: [string, string]; // [cor para valor mínimo, cor para valor máximo]
-  higherIsBetter: boolean;      // true = ordem decrescente no ranking, false = crescente
+  higherIsBetter: boolean; // true = ordem decrescente no ranking, false = crescente
 }
 
 // Props injetadas pelo Shell no painel lateral do módulo ativo
@@ -62,9 +66,21 @@ export interface ModuleContract {
   /** Retorna os indicadores disponíveis para a camada informada. */
   getIndicators?: (layer: ObservatoryLayer) => ModuleIndicator[];
   /** Retorna o estilo de camada para simbologia dinâmica dado um indicador e valor normalizado [0,1]. */
-  getMapLayerStyle?: (indicatorId: string | null, value: number) => ModuleLayerStyle;
+  getMapLayerStyle?: (
+    indicatorId: string | null,
+    value: number,
+  ) => ModuleLayerStyle;
   /** Constrói o ObservatorySelection para uma entidade selecionada. Chamado pelo Shell via useEntitySelection. */
   buildSelection?: (entity: MapEntity) => ObservatorySelection;
+  /**
+   * Retorna uma função extratora de valor para o indicador informado.
+   * A extratora recebe as properties de uma GeoJSON feature e retorna o valor numérico bruto,
+   * ou null se o indicador não estiver disponível naquela feature.
+   * Usado pelo choropleth para colorir o mapa.
+   */
+  indicatorValueExtractor?: (
+    indicatorId: string,
+  ) => ((props: Record<string, unknown>) => number | null) | null;
   /** Callback chamado quando este módulo se torna o módulo ativo. */
   onModuleActivated?: (shellContext: Readonly<ShellContextType>) => void;
   /** Callback chamado quando este módulo deixa de ser o módulo ativo. */
