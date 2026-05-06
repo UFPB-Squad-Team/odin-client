@@ -13,6 +13,7 @@ import { ModuleBootstrap } from "@/shell/components/module-bootstrap";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
 import type { ShellContextType } from "@/core/types/shell";
 import type { ObservatoryLayer } from "@/core/types/territory";
+import { resolveLayerByZoom } from "@/core/geospatial/use-map-layers";
 
 const STORAGE_KEY = "odin:observatorio:shell:v1";
 
@@ -146,6 +147,7 @@ export function ObservatorioShell() {
   const searchParams = useSearchParams();
   const initializedRef = useRef(false);
   const previousActiveLayerRef = useRef<ObservatoryLayer>("bairro");
+  const skipZoomLayerSyncRef = useRef(false);
 
   const [activeIndicatorId, setActiveIndicatorId] = useState<string | null>(
     null,
@@ -178,6 +180,10 @@ export function ObservatorioShell() {
     setSidebarCollapsed,
   } = useObservatorioShell();
 
+  function handleEntityClick(entity: import("@/core/types/shell").MapEntity) {
+    selectEntity(entity);
+  }
+
   // ShellContext para módulos
   const shellContext: ShellContextType = {
     activeLayer,
@@ -190,16 +196,51 @@ export function ObservatorioShell() {
       ? (() => {
           if (selected.kind === "municipio") {
             const found = municipios.find((m) => m.id === selected.id);
+            if (found) {
+              return {
+                kind: "municipio" as const,
+                data: found,
+              };
+            }
             return {
               kind: "municipio" as const,
               data: {
                 id: selected.id,
                 nome: selected.nome,
-                estadoId: found?.estadoId ?? "",
-                geoProps: found?.geoProps,
+                estadoId: filters.estadoId ?? "",
+                geoProps: undefined,
               },
             };
           }
+
+          if (selected.kind === "bairro") {
+            const found = bairros.find((item) => item.id === selected.id);
+            if (found) {
+              return {
+                kind: "bairro" as const,
+                data: found,
+              };
+            }
+            return {
+              kind: "bairro" as const,
+              data: {
+                id: selected.id,
+                nome: selected.nome,
+                municipioId: filters.municipioId ?? "",
+              },
+            };
+          }
+
+          const fallbackSchool = mapEntities.find(
+            (entity) =>
+              entity.kind === "escola" &&
+              (entity.data.id === selected.id || entity.data.inepId === selected.id),
+          );
+
+          if (fallbackSchool) {
+            return fallbackSchool;
+          }
+
           return {
             kind: selected.kind,
             data: { id: selected.id, nome: selected.nome },
@@ -375,8 +416,22 @@ export function ObservatorioShell() {
     }
 
     previousActiveLayerRef.current = activeLayer;
+    skipZoomLayerSyncRef.current = true;
     setMapViewState(initialViewForLayer(activeLayer));
   }, [activeLayer]);
+
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    if (skipZoomLayerSyncRef.current) {
+      skipZoomLayerSyncRef.current = false;
+      return;
+    }
+
+    const resolvedLayer = resolveLayerByZoom(mapViewState.zoom, activeLayer);
+    if (resolvedLayer !== activeLayer) {
+      setActiveLayer(resolvedLayer);
+    }
+  }, [activeLayer, mapViewState.zoom, setActiveLayer]);
 
   // Persiste em localStorage
   useEffect(() => {
@@ -567,7 +622,10 @@ export function ObservatorioShell() {
             estados={estados}
             municipioId={filters.municipioId}
             municipios={municipios}
-            onLayerChange={setActiveLayer}
+            onLayerChange={(layer) => {
+              skipZoomLayerSyncRef.current = true;
+              setActiveLayer(layer);
+            }}
             onSetBairro={filters.setBairro}
             onSetEstado={filters.setEstado}
             onSetMunicipio={filters.setMunicipio}
@@ -587,7 +645,7 @@ export function ObservatorioShell() {
               isLoading={
                 loading.escolas || loading.bairros || loading.municipios
               }
-              onEntityClick={selectEntity}
+              onEntityClick={handleEntityClick}
               onRecenter={() =>
                 setMapViewState(initialViewForLayer(activeLayer))
               }
@@ -611,7 +669,7 @@ export function ObservatorioShell() {
             selection={selected}
             activeModuleId={activeModuleId}
             shellContext={shellContext}
-            onNavigate={selectEntity}
+            onNavigate={handleEntityClick}
           />
         </div>
       </main>

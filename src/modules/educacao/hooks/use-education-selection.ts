@@ -348,11 +348,19 @@ export function buildEducationSelection(
   }
 
   // escola
+  console.log(entity);
   const detail = ESCOLA_ATLAS_MOCKS[entity.data.id];
+  const escolaNome = entity.data.nome;
+  const escolaMunicipio = entity.data.municipioNome ?? "—";
+  const escolaBairro = entity.data.bairroNome ?? "—";
+  const escolaUf = entity.data.estadoSigla ?? detail?.endereco.uf ?? "—";
+  const escolaDependencia = detail?.dependenciaAdm ?? "Não informado";
+  const escolaZona = detail?.zonaLocalizacao ?? "—";
+  const escolaAno = detail?.anoReferencia ?? null;
 
   return {
     id: entity.data.id,
-    nome: entity.data.nome,
+    nome: escolaNome,
     kind: "escola",
     subtitle: "Visão micro em unidade escolar",
     metrics: [
@@ -367,112 +375,26 @@ export function buildEducationSelection(
         description: "",
       },
     ],
-    sections: detail
-      ? [
-          {
-            title: "Identificação",
-            rows: [
-              {
-                label: "Dependência",
-                value: detail.dependenciaAdm,
-                description: "",
-              },
-              {
-                label: "Ano referência",
-                value: String(detail.anoReferencia),
-                description: "",
-              },
-              { label: "Zona", value: detail.zonaLocalizacao, description: "" },
-            ],
-          },
-          {
-            title: "Endereço",
-            rows: [
-              {
-                label: "Município",
-                value: detail.endereco.municipio,
-                description: "",
-              },
-              {
-                label: "Bairro",
-                value: detail.endereco.bairro,
-                description: "",
-              },
-              {
-                label: "Logradouro",
-                value: detail.endereco.logradouro,
-                description: "",
-              },
-              { label: "UF", value: detail.endereco.uf, description: "" },
-            ],
-          },
-          {
-            title: "Indicadores (mock)",
-            rows: [
-              {
-                label: "Taxa abandono",
-                value: `${detail.indicadores.taxaAbandono ?? "—"}%`,
-                description: "",
-              },
-              {
-                label: "Taxa reprovação",
-                value: `${detail.indicadores.taxaReprovacao ?? "—"}%`,
-                description: "",
-              },
-              {
-                label: "Docentes superior",
-                value: `${detail.indicadores.docentesSuperior ?? "—"}%`,
-                description: "",
-              },
-              {
-                label: "Horas aula diárias",
-                value: detail.indicadores.horasAulaDiarias
-                  ? `${detail.indicadores.horasAulaDiarias.toFixed(1)}h`
-                  : "—",
-                description: "",
-              },
-              {
-                label: "TDI",
-                value: String(detail.indicadores.tdi ?? "—"),
-                description: "",
-              },
-              {
-                label: "TNR",
-                value: String(detail.indicadores.tnr ?? "—"),
-                description: "",
-              },
-            ],
-          },
-          {
-            title: "Infraestrutura",
-            rows: [
-              {
-                label: "Internet para alunos",
-                value: detail.infraestrutura.internetParaAlunos ? "Sim" : "Não",
-                description: "",
-              },
-              {
-                label: "Biblioteca",
-                value: detail.infraestrutura.possuiBiblioteca ? "Sim" : "Não",
-                description: "",
-              },
-              {
-                label: "Lab. informática",
-                value: detail.infraestrutura.possuiLaboratorioInformatica
-                  ? "Sim"
-                  : "Não",
-                description: "",
-              },
-              {
-                label: "Acessibilidade PCD",
-                value: detail.infraestrutura.possuiAcessibilidadePcd
-                  ? "Sim"
-                  : "Não",
-                description: "",
-              },
-            ],
-          },
-        ]
-      : undefined,
+    sections: [
+      {
+        title: "Identificação",
+        rows: [
+          { label: "INEP", value: String(entity.data.inepId ?? entity.data.id), description: "" },
+          { label: "Município", value: escolaMunicipio, description: "" },
+          { label: "Bairro", value: escolaBairro, description: "" },
+          { label: "UF", value: escolaUf, description: "" },
+          { label: "Dependência", value: escolaDependencia, description: "" },
+          { label: "Ano referência", value: escolaAno ? String(escolaAno) : "—", description: "" },
+          { label: "Zona", value: escolaZona, description: "" },
+        ],
+      },
+      {
+        title: "Indicadores",
+        rows: [
+          { label: "IDEB", value: entity.data.ideb?.toFixed(1) ?? "—", description: "" },
+          { label: "INSE", value: entity.data.inse?.toFixed(1) ?? "—", description: "" },
+        ],
+      },
+    ],
   };
 }

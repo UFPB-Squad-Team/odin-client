@@ -21,8 +21,13 @@ export interface Bairro {
 
 export interface Escola {
   id: string;
+  inepId?: string;
   nome: string;
   bairroId: string;
+  bairroNome?: string;
+  municipioId?: string;
+  municipioNome?: string;
+  estadoSigla?: string;
   ideb?: number;
   inse?: number;
 }

@@ -1,8 +1,3 @@
-import {
-  MOCK_BAIRROS,
-  MOCK_ESCOLAS,
-  MOCK_MUNICIPIOS,
-} from "@/modules/educacao/services/education-mock-data";
 import type {
   CamadaGeoespacial,
   GeoJSONFeature,
@@ -11,6 +6,29 @@ import type {
 import type { ObservatoryLayer } from "@/core/types/territory";
 
 type Point = [number, number];
+
+const MOCK_MUNICIPIOS = [
+  { id: "jp", nome: "João Pessoa", estadoId: "pb" },
+  { id: "cg", nome: "Campina Grande", estadoId: "pb" },
+  { id: "rec", nome: "Recife", estadoId: "pe" },
+  { id: "for", nome: "Fortaleza", estadoId: "ce" },
+];
+
+const MOCK_BAIRROS = [
+  { id: "manaira", nome: "Manaíra", municipioId: "jp" },
+  { id: "tamba", nome: "Tambaú", municipioId: "jp" },
+  { id: "catole", nome: "Catolé", municipioId: "cg" },
+  { id: "boa-viagem", nome: "Boa Viagem", municipioId: "rec" },
+  { id: "meireles", nome: "Meireles", municipioId: "for" },
+];
+
+const MOCK_ESCOLAS = [
+  { id: "ecit-1", nome: "ECIT Litorânea", bairroId: "manaira", ideb: 5.6, inse: 5.2 },
+  { id: "escola-2", nome: "EMEF Tambaú", bairroId: "tamba", ideb: 5.1, inse: 4.8 },
+  { id: "escola-3", nome: "EMEF Catolé", bairroId: "catole", ideb: 4.9, inse: 4.6 },
+  { id: "escola-4", nome: "Escola Boa Viagem", bairroId: "boa-viagem", ideb: 5.8, inse: 5.3 },
+  { id: "escola-5", nome: "Escola Meireles", bairroId: "meireles", ideb: 5.7, inse: 5 },
+];
 
 const MUNICIPIO_CENTERS: Record<string, Point> = {
   jp: [-34.863, -7.115],
@@ -143,8 +161,12 @@ export function buildMockLayer(
   }
 
   if (nivel === "escola") {
-    const escolas = MOCK_ESCOLAS.filter(
-      (escola) => escola.bairroId === recorteId,
+    const bairrosDoRecorte = MOCK_BAIRROS.filter(
+      (bairro) => bairro.municipioId === recorteId,
+    ).map((bairro) => bairro.id);
+
+    const escolas = MOCK_ESCOLAS.filter((escola) =>
+      bairrosDoRecorte.includes(escola.bairroId),
     );
 
     features = escolas.map((escola, index) => {

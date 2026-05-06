@@ -96,17 +96,34 @@ export function ObservatorioDetailPanel({
               ? getModule(activeModuleId)
               : undefined;
             if (activeModule?.DetailPanel && shellContext && onNavigate) {
-              const entity: MapEntity = {
-                kind: selection.kind,
-                data: {
-                  id: selection.id,
-                  nome: selection.nome,
-                  ...(shellContext.selectedEntity?.kind === selection.kind &&
-                  shellContext.selectedEntity.kind === "municipio"
-                    ? { geoProps: shellContext.selectedEntity.data.geoProps }
-                    : {}),
-                },
-              } as MapEntity;
+              const entity: MapEntity =
+                shellContext.selectedEntity &&
+                shellContext.selectedEntity.kind === selection.kind &&
+                shellContext.selectedEntity.data.id === selection.id
+                  ? shellContext.selectedEntity
+                  : ({
+                      kind: selection.kind,
+                      data:
+                        selection.kind === "municipio"
+                          ? {
+                              id: selection.id,
+                              nome: selection.nome,
+                              estadoId: shellContext.filters.estadoId ?? "",
+                              geoProps: undefined,
+                            }
+                          : selection.kind === "bairro"
+                            ? {
+                                id: selection.id,
+                                nome: selection.nome,
+                                municipioId:
+                                  shellContext.filters.municipioId ?? "",
+                              }
+                            : {
+                                id: selection.id,
+                                nome: selection.nome,
+                                bairroId: "",
+                              },
+                    } as MapEntity);
               return (
                 <activeModule.DetailPanel
                   entity={entity}

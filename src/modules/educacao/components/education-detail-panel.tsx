@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ModuleDetailPanelProps } from "@/core/types/module";
@@ -277,6 +278,15 @@ export function EducationDetailPanel({
             </DetailSection>
           ))}
         </>
+      )}
+
+      {entity.kind === "escola" && (
+        <Link
+          href={`/schools/${entity.data.id}`}
+          className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-500/5 px-3 py-2.5 text-sm font-medium text-cyan-700 transition-colors hover:border-cyan-500/60 hover:bg-cyan-500/10 dark:text-cyan-300"
+        >
+          Abrir página completa da escola →
+        </Link>
       )}
 
       {/* ── Navegação ── */}

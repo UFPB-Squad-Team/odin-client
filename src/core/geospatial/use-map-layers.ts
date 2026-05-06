@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { listCamadas, fetchMunicipiosGeoJSON } from "@/core/geospatial/geospatial-api";
+import {
+  fetchMunicipiosGeoJSON,
+  fetchSchoolsGeoJSON,
+  listCamadas,
+} from "@/core/geospatial/geospatial-api";
 import { buildMockCollection } from "@/core/geospatial/geospatial-mock-data";
 import type {
   GeoJSONFeatureCollection,
@@ -303,7 +307,7 @@ async function fetchMunicipalityCollection(
   return { type: "FeatureCollection", features: mergedFeatures };
 }
 
-function resolveLayerByZoom(
+export function resolveLayerByZoom(
   zoom: number | undefined,
   fallback: ObservatoryLayer,
 ) {
@@ -316,13 +320,12 @@ function resolveLayerByZoom(
 function getRecorteId(
   layer: ObservatoryLayer,
   estadoId?: string | null,
-  _municipioId?: string | null,
-  _bairroId?: string | null,
+  municipioId?: string | null,
 ) {
   void layer;
-  void _municipioId;
-  void _bairroId;
-  return estadoId ?? null;
+  if (layer === "municipio") return estadoId ?? null;
+  if (layer === "bairro") return municipioId ?? estadoId ?? null;
+  return municipioId ?? estadoId ?? null;
 }
 
 function getBackendRecorteId(
@@ -331,9 +334,10 @@ function getBackendRecorteId(
   municipioId?: string | null,
   bairroId?: string | null,
 ) {
+  void bairroId;
   if (layer === "municipio") return estadoId ?? null;
   if (layer === "bairro") return municipioId ?? estadoId ?? null;
-  return bairroId ?? municipioId ?? estadoId ?? null;
+  return municipioId ?? estadoId ?? null;
 }
 
 export function useMapLayers({
@@ -355,8 +359,8 @@ export function useMapLayers({
   );
 
   const recorteId = useMemo(
-    () => getRecorteId(resolvedLayer, estadoId, municipioId, bairroId),
-    [bairroId, estadoId, municipioId, resolvedLayer],
+    () => getRecorteId(resolvedLayer, estadoId, municipioId),
+    [estadoId, municipioId, resolvedLayer],
   );
 
   const backendRecorteId = useMemo(
@@ -405,9 +409,9 @@ export function useMapLayers({
           nextCollection = await fetchStaticLayerCollection("bairro", estadoUf);
         }
         if (!nextCollection && resolvedLayer === "escola") {
-          nextCollection = await fetchStaticLayerCollection("escola", estadoUf);
+          nextCollection = await fetchSchoolsGeoJSON(municipioId ?? null);
         }
-        if (!nextCollection) {
+        if (!nextCollection && resolvedLayer !== "escola") {
           const remoteCollection = await listCamadas(
             resolvedLayer,
             currentBackendRecorteId,
@@ -415,8 +419,20 @@ export function useMapLayers({
           nextCollection = remoteCollection ?? buildMockCollection(resolvedLayer, currentBackendRecorteId);
         }
 
-        cacheRef.current[currentCacheKey] = nextCollection;
-        if (alive) setCollection(nextCollection);
+        if (nextCollection) {
+          cacheRef.current[currentCacheKey] = nextCollection;
+          if (alive) setCollection(nextCollection);
+          return;
+        }
+
+        if (resolvedLayer === "escola") {
+          if (alive) setCollection(null);
+          return;
+        }
+
+        const fallbackCollection = buildMockCollection(resolvedLayer, currentBackendRecorteId);
+        cacheRef.current[currentCacheKey] = fallbackCollection;
+        if (alive) setCollection(fallbackCollection);
       } catch (loadError) {
         const fallbackCollection = buildMockCollection(resolvedLayer, currentBackendRecorteId);
         cacheRef.current[currentCacheKey] = fallbackCollection;
@@ -435,7 +451,7 @@ export function useMapLayers({
 
     load();
     return () => { alive = false; };
-  }, [backendRecorteId, cacheKey, estadoUf, recorteId, refreshTick, resolvedLayer]);
+  }, [backendRecorteId, cacheKey, estadoUf, municipioId, recorteId, refreshTick, resolvedLayer]);
 
   const features = collection?.features ?? [];
 

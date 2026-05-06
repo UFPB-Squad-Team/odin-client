@@ -12,7 +12,7 @@ import { useMapLayers } from "@/core/geospatial/use-map-layers";
 import { useChoropleth } from "@/core/choropleth/use-choropleth";
 import { ObservatorioMapTooltip } from "@/shell/components/observatorio-map-tooltip";
 import { LAYER_STYLES, type GeoJSONFeature } from "@/core/types/geospatial";
-import type { ObservatoryLayer } from "@/core/types/territory";
+import type { Escola, ObservatoryLayer } from "@/core/types/territory";
 import type { MapEntity } from "@/core/types/shell";
 
 type MapboxObservatorioMapProps = {
@@ -259,6 +259,7 @@ function resolveFeatureTitle(
 ) {
   const rawName =
     feature.properties?.nome ??
+    feature.properties?.escola_nome ??
     feature.properties?.name ??
     feature.properties?.description ??
     feature.properties?.id;
@@ -457,6 +458,38 @@ export function MapboxObservatorioMap({
 
     if (entity) {
       onEntityClick(entity);
+      return;
+    }
+
+    if (resolvedLayer === "escola") {
+      const fallbackId = String(
+        feature.properties?.id ?? feature.properties?.escola_id_inep ?? feature.id ?? "",
+      );
+      const fallbackNome = resolveFeatureTitle(feature);
+
+      if (fallbackId) {
+        const fallbackSchool = {
+          id: fallbackId,
+          inepId: String(
+            feature.properties?.escola_id_inep ?? feature.properties?.school_id_inep ?? fallbackId,
+          ).replace(/\.0$/, ""),
+          nome: fallbackNome,
+          bairroId: "",
+          bairroNome: String(feature.properties?.bairro ?? "") || undefined,
+          municipioId: String(
+            feature.properties?.municipioIdIbge ?? feature.properties?.municipio_id_ibge ?? "",
+          ) || undefined,
+          municipioNome: String(feature.properties?.municipio_nome ?? "") || undefined,
+          estadoSigla: String(feature.properties?.estado_sigla ?? feature.properties?.uf ?? "") || undefined,
+          ideb: typeof feature.properties?.ideb === "number" ? feature.properties.ideb : undefined,
+          inse: typeof feature.properties?.inse === "number" ? feature.properties.inse : undefined,
+        } satisfies Escola;
+
+        onEntityClick({
+          kind: "escola",
+          data: fallbackSchool,
+        });
+      }
     }
   };
 
