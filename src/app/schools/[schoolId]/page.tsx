@@ -76,12 +76,6 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
 
             <div className="flex flex-wrap gap-2">
               <Link
-                href="/observatorio?layer=escola"
-                className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-800 transition hover:bg-cyan-500/15 dark:text-cyan-200"
-              >
-                Abrir observatório
-              </Link>
-              <Link
                 href="/observatorio"
                 className="inline-flex items-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
               >
