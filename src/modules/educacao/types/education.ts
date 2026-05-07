@@ -46,8 +46,6 @@ export interface EducationResumoMunicipio {
 
 export type EducationResumoBairro = EducationResumoMunicipio;
 
-// src/modules/educacao/types/education.ts  (adicionar ao arquivo existente)
-
 /** Dados de uma etapa de ensino retornados pela API */
 export type EtapaIndicadores = {
   alunosPorTurma?: number | null;
