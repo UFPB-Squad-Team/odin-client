@@ -136,7 +136,20 @@ export function ObservatorioDetailPanel({
             return (
               <div className="mt-3 space-y-2 sm:mt-4">
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950/70 dark:text-zinc-300 sm:px-3 sm:text-xs">
-                  ID: {selection.id}
+                  {(() => {
+                    const src = selection.sourceEntity?.data ?? shellContext?.selectedEntity?.data;
+                    const raw: any = src ?? {};
+                    const inep = raw.inepId ?? raw.escola_id_inep ?? raw.escolaId ?? selection.id;
+                    const ibge = raw.municipioId ?? raw.municipioIdIbge ?? raw.municipio_id_ibge ?? raw.municipio_id ?? "—";
+                    const alunos = raw.indicadores?.totalAlunos ?? raw.totalAlunos ?? raw.total_alunos ?? raw.alunos ?? "—";
+                    return (
+                      <>
+                        <div className="text-[11px]">IBGE: <strong className="ml-1">{ibge}</strong></div>
+                        <div className="text-[11px]">INEP: <strong className="ml-1">{String(inep)}</strong></div>
+                        <div className="text-[11px]">Alunos: <strong className="ml-1">{String(alunos)}</strong></div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {selection.metrics?.map((metric) => (

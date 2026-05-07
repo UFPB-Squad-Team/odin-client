@@ -16,6 +16,16 @@ function formatNumber(value: number | null | undefined) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
+function formatPct(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  return `${value.toFixed(1)}%`;
+}
+
+function formatHoras(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  return `${value.toFixed(1)}h`;
+}
+
 function SectionCard({
   title,
   children,
@@ -44,6 +54,14 @@ function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+type EtapaIndicadores = {
+  alunosPorTurma?: number | null;
+  taxaAprovacao?: number | null;
+  taxaReprovacao?: number | null;
+  horasAulaDiarias?: number | null;
+  tnr?: number | null;
+};
+
 export default async function SchoolPage({ params }: SchoolPageProps) {
   const { schoolId } = await params;
   const school = await fetchSchoolDetail(schoolId);
@@ -57,9 +75,17 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
   const endereco = school.endereco;
   const infraestrutura = school.infraestrutura;
 
+  const etapas: Array<[string, EtapaIndicadores | undefined]> = [
+    ["Educação infantil", school.indicadores?.educacaoInfantil],
+    ["Fund. anos iniciais", school.indicadores?.fundamentalAnosIniciais],
+    ["Fund. anos finais", school.indicadores?.fundamentalAnosFinais],
+    ["Ensino médio", school.indicadores?.ensinoMedio],
+  ];
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.12),_transparent_40%),linear-gradient(180deg,_#fafafa,_#f4f7fb)] text-zinc-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.15),_transparent_40%),linear-gradient(180deg,_#020617,_#0f172a)] dark:text-zinc-100">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+
         <header className="rounded-3xl border border-zinc-200/70 bg-white/85 p-5 shadow-lg shadow-cyan-500/5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/75 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
@@ -73,7 +99,6 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
                 {school.municipio_nome} · {school.estado_sigla} · {school.dependencia_adm} · {school.tipo_localizacao}
               </p>
             </div>
-
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/observatorio"
@@ -86,62 +111,82 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
         </header>
 
         <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="grid gap-4">
+
+          <div className="grid auto-rows-min gap-4">
+
             <SectionCard title="Resumo">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <FieldRow label="ID" value={school.id} />
-                <FieldRow label="Alunos" value={formatNumber(totalAlunos)} />
-                <FieldRow label="IBGE do município" value={school.municipio_id_ibge} />
-                <FieldRow label="INEP / escola" value={String(school.escola_id_inep ?? school.id)} />
-              </div>
+              <FieldRow label="INEP" value={String(school.escola_id_inep)} />
+              <FieldRow label="IBGE do município" value={school.municipio_id_ibge} />
+              <FieldRow label="Total de alunos" value={formatNumber(totalAlunos)} />
+              <FieldRow label="Ano referência" value={school.indicadores?.anoReferencia ?? "—"} />
             </SectionCard>
 
             <SectionCard title="Endereço">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <FieldRow label="Bairro" value={endereco?.bairro ?? "—"} />
-                <FieldRow label="Logradouro" value={endereco?.logradouro ?? "—"} />
-                <FieldRow label="Número" value={endereco?.numero ?? "—"} />
-                <FieldRow label="CEP" value={endereco?.cep ?? "—"} />
-                <FieldRow label="Município" value={endereco?.municipio ?? school.municipio_nome} />
-                <FieldRow label="UF" value={endereco?.uf ?? school.estado_sigla} />
-              </div>
+              <FieldRow label="Bairro" value={endereco?.bairro ?? "—"} />
+              <FieldRow label="Logradouro" value={endereco?.logradouro ?? "—"} />
+              <FieldRow label="Número" value={endereco?.numero ?? "—"} />
+              <FieldRow label="CEP" value={endereco?.cep ?? "—"} />
+              <FieldRow label="Município" value={endereco?.municipio ?? school.municipio_nome} />
+              <FieldRow label="UF" value={endereco?.uf ?? school.estado_sigla} />
             </SectionCard>
 
             <SectionCard title="Indicadores">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <FieldRow label="Ano referência" value={school.indicadores?.anoReferencia ?? "—"} />
-                <FieldRow label="Total de alunos" value={formatNumber(school.indicadores?.totalAlunos)} />
-                <FieldRow label="Educação infantil" value={formatNumber(school.indicadores?.educacaoInfantil?.alunosPorTurma)} />
-                <FieldRow label="Fundamental anos iniciais" value={formatNumber(school.indicadores?.fundamentalAnosIniciais?.alunosPorTurma)} />
-                <FieldRow label="Fundamental anos finais" value={formatNumber(school.indicadores?.fundamentalAnosFinais?.alunosPorTurma)} />
-                <FieldRow label="Ensino médio" value={formatNumber(school.indicadores?.ensinoMedio?.alunosPorTurma)} />
-              </div>
+              {etapas.map(([label, etapa]) => (
+                <div key={label} className="mb-3 last:mb-0">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                    {label}
+                  </p>
+                  <FieldRow label="Alunos/turma" value={formatNumber(etapa?.alunosPorTurma)} />
+                  <FieldRow label="Aprovação" value={formatPct(etapa?.taxaAprovacao)} />
+                  <FieldRow label="Reprovação" value={formatPct(etapa?.taxaReprovacao)} />
+                  <FieldRow label="Horas/dia" value={formatHoras(etapa?.horasAulaDiarias)} />
+                </div>
+              ))}
             </SectionCard>
+
           </div>
 
-          <div className="grid gap-4 self-start">
-            <SectionCard title="Infraestrutura">
-              <div className="grid gap-2">
-                <FieldRow label="Acessibilidade PCD" value={formatBoolean(infraestrutura?.possuiAcessibilidadePcd)} />
-                <FieldRow label="Água potável" value={formatBoolean(infraestrutura?.possuiAguaPotavel)} />
-                <FieldRow label="Biblioteca" value={formatBoolean(infraestrutura?.possuiBiblioteca)} />
-                <FieldRow label="Coleta de lixo" value={formatBoolean(infraestrutura?.possuiColetaLixo)} />
-                <FieldRow label="Cozinha" value={formatBoolean(infraestrutura?.possuiCozinha)} />
-                <FieldRow label="Energia pública" value={formatBoolean(infraestrutura?.possuiEnergiaPublica)} />
-                <FieldRow label="Internet" value={formatBoolean(infraestrutura?.internet?.possuiInternet)} />
-                <FieldRow label="Internet para alunos" value={formatBoolean(infraestrutura?.internet?.internetParaAlunos)} />
-                <FieldRow label="Internet administrativa" value={formatBoolean(infraestrutura?.internet?.internetAdministrativa)} />
-              </div>
+          <div className="grid auto-rows-min gap-4">
+
+            <SectionCard title="Infraestrutura — Espaços">
+              <FieldRow label="Salas utilizadas" value={infraestrutura?.salas?.utilizadas ?? "—"} />
+              <FieldRow label="Salas climatizadas" value={infraestrutura?.salas?.climatizadas ?? "—"} />
+              <FieldRow label="Salas acessíveis" value={infraestrutura?.salas?.acessiveis ?? "—"} />
+              <FieldRow label="Biblioteca" value={formatBoolean(infraestrutura?.possuiBiblioteca)} />
+              <FieldRow label="Quadra de esportes" value={formatBoolean(infraestrutura?.possuiQuadraEsportes)} />
+              <FieldRow label="Refeitório" value={formatBoolean(infraestrutura?.possuiRefeitorio)} />
+              <FieldRow label="Pátio coberto" value={formatBoolean(infraestrutura?.possuiPatioCoberto)} />
+              <FieldRow label="Lab. informática" value={formatBoolean(infraestrutura?.possuiLaboratorioInformatica)} />
+              <FieldRow label="Lab. ciências" value={formatBoolean(infraestrutura?.possuiLaboratorioCiencias)} />
+              <FieldRow label="Acessibilidade PCD" value={formatBoolean(infraestrutura?.possuiAcessibilidadePcd)} />
+              <FieldRow label="Esgoto rede pública" value={formatBoolean(infraestrutura?.possuiEsgotoRedePublica)} />
+              <FieldRow label="Coleta de lixo" value={formatBoolean(infraestrutura?.possuiColetaLixo)} />
             </SectionCard>
 
-            <SectionCard title="Localização">
-              <div className="grid gap-2">
-                <FieldRow label="Longitude" value={localizacao?.[0]?.toFixed(6) ?? "—"} />
-                <FieldRow label="Latitude" value={localizacao?.[1]?.toFixed(6) ?? "—"} />
-                <FieldRow label="Dependência" value={school.dependencia_adm} />
-                <FieldRow label="Tipo" value={school.tipo_localizacao} />
-              </div>
+            <SectionCard title="Infraestrutura — Conectividade">
+              <FieldRow label="Internet" value={formatBoolean(infraestrutura?.internet?.possuiInternet)} />
+              <FieldRow label="Para alunos" value={formatBoolean(infraestrutura?.internet?.internetParaAlunos)} />
+              <FieldRow label="Administrativa" value={formatBoolean(infraestrutura?.internet?.internetAdministrativa)} />
             </SectionCard>
+
+            {infraestrutura?.equipamentos && (
+              <SectionCard title="Infraestrutura — Equipamentos">
+                <FieldRow label="Desktop (aluno)" value={formatBoolean(infraestrutura.equipamentos.desktopAluno)} />
+                <FieldRow label="Notebook (aluno)" value={formatBoolean(infraestrutura.equipamentos.computadorPortatilAluno)} />
+                <FieldRow label="Tablet (aluno)" value={formatBoolean(infraestrutura.equipamentos.tabletAluno)} />
+                <FieldRow label="Multimídia" value={formatBoolean(infraestrutura.equipamentos.multimidia)} />
+                <FieldRow label="Lousa digital" value={formatBoolean(infraestrutura.equipamentos.lousaDigital)} />
+                <FieldRow label="Impressora" value={formatBoolean(infraestrutura.equipamentos.impressora)} />
+              </SectionCard>
+            )}
+
+            <SectionCard title="Localização">
+              <FieldRow label="Longitude" value={localizacao?.[0]?.toFixed(6) ?? "—"} />
+              <FieldRow label="Latitude" value={localizacao?.[1]?.toFixed(6) ?? "—"} />
+              <FieldRow label="Dependência" value={school.dependencia_adm} />
+              <FieldRow label="Tipo" value={school.tipo_localizacao} />
+            </SectionCard>
+
           </div>
         </section>
       </div>
