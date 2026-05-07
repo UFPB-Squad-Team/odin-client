@@ -49,20 +49,12 @@ export async function fetchMunicipiosGeoJSON(
 
 /**
  * Busca escolas como GeoJSON para a camada de mapa.
- * GET /api/v1/escolas/geojson/paraiba?municipio_id=2507507
+ * GET /api/v1/escolas/geojson/paraiba
  */
-export async function fetchSchoolsGeoJSON(
-  municipioId?: string | null,
-): Promise<GeoJSONFeatureCollection | null> {
+export async function fetchSchoolsGeoJSON(): Promise<GeoJSONFeatureCollection | null> {
   if (!API_BASE_URL) return null;
 
-  const query = municipioId
-    ? `?municipio_id=${encodeURIComponent(municipioId)}`
-    : "";
-
-  const response = await fetch(
-    `${API_BASE_URL}/escolas/geojson/paraiba${query}`,
-  );
+  const response = await fetch(`${API_BASE_URL}/escolas/geojson/paraiba`);
 
   if (!response.ok) return null;
 

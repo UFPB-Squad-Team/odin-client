@@ -267,6 +267,7 @@ export function buildEducationSelection(
       nome: entity.data.nome,
       kind: "municipio",
       subtitle: "Visão agregada por município",
+      sourceEntity: entity,
       metrics: [
         {
           label: "Escolas no recorte",
@@ -314,6 +315,7 @@ export function buildEducationSelection(
       nome: entity.data.nome,
       kind: "bairro",
       subtitle: "Visão territorial detalhada por bairro",
+      sourceEntity: entity,
       metrics: [
         {
           label: "Escolas no bairro",
@@ -348,7 +350,6 @@ export function buildEducationSelection(
   }
 
   // escola
-  console.log(entity);
   const detail = ESCOLA_ATLAS_MOCKS[entity.data.id];
   const escolaNome = entity.data.nome;
   const escolaMunicipio = entity.data.municipioNome ?? "—";
@@ -363,6 +364,7 @@ export function buildEducationSelection(
     nome: escolaNome,
     kind: "escola",
     subtitle: "Visão micro em unidade escolar",
+    sourceEntity: entity,
     metrics: [
       {
         label: "IDEB",

@@ -97,7 +97,8 @@ export function ObservatorioDetailPanel({
               : undefined;
             if (activeModule?.DetailPanel && shellContext && onNavigate) {
               const entity: MapEntity =
-                shellContext.selectedEntity &&
+                selection.sourceEntity ??
+                (shellContext.selectedEntity &&
                 shellContext.selectedEntity.kind === selection.kind &&
                 shellContext.selectedEntity.data.id === selection.id
                   ? shellContext.selectedEntity
@@ -123,7 +124,7 @@ export function ObservatorioDetailPanel({
                                 nome: selection.nome,
                                 bairroId: "",
                               },
-                    } as MapEntity);
+                    } as MapEntity));
               return (
                 <activeModule.DetailPanel
                   entity={entity}

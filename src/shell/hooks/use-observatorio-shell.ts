@@ -231,6 +231,7 @@ export function useObservatorioShell() {
         nome: entity.data.nome,
         kind: entity.kind,
         subtitle: `${entity.kind.charAt(0).toUpperCase() + entity.kind.slice(1)} selecionado`,
+        sourceEntity: entity,
       });
     }
     setDetailsOpen(true);

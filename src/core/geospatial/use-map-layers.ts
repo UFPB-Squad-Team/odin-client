@@ -325,7 +325,7 @@ function getRecorteId(
   void layer;
   if (layer === "municipio") return estadoId ?? null;
   if (layer === "bairro") return municipioId ?? estadoId ?? null;
-  return municipioId ?? estadoId ?? null;
+  return estadoId ?? null;
 }
 
 function getBackendRecorteId(
@@ -337,7 +337,7 @@ function getBackendRecorteId(
   void bairroId;
   if (layer === "municipio") return estadoId ?? null;
   if (layer === "bairro") return municipioId ?? estadoId ?? null;
-  return municipioId ?? estadoId ?? null;
+  return estadoId ?? null;
 }
 
 export function useMapLayers({
@@ -409,7 +409,7 @@ export function useMapLayers({
           nextCollection = await fetchStaticLayerCollection("bairro", estadoUf);
         }
         if (!nextCollection && resolvedLayer === "escola") {
-          nextCollection = await fetchSchoolsGeoJSON(municipioId ?? null);
+          nextCollection = await fetchSchoolsGeoJSON();
         }
         if (!nextCollection && resolvedLayer !== "escola") {
           const remoteCollection = await listCamadas(

@@ -194,6 +194,10 @@ export function ObservatorioShell() {
     },
     selectedEntity: selected
       ? (() => {
+          if (selected.sourceEntity) {
+            return selected.sourceEntity;
+          }
+
           if (selected.kind === "municipio") {
             const found = municipios.find((m) => m.id === selected.id);
             if (found) {

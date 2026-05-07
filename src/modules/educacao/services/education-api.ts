@@ -67,11 +67,6 @@ export async function listEscolasByBairro(bairroId: string): Promise<Escola[]> {
 }
 
 async function resolveSchoolDetailId(schoolId: string): Promise<string | null> {
-  const directResponse = await fetch(`${API_BASE_URL}/${schoolId}`);
-  if (directResponse.ok) {
-    return schoolId;
-  }
-
   const schoolsCollection = await fetchAllSchools();
   if (!schoolsCollection) {
     return null;
@@ -98,15 +93,13 @@ export async function fetchSchoolDetail(
 ): Promise<SchoolDetail | null> {
   if (!API_BASE_URL) return null;
 
-  let resolvedSchoolId = schoolId;
   const directResponse = await fetch(`${API_BASE_URL}/${schoolId}`);
-  if (!directResponse.ok) {
-    const fallbackSchoolId = await resolveSchoolDetailId(schoolId);
-    if (!fallbackSchoolId) return null;
-    resolvedSchoolId = fallbackSchoolId;
-  } else {
+  if (directResponse.ok) {
     return (await directResponse.json()) as SchoolDetail;
   }
+
+  const resolvedSchoolId = await resolveSchoolDetailId(schoolId);
+  if (!resolvedSchoolId || resolvedSchoolId === schoolId) return null;
 
   const response = await fetch(`${API_BASE_URL}/${resolvedSchoolId}`);
   if (!response.ok) return null;
