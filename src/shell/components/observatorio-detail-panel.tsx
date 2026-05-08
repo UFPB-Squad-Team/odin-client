@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getModule } from "@/core/registry/module-registry";
 import type {
   ObservatorySelection,
@@ -31,21 +32,87 @@ export function ObservatorioDetailPanel({
   shellContext,
   onNavigate,
 }: DetailPanelProps) {
+  const router = useRouter();
+  const [isNavigating, setIsNavigating] = useState(false);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
+      if (event.key === "Escape") onClose();
     }
-
-    if (isOpen) {
-      window.addEventListener("keydown", onKeyDown);
-    }
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
+    if (isOpen) window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) setIsNavigating(false);
+  }, [isOpen]);
+
+  function navigateToCompare(
+    primaryKind: string,
+    primaryId: string,
+    primaryName: string,
+    primarySubtitle: string,
+    primaryMetrics?: Array<{ label: string; value: string; description?: string }>,
+    secondaryKind?: string,
+    secondaryId?: string,
+    secondaryName?: string,
+    secondarySubtitle?: string,
+    secondaryMetrics?: Array<{ label: string; value: string; description?: string }>,
+  ) {
+    setIsNavigating(true);
+    const params = new URLSearchParams({
+      primaryKind,
+      primaryId,
+      primaryName,
+      primarySubtitle,
+      ...(primaryMetrics ? { primaryMetrics: JSON.stringify(primaryMetrics) } : {}),
+      ...(secondaryKind && secondaryId && secondaryName && secondarySubtitle
+        ? {
+            secondaryKind,
+            secondaryId,
+            secondaryName,
+            secondarySubtitle,
+            ...(secondaryMetrics ? { secondaryMetrics: JSON.stringify(secondaryMetrics) } : {}),
+          }
+        : {}),
+    });
+    router.push(`/observatorio/compare?${params.toString()}`);
+    onClose();
+  }
+
+  const handleCompareClick = () => {
+    if (!selection || !shellContext) return;
+    navigateToCompare(
+      selection.kind,
+      selection.id,
+      selection.nome,
+      selection.subtitle || '',
+      selection.metrics,
+    );
+  };
+
+  const handleCompareWithSelectedClick = () => {
+    if (!selection || !shellContext || !primary) return;
+    navigateToCompare(
+      primary.kind,
+      primary.id,
+      primary.nome,
+      primary.subtitle || '',
+      primary.metrics,
+      selection.kind,
+      selection.id,
+      selection.nome,
+      selection.subtitle || '',
+      selection.metrics,
+    );
+  };
+  const primary = shellContext?.comparePrimarySelection ?? null;
+  const isSameAsPrimary = Boolean(
+    primary &&
+    selection &&
+    primary.id === selection.id &&
+    primary.kind === selection.kind,
+  );
 
   return (
     <>
@@ -81,13 +148,85 @@ export function ObservatorioDetailPanel({
             ) : null}
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-shrink-0 rounded-md border border-zinc-300 px-2 py-1 text-[10px] font-medium text-zinc-700 transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:px-3 sm:py-1.5 sm:text-xs"
-          >
-            Fechar
-          </button>
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            {selection && shellContext ? (
+              <>
+                {!primary ? (
+                  <button
+                    type="button"
+                    disabled={isNavigating}
+                    onClick={handleCompareClick}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-cyan-600 bg-cyan-50 px-2 py-1 text-[10px] font-medium text-cyan-700 transition hover:bg-cyan-100 disabled:opacity-60 dark:border-cyan-500/30 dark:bg-cyan-900/30 dark:text-cyan-200 sm:px-3 sm:py-1.5 sm:text-xs"
+                  >
+                    {isNavigating ? (
+                      <svg
+                        className="h-3 w-3 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        />
+                      </svg>
+                    ) : null}
+                    Comparar
+                  </button>
+                ) : isSameAsPrimary ? (
+                  <span className="rounded-md border border-zinc-300 px-2 py-1 text-[10px] font-medium text-zinc-400 sm:px-3 sm:py-1.5 sm:text-xs">
+                    Selecionado
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isNavigating}
+                    onClick={handleCompareWithSelectedClick}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-indigo-600 bg-indigo-50 px-2 py-1 text-[10px] font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-600/30 dark:bg-indigo-900/30 dark:text-indigo-200 sm:px-3 sm:py-1.5 sm:text-xs"
+                  >
+                    {isNavigating ? (
+                      <svg
+                        className="h-3 w-3 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        />
+                      </svg>
+                    ) : null}
+                    Comparar com selecionado
+                  </button>
+                )}
+              </>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-[10px] font-medium text-zinc-700 transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:px-3 sm:py-1.5 sm:text-xs"
+            >
+              Fechar
+            </button>
+          </div>
         </div>
 
         {selection ? (
@@ -99,32 +238,32 @@ export function ObservatorioDetailPanel({
               const entity: MapEntity =
                 selection.sourceEntity ??
                 (shellContext.selectedEntity &&
-                shellContext.selectedEntity.kind === selection.kind &&
-                shellContext.selectedEntity.data.id === selection.id
+                  shellContext.selectedEntity.kind === selection.kind &&
+                  shellContext.selectedEntity.data.id === selection.id
                   ? shellContext.selectedEntity
                   : ({
-                      kind: selection.kind,
-                      data:
-                        selection.kind === "municipio"
+                    kind: selection.kind,
+                    data:
+                      selection.kind === "municipio"
+                        ? {
+                          id: selection.id,
+                          nome: selection.nome,
+                          estadoId: shellContext.filters.estadoId ?? "",
+                          geoProps: undefined,
+                        }
+                        : selection.kind === "bairro"
                           ? {
-                              id: selection.id,
-                              nome: selection.nome,
-                              estadoId: shellContext.filters.estadoId ?? "",
-                              geoProps: undefined,
-                            }
-                          : selection.kind === "bairro"
-                            ? {
-                                id: selection.id,
-                                nome: selection.nome,
-                                municipioId:
-                                  shellContext.filters.municipioId ?? "",
-                              }
-                            : {
-                                id: selection.id,
-                                nome: selection.nome,
-                                bairroId: "",
-                              },
-                    } as MapEntity));
+                            id: selection.id,
+                            nome: selection.nome,
+                            municipioId:
+                              shellContext.filters.municipioId ?? "",
+                          }
+                          : {
+                            id: selection.id,
+                            nome: selection.nome,
+                            bairroId: "",
+                          },
+                  } as MapEntity));
               return (
                 <activeModule.DetailPanel
                   entity={entity}
@@ -133,20 +272,46 @@ export function ObservatorioDetailPanel({
                 />
               );
             }
+
             return (
               <div className="mt-3 space-y-2 sm:mt-4">
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950/70 dark:text-zinc-300 sm:px-3 sm:text-xs">
                   {(() => {
-                    const src = selection.sourceEntity?.data ?? shellContext?.selectedEntity?.data;
-                    const raw: any = src ?? {};
-                    const inep = raw.inepId ?? raw.escola_id_inep ?? raw.escolaId ?? selection.id;
-                    const ibge = raw.municipioId ?? raw.municipioIdIbge ?? raw.municipio_id_ibge ?? raw.municipio_id ?? "—";
-                    const alunos = raw.indicadores?.totalAlunos ?? raw.totalAlunos ?? raw.total_alunos ?? raw.alunos ?? "—";
+                    const src =
+                      selection.sourceEntity?.data ??
+                      shellContext?.selectedEntity?.data;
+                    const raw = (src ?? {}) as Record<string, unknown>;
+                    const inep = (raw.inepId ??
+                      raw.escola_id_inep ??
+                      raw.escolaId ??
+                      selection.id) as string | number;
+                    const ibge = (raw.municipioId ??
+                      raw.municipioIdIbge ??
+                      raw.municipio_id_ibge ??
+                      raw.municipio_id ??
+                      "—") as string;
+                    const indicadores = raw.indicadores as
+                      | Record<string, unknown>
+                      | undefined;
+                    const alunos = (indicadores?.totalAlunos ??
+                      raw.totalAlunos ??
+                      raw.total_alunos ??
+                      raw.alunos ??
+                      "—") as string | number;
                     return (
                       <>
-                        <div className="text-[11px]">IBGE: <strong className="ml-1">{ibge}</strong></div>
-                        <div className="text-[11px]">INEP: <strong className="ml-1">{String(inep)}</strong></div>
-                        <div className="text-[11px]">Alunos: <strong className="ml-1">{String(alunos)}</strong></div>
+                        <div className="text-[11px]">
+                          IBGE:{" "}
+                          <strong className="ml-1">{String(ibge)}</strong>
+                        </div>
+                        <div className="text-[11px]">
+                          INEP:{" "}
+                          <strong className="ml-1">{String(inep)}</strong>
+                        </div>
+                        <div className="text-[11px]">
+                          Alunos:{" "}
+                          <strong className="ml-1">{String(alunos)}</strong>
+                        </div>
                       </>
                     );
                   })()}

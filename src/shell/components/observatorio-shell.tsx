@@ -4,11 +4,11 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ObservatorioDetailPanel } from "@/shell/components/observatorio-detail-panel";
+import ComparePanel from "@/shell/components/compare-panel";
 import { MapboxObservatorioMap } from "@/shell/components/mapbox-observatorio-map-v2";
 import { ObservatorioSidebar } from "@/shell/components/observatorio-sidebar";
 import { ShareLinkButton } from "@/shell/components/share-link-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { ShellProvider } from "@/shell/context/shell-context";
 import { ModuleBootstrap } from "@/shell/components/module-bootstrap";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
 import type { ShellContextType } from "@/core/types/shell";
@@ -142,6 +142,7 @@ function buildShareableSearchParams(state: {
 }
 
 export function ObservatorioShell() {
+
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -158,6 +159,9 @@ export function ObservatorioShell() {
   const [mapVisualControls, setMapVisualControls] = useState<MapVisualControls>(
     DEFAULT_MAP_VISUAL_CONTROLS,
   );
+  const [comparePrimarySelection, setComparePrimarySelection] = useState<import("@/core/types/shell").ObservatorySelection | null>(null);
+  const [compareSecondarySelection, setCompareSecondarySelection] = useState<import("@/core/types/shell").ObservatorySelection | null>(null);
+  const [comparePanelOpen, setComparePanelOpen] = useState(false);
 
   const {
     activeLayer,
@@ -188,72 +192,84 @@ export function ObservatorioShell() {
   const shellContext: ShellContextType = {
     activeLayer,
     filters: {
+      activeLayer,
       estadoId: filters.estadoId,
       municipioId: filters.municipioId,
       bairroId: filters.bairroId,
     },
     selectedEntity: selected
       ? (() => {
-          if (selected.sourceEntity) {
-            return selected.sourceEntity;
-          }
+        if (selected.sourceEntity) {
+          return selected.sourceEntity;
+        }
 
-          if (selected.kind === "municipio") {
-            const found = municipios.find((m) => m.id === selected.id);
-            if (found) {
-              return {
-                kind: "municipio" as const,
-                data: found,
-              };
-            }
+        if (selected.kind === "municipio") {
+          const found = municipios.find((m) => m.id === selected.id);
+          if (found) {
             return {
               kind: "municipio" as const,
-              data: {
-                id: selected.id,
-                nome: selected.nome,
-                estadoId: filters.estadoId ?? "",
-                geoProps: undefined,
-              },
+              data: found,
             };
           }
+          return {
+            kind: "municipio" as const,
+            data: {
+              id: selected.id,
+              nome: selected.nome,
+              estadoId: filters.estadoId ?? "",
+              geoProps: undefined,
+            },
+          };
+        }
 
-          if (selected.kind === "bairro") {
-            const found = bairros.find((item) => item.id === selected.id);
-            if (found) {
-              return {
-                kind: "bairro" as const,
-                data: found,
-              };
-            }
+        if (selected.kind === "bairro") {
+          const found = bairros.find((item) => item.id === selected.id);
+          if (found) {
             return {
               kind: "bairro" as const,
-              data: {
-                id: selected.id,
-                nome: selected.nome,
-                municipioId: filters.municipioId ?? "",
-              },
+              data: found,
             };
           }
-
-          const fallbackSchool = mapEntities.find(
-            (entity) =>
-              entity.kind === "escola" &&
-              (entity.data.id === selected.id || entity.data.inepId === selected.id),
-          );
-
-          if (fallbackSchool) {
-            return fallbackSchool;
-          }
-
           return {
-            kind: selected.kind,
-            data: { id: selected.id, nome: selected.nome },
-          } as import("@/core/types/shell").MapEntity;
-        })()
+            kind: "bairro" as const,
+            data: {
+              id: selected.id,
+              nome: selected.nome,
+              municipioId: filters.municipioId ?? "",
+            },
+          };
+        }
+
+        const fallbackSchool = mapEntities.find(
+          (entity) =>
+            entity.kind === "escola" &&
+            (entity.data.id === selected.id || entity.data.inepId === selected.id),
+        );
+
+        if (fallbackSchool) {
+          return fallbackSchool;
+        }
+
+        return {
+          kind: selected.kind,
+          data: { id: selected.id, nome: selected.nome },
+        } as import("@/core/types/shell").MapEntity;
+      })()
       : null,
     activeModuleId,
     setActiveLayer,
     setActiveModule,
+    municipios: municipios || [],
+    bairros: bairros || [],
+    escolas: mapEntities
+      .filter(e => e.kind === "escola")
+      .map(e => e.data) || [],
+    comparePrimarySelection,
+    setComparePrimarySelection,
+    compareSecondarySelection,
+    setCompareSecondarySelection,
+    comparePanelOpen,
+    setComparePanelOpen,
   };
 
   // Restaura estado da URL ou localStorage na inicialização
@@ -334,7 +350,7 @@ export function ObservatorioShell() {
                 initialViewForLayer(parsedLayer ?? activeLayer).latitude,
               zoom: clamp(
                 parsed.viewState?.zoom ??
-                  initialViewForLayer(parsedLayer ?? activeLayer).zoom,
+                initialViewForLayer(parsedLayer ?? activeLayer).zoom,
                 0,
                 22,
               ),
@@ -345,13 +361,13 @@ export function ObservatorioShell() {
                 : DEFAULT_MAP_VISUAL_CONTROLS.styleId,
               fillOpacity: clamp(
                 parsed.visualControls?.fillOpacity ??
-                  DEFAULT_MAP_VISUAL_CONTROLS.fillOpacity,
+                DEFAULT_MAP_VISUAL_CONTROLS.fillOpacity,
                 20,
                 100,
               ),
               pointScale: clamp(
                 parsed.visualControls?.pointScale ??
-                  DEFAULT_MAP_VISUAL_CONTROLS.pointScale,
+                DEFAULT_MAP_VISUAL_CONTROLS.pointScale,
                 70,
                 160,
               ),
@@ -365,15 +381,15 @@ export function ObservatorioShell() {
 
     const initial = hasQueryState
       ? {
-          activeModuleId: queryState.activeModuleId ?? undefined,
-          bairroId: queryState.bairroId,
-          estadoId: queryState.estadoId,
-          layer: queryState.layer ?? undefined,
-          municipioId: queryState.municipioId,
-          sidebarCollapsed: queryState.sidebarCollapsed,
-          viewState: queryState.viewState,
-          visualControls: queryState.visualControls,
-        }
+        activeModuleId: queryState.activeModuleId ?? undefined,
+        bairroId: queryState.bairroId,
+        estadoId: queryState.estadoId,
+        layer: queryState.layer ?? undefined,
+        municipioId: queryState.municipioId,
+        sidebarCollapsed: queryState.sidebarCollapsed,
+        viewState: queryState.viewState,
+        visualControls: queryState.visualControls,
+      }
       : storageState;
 
     if (initial) {
@@ -566,7 +582,7 @@ export function ObservatorioShell() {
   };
 
   return (
-    <ShellProvider value={shellContext}>
+    <>
       <ModuleBootstrap />
       <main className="relative h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-900 transition-colors dark:text-zinc-100">
         <header className="relative z-[50] border-b border-zinc-200/80 bg-white/90 px-3 py-3 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/85 sm:px-4">
@@ -675,8 +691,9 @@ export function ObservatorioShell() {
             shellContext={shellContext}
             onNavigate={handleEntityClick}
           />
+          <ComparePanel />
         </div>
       </main>
-    </ShellProvider>
+    </>
   );
 }

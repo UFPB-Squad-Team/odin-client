@@ -33,6 +33,7 @@ export interface Escola {
 }
 
 export type TerritoryFilters = {
+  activeLayer: string;
   estadoId: string | null;
   municipioId: string | null;
   bairroId: string | null;

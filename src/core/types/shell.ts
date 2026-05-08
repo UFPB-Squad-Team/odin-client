@@ -12,13 +12,17 @@ export type ObservatorySelection = {
   subtitle: string;
   sourceEntity?: MapEntity;
   metrics?: Array<{
-    description: string; label: string; value: string 
-}>;
+    description?: string; 
+    label: string;
+    value: string;
+  }>;
   sections?: Array<{
     title: string;
     rows: Array<{
-      description: string; label: string; value: string 
-}>;
+      description?: string; 
+      label: string;
+      value: string;
+    }>;
   }>;
 };
 
@@ -44,10 +48,19 @@ export type SearchSuggestion = {
 // Estado compartilhado exposto pelo ShellContext para os módulos consumirem.
 // Módulos leem este contexto via useShellContext() — nunca importam do Shell diretamente.
 export interface ShellContextType {
+  municipios: Municipio[];// Não pode ser never[]
+  escolas: Escola[];       
+  bairros: Bairro[];        
   activeLayer: ObservatoryLayer;
   filters: TerritoryFilters;
   selectedEntity: MapEntity | null;
   activeModuleId: string | null;
   setActiveLayer: (layer: ObservatoryLayer) => void;
   setActiveModule: (moduleId: string) => void;
+  comparePrimarySelection?: ObservatorySelection | null;
+  setComparePrimarySelection?: (s: ObservatorySelection | null) => void;
+  compareSecondarySelection?: ObservatorySelection | null;
+  setCompareSecondarySelection?: (s: ObservatorySelection | null) => void;
+  comparePanelOpen?: boolean;
+  setComparePanelOpen?: (v: boolean) => void;
 }
