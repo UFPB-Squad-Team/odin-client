@@ -5,8 +5,6 @@
 
 import { useEffect } from "react";
 import { getModule, registerModule } from "@/core/registry/module-registry";
-import { educacaoModule } from "@/modules/educacao";
-import { socioeconomicoModule } from "@/modules/socioeconomico";
 
 let bootstrapped = false;
 
@@ -15,12 +13,16 @@ export function ModuleBootstrap() {
     if (bootstrapped) return;
     bootstrapped = true;
 
-    if (!getModule("educacao")) {
-      registerModule(educacaoModule);
-    }
-    if (!getModule("socioeconomico")) {
-      registerModule(socioeconomicoModule);
-    }
+    void (async () => {
+      if (!getModule("educacao")) {
+        const { educacaoModule } = await import("@/modules/educacao");
+        registerModule(educacaoModule);
+      }
+      if (!getModule("socioeconomico")) {
+        const { socioeconomicoModule } = await import("@/modules/socioeconomico");
+        registerModule(socioeconomicoModule);
+      }
+    })();
   }, []);
 
   return null;

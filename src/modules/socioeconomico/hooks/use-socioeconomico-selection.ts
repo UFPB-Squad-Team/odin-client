@@ -25,6 +25,7 @@ export function buildSocioeconomicoSelection(
       kind: "escola",
       subtitle:
         "Dados socioeconômicos não disponíveis para escolas individuais",
+      sourceEntity: entity,
       metrics: [],
     };
   }
@@ -88,6 +89,7 @@ export function buildSocioeconomicoSelection(
       nome: entity.data.nome,
       kind: "municipio",
       subtitle: `Contexto Socioeconômico — ${fonte} (${anoRef})`,
+      sourceEntity: entity,
       metrics: [
         {
           label: "População",

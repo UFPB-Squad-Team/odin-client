@@ -3,21 +3,35 @@
 import Fuse from "fuse.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCascadeFilters } from "@/core/filters/use-cascade-filters";
+import { fetchAllSchools } from "@/core/geospatial/geospatial-api";
 import {
   listBairros,
-  listEscolasByBairro,
   listEstados,
   listMunicipios,
-} from "@/modules/educacao/services/education-api";
+} from "@/core/territory/territory-api";
 import {
   MOCK_BAIRROS,
   MOCK_ENDERECOS,
   MOCK_ESCOLAS,
   MOCK_ESTADOS,
   MOCK_MUNICIPIOS,
-} from "@/modules/educacao/services/education-mock-data";
+} from "./territory-mock-data";
 import type { Bairro, Escola, Estado, Municipio } from "@/core/types/territory";
 import type { SearchSuggestion } from "@/core/types/shell";
+
+function slugify(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function toNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 async function withFallback<T>(
   request: () => Promise<T[]>,
@@ -138,16 +152,55 @@ export function useShellFilters(initialState?: InitialState) {
   useEffect(() => {
     let alive = true;
     async function loadEscolas() {
-      if (!bairroId) { setEscolas([]); return; }
+      if (!municipioId) { setEscolas([]); return; }
       setLoading((prev) => ({ ...prev, escolas: true }));
-      const fallback = MOCK_ESCOLAS.filter((e) => e.bairroId === bairroId);
-      const data = await withFallback(() => listEscolasByBairro(bairroId), fallback);
+      const fallback = MOCK_ESCOLAS.filter((item) =>
+        MOCK_BAIRROS.some(
+          (bairro) => bairro.id === item.bairroId && bairro.municipioId === municipioId,
+        ),
+      );
+
+      const geojson = await fetchAllSchools(municipioId);
+
+      const data = geojson?.features?.length
+        ? geojson.features
+            .map((feature) => {
+              const props = feature.properties as Record<string, unknown>;
+              const rawId = String(
+                props.escola_id_inep ?? props.id ?? feature.id ?? "",
+              ).replace(/\.0$/, "");
+              const nome = String(
+                props.escola_nome ?? props.nome ?? props.name ?? rawId,
+              );
+              const bairroNome = String(props.bairro ?? props.bairro_nome ?? "").trim();
+              const bairroMatch = MOCK_BAIRROS.find((bairro) => bairro.nome === bairroNome);
+
+              return {
+                id: rawId,
+                inepId: String(
+                  props.escola_id_inep ?? props.school_id_inep ?? rawId,
+                ).replace(/\.0$/, ""),
+                nome,
+                bairroId: bairroMatch?.id ?? slugify(bairroNome || rawId),
+                bairroNome: bairroNome || undefined,
+                municipioId,
+                municipioNome:
+                  String(props.municipio_nome ?? props.municipio ?? "").trim() || undefined,
+                estadoSigla:
+                  String(props.estado_sigla ?? props.uf ?? estadoId ?? "").trim() || undefined,
+                ideb: toNumber(props.ideb),
+                inse: toNumber(props.inse),
+              } satisfies Escola;
+            })
+            .filter((item) => item.id && item.nome)
+        : fallback;
+
       if (alive) setEscolas(data);
       setLoading((prev) => ({ ...prev, escolas: false }));
     }
     loadEscolas();
     return () => { alive = false; };
-  }, [bairroId]);
+  }, [estadoId, municipioId]);
 
   const searchCatalog = useMemo<SearchSuggestion[]>(() => {
     const municipioLookup = new Map(municipios.map((m) => [m.id, m.nome]));
@@ -163,10 +216,11 @@ export function useShellFilters(initialState?: InitialState) {
 
     const byEscola = escolas.map((e) => ({
       id: `escola-${e.id}`, kind: "escola" as const,
-      label: e.nome, subtitle: `Escola · ${bairroLookup.get(e.bairroId) ?? ""}`,
+      label: e.nome,
+      subtitle: `Escola · ${e.bairroNome ?? bairroLookup.get(e.bairroId) ?? e.municipioNome ?? ""}`,
       escolaId: e.id, bairroId: e.bairroId, municipioId: municipioId ?? undefined,
       estadoId: estadoId ?? undefined,
-      keywords: `${e.nome} ${bairroLookup.get(e.bairroId) ?? ""}`,
+      keywords: `${e.nome} ${e.bairroNome ?? bairroLookup.get(e.bairroId) ?? ""} ${e.municipioNome ?? municipioLookup.get(municipioId ?? "") ?? ""}`,
     }));
 
     const byEndereco = MOCK_ENDERECOS.map((a) => ({

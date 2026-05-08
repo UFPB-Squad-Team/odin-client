@@ -10,6 +10,7 @@ export type ObservatorySelection = {
   nome: string;
   kind: ObservatoryLayer;
   subtitle: string;
+  sourceEntity?: MapEntity;
   metrics?: Array<{
     description: string; label: string; value: string 
 }>;
