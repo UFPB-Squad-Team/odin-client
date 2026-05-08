@@ -47,6 +47,7 @@ type MetricGroup = {
     b: number;
     format: "int" | "pct" | "decimal";
     higherIsBetter: boolean;
+    competitive?: boolean;
   }>;
 };
 
@@ -58,6 +59,21 @@ function extractMunicipioMetrics(
   const pb = (b?.geoProps ?? {}) as Record<string, unknown>;
   const ea = (pa.educacao ?? {}) as Record<string, unknown>;
   const eb = (pb.educacao ?? {}) as Record<string, unknown>;
+  const sa = (pa.socioeconomico ?? {}) as Record<string, unknown>;
+  const sb = (pb.socioeconomico ?? {}) as Record<string, unknown>;
+
+  const saSaneamento = (sa.saneamento ?? {}) as Record<string, unknown>;
+  const sbSaneamento = (sb.saneamento ?? {}) as Record<string, unknown>;
+  const saPopulacao = (sa.populacao ?? {}) as Record<string, unknown>;
+  const sbPopulacao = (sb.populacao ?? {}) as Record<string, unknown>;
+  const saEducacaoPop = (sa.educacaoPopulacao ?? {}) as Record<string, unknown>;
+  const sbEducacaoPop = (sb.educacaoPopulacao ?? {}) as Record<string, unknown>;
+  const saEstruturaEtaria = (sa.estruturaEtaria ?? {}) as Record<string, unknown>;
+  const sbEstruturaEtaria = (sb.estruturaEtaria ?? {}) as Record<string, unknown>;
+  const saRaca = (sa.raca ?? {}) as Record<string, unknown>;
+  const sbRaca = (sb.raca ?? {}) as Record<string, unknown>;
+  const saHabitacao = (sa.habitacao ?? {}) as Record<string, unknown>;
+  const sbHabitacao = (sb.habitacao ?? {}) as Record<string, unknown>;
 
   return [
     {
@@ -90,20 +106,7 @@ function extractMunicipioMetrics(
       ],
     },
     {
-      label: "Qualidade",
-      metrics: [
-        {
-          key: "avgIdeb",
-          label: "IDEB médio",
-          a: parseNum(pa.avg_ideb),
-          b: parseNum(pb.avg_ideb),
-          format: "decimal",
-          higherIsBetter: true,
-        },
-      ],
-    },
-    {
-      label: "Infraestrutura",
+      label: "Infraestrutura escolar",
       metrics: [
         {
           key: "internet",
@@ -130,12 +133,141 @@ function extractMunicipioMetrics(
           higherIsBetter: true,
         },
         {
-          key: "semAcessibilidade",
-          label: "Sem acessibilidade PCD",
-          a: parseNum(ea.pctSemAcessibilidade ?? pa.pct_sem_acessibilidade),
-          b: parseNum(eb.pctSemAcessibilidade ?? pb.pct_sem_acessibilidade),
+          key: "comAcessibilidade",
+          label: "Com acessibilidade PCD",
+          a: Math.max(
+            0,
+            100 - parseNum(ea.pctSemAcessibilidade ?? pa.pct_sem_acessibilidade),
+          ),
+          b: Math.max(
+            0,
+            100 - parseNum(eb.pctSemAcessibilidade ?? pb.pct_sem_acessibilidade),
+          ),
+          format: "pct",
+          higherIsBetter: true,
+        },
+      ],
+    },
+    {
+      label: "Demografia",
+      metrics: [
+        {
+          key: "populacaoTotal",
+          label: "População total",
+          a: parseNum(saPopulacao.total),
+          b: parseNum(sbPopulacao.total),
+          format: "int",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "pctCriancas0a9",
+          label: "Crianças (0-9)",
+          a: parseNum(saEstruturaEtaria.pctCriancas0a9),
+          b: parseNum(sbEstruturaEtaria.pctCriancas0a9),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "pctIdosos60Mais",
+          label: "Idosos (60+)",
+          a: parseNum(saEstruturaEtaria.pctIdosos60Mais),
+          b: parseNum(sbEstruturaEtaria.pctIdosos60Mais),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "pctPretaParda",
+          label: "Pop. preta/parda",
+          a: parseNum(saRaca.pctPretaParda),
+          b: parseNum(sbRaca.pctPretaParda),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+      ],
+    },
+    {
+      label: "Saneamento",
+      metrics: [
+        {
+          key: "aguaRedeGeral",
+          label: "Água da rede geral",
+          a: parseNum(saSaneamento.pctAguaRedeGeral),
+          b: parseNum(sbSaneamento.pctAguaRedeGeral),
+          format: "pct",
+          higherIsBetter: true,
+        },
+        {
+          key: "esgotoRedeGeral",
+          label: "Esgoto da rede geral",
+          a: parseNum(saSaneamento.pctEsgotoRedeGeral),
+          b: parseNum(sbSaneamento.pctEsgotoRedeGeral),
+          format: "pct",
+          higherIsBetter: true,
+        },
+        {
+          key: "lixoColetado",
+          label: "Lixo coletado",
+          a: parseNum(saSaneamento.pctLixoColetado),
+          b: parseNum(sbSaneamento.pctLixoColetado),
+          format: "pct",
+          higherIsBetter: true,
+        },
+        {
+          key: "aguaInadequada",
+          label: "Água inadequada",
+          a: parseNum(saSaneamento.pctAguaInadequada),
+          b: parseNum(sbSaneamento.pctAguaInadequada),
           format: "pct",
           higherIsBetter: false,
+        },
+        {
+          key: "esgotoInadequado",
+          label: "Esgoto inadequado",
+          a: parseNum(saSaneamento.pctEsgotoInadequado),
+          b: parseNum(sbSaneamento.pctEsgotoInadequado),
+          format: "pct",
+          higherIsBetter: false,
+        },
+        {
+          key: "lixoInadequado",
+          label: "Lixo inadequado",
+          a: parseNum(saSaneamento.pctLixoInadequado),
+          b: parseNum(sbSaneamento.pctLixoInadequado),
+          format: "pct",
+          higherIsBetter: false,
+        },
+      ],
+    },
+    {
+      label: "Vulnerabilidade social",
+      metrics: [
+        {
+          key: "taxaAlfabetizacao15Mais",
+          label: "Alfabetização (15+)",
+          a: Math.max(0, 100 - parseNum(saEducacaoPop.taxaAnalfabetismo15Mais)),
+          b: Math.max(0, 100 - parseNum(sbEducacaoPop.taxaAnalfabetismo15Mais)),
+          format: "pct",
+          higherIsBetter: true,
+        },
+        {
+          key: "razaoDependencia",
+          label: "Razão de dependência",
+          a: parseNum(saEstruturaEtaria.razaoDependencia),
+          b: parseNum(sbEstruturaEtaria.razaoDependencia),
+          format: "pct",
+          higherIsBetter: false,
+        },
+        {
+          key: "domNaoSuperlotado",
+          label: "Domicílios não superlotados",
+          a: Math.max(0, 100 - parseNum(saHabitacao.pctDomSuperlotado)),
+          b: Math.max(0, 100 - parseNum(sbHabitacao.pctDomSuperlotado)),
+          format: "pct",
+          higherIsBetter: true,
         },
       ],
     },
@@ -406,6 +538,7 @@ export default function ComparePage() {
     let scoreB = 0;
     groups.forEach((g) =>
       g.metrics.forEach((m) => {
+        if (m.competitive === false) return;
         if (m.a === 0 && m.b === 0) return;
         if (m.higherIsBetter) {
           if (m.a > m.b) scoreA++;
@@ -577,8 +710,17 @@ export default function ComparePage() {
                           {group.metrics.map((m) => {
                             const aVal = formatMetricValue(m.a, m.format);
                             const bVal = formatMetricValue(m.b, m.format);
-                            const aWins = m.a > 0 && m.b > 0 && (m.higherIsBetter ? m.a > m.b : m.a < m.b);
-                            const bWins = m.a > 0 && m.b > 0 && (m.higherIsBetter ? m.b > m.a : m.b < m.a);
+                            const isCompetitive = m.competitive !== false;
+                            const aWins =
+                              isCompetitive &&
+                              m.a > 0 &&
+                              m.b > 0 &&
+                              (m.higherIsBetter ? m.a > m.b : m.a < m.b);
+                            const bWins =
+                              isCompetitive &&
+                              m.a > 0 &&
+                              m.b > 0 &&
+                              (m.higherIsBetter ? m.b > m.a : m.b < m.a);
                             const noData = m.a === 0 && m.b === 0;
 
                             return (
@@ -586,7 +728,14 @@ export default function ComparePage() {
                                 key={m.key}
                                 className="metric-row grid grid-cols-[1fr_1fr_1fr] items-center gap-4 border-t border-zinc-800/60 px-4 py-3 transition-colors"
                               >
-                                <span className="text-sm text-zinc-400">{m.label}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-zinc-400">{m.label}</span>
+                                  {isCompetitive && !m.higherIsBetter && (
+                                    <span className="rounded border border-zinc-700 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-zinc-500">
+                                      menor melhor
+                                    </span>
+                                  )}
+                                </div>
 
                                 <div className="text-right">
                                   {noData ? (
@@ -603,7 +752,7 @@ export default function ComparePage() {
                                           <span className="ml-1 text-[10px] text-cyan-500">↑</span>
                                         )}
                                       </span>
-                                      {m.a > 0 && m.b > 0 && (
+                                      {isCompetitive && m.a > 0 && m.b > 0 && (
                                         <CompareBar a={m.a} b={m.b} higherIsBetter={m.higherIsBetter} />
                                       )}
                                     </div>
@@ -729,6 +878,7 @@ function ScoreCard({
 
   groups.forEach((g) =>
     g.metrics.forEach((m) => {
+      if (m.competitive === false) return;
       if (m.a === 0 && m.b === 0) return;
       if (m.higherIsBetter) {
         if (m.a > m.b) scoreA++;
