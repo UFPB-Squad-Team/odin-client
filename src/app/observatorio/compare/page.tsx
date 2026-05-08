@@ -714,8 +714,6 @@ export default function ComparePage() {
   );
 }
 
-// ─── ScoreCard ───────────────────────────────────────────────────────────────
-
 function ScoreCard({
   groups,
   nameA,
