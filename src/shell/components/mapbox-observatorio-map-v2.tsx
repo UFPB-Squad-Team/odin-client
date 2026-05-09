@@ -491,6 +491,26 @@ export function MapboxObservatorioMap({
         });
       }
     }
+
+    // Fallback para bairros: quando a lista de `entities` não contém o bairro
+    // (por exemplo, bairros foram carregados via GeoJSON apenas no mapa),
+    // constrói uma entidade temporária a partir das propriedades da feature
+    if (resolvedLayer === "bairro") {
+      const fallbackId = String(feature.properties?.id ?? feature.id ?? "").replace(/\.0$/, "");
+      const fallbackNome = resolveFeatureTitle(feature);
+      const municipioId = String(feature.properties?.municipioIdIbge ?? feature.properties?.municipio_id_ibge ?? "").replace(/\.0$/, "") || undefined;
+
+      if (fallbackId) {
+        const fallbackBairro = {
+          id: fallbackId,
+          nome: fallbackNome,
+          municipioId: municipioId ?? "",
+          geoProps: feature.properties ?? {},
+        };
+
+        onEntityClick({ kind: "bairro", data: fallbackBairro });
+      }
+    }
   };
 
   const handleHover = (event: MapLayerMouseEvent) => {

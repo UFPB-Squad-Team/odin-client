@@ -5,6 +5,7 @@ import type {
   Municipio,
 } from "@/core/types/territory";
 import { fetchAllSchools } from "@/core/geospatial/geospatial-api";
+import { listBairros as listBairrosFromTerritory } from "@/core/territory/territory-api";
 import type { SchoolDetail } from "../types/school-detail";
 export { fetchSchoolsGeoJSON } from "@/core/geospatial/geospatial-api";
 
@@ -53,10 +54,7 @@ export async function listMunicipios(estadoId: string): Promise<Municipio[]> {
 }
 
 export async function listBairros(municipioId: string): Promise<Bairro[]> {
-  if (!API_BASE_URL) return [];
-  const response = await fetch(`${API_BASE_URL}/bairros?municipio_id=${municipioId}`);
-  if (!response.ok) throw new Error("bairros indisponível");
-  return (await response.json()) as Bairro[];
+  return listBairrosFromTerritory(municipioId);
 }
 
 export async function listEscolasByBairro(bairroId: string): Promise<Escola[]> {

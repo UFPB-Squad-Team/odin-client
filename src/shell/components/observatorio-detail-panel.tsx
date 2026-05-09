@@ -53,11 +53,13 @@ export function ObservatorioDetailPanel({
     primaryName: string,
     primarySubtitle: string,
     primaryMetrics?: Array<{ label: string; value: string; description?: string }>,
+    primaryMunicipioId?: string,
     secondaryKind?: string,
     secondaryId?: string,
     secondaryName?: string,
     secondarySubtitle?: string,
     secondaryMetrics?: Array<{ label: string; value: string; description?: string }>,
+    secondaryMunicipioId?: string,
   ) {
     setIsNavigating(true);
     const params = new URLSearchParams({
@@ -66,6 +68,7 @@ export function ObservatorioDetailPanel({
       primaryName,
       primarySubtitle,
       ...(primaryMetrics ? { primaryMetrics: JSON.stringify(primaryMetrics) } : {}),
+      ...(primaryMunicipioId ? { primaryMunicipioId } : {}),
       ...(secondaryKind && secondaryId && secondaryName && secondarySubtitle
         ? {
             secondaryKind,
@@ -73,6 +76,7 @@ export function ObservatorioDetailPanel({
             secondaryName,
             secondarySubtitle,
             ...(secondaryMetrics ? { secondaryMetrics: JSON.stringify(secondaryMetrics) } : {}),
+            ...(secondaryMunicipioId ? { secondaryMunicipioId } : {}),
           }
         : {}),
     });
@@ -82,28 +86,51 @@ export function ObservatorioDetailPanel({
 
   const handleCompareClick = () => {
     if (!selection || !shellContext) return;
+    const primaryMunicipioId =
+      selection.kind === "bairro"
+        ? (selection.sourceEntity?.kind === "bairro"
+            ? selection.sourceEntity.data.municipioId
+            : shellContext.filters.municipioId) ?? undefined
+        : undefined;
+
     navigateToCompare(
       selection.kind,
       selection.id,
       selection.nome,
       selection.subtitle || '',
       selection.metrics,
+      primaryMunicipioId,
     );
   };
 
   const handleCompareWithSelectedClick = () => {
     if (!selection || !shellContext || !primary) return;
+    const primaryMunicipioId =
+      primary.kind === "bairro"
+        ? (primary.sourceEntity?.kind === "bairro"
+            ? primary.sourceEntity.data.municipioId
+            : shellContext.filters.municipioId) ?? undefined
+        : undefined;
+    const secondaryMunicipioId =
+      selection.kind === "bairro"
+        ? (selection.sourceEntity?.kind === "bairro"
+            ? selection.sourceEntity.data.municipioId
+            : shellContext.filters.municipioId) ?? undefined
+        : undefined;
+
     navigateToCompare(
       primary.kind,
       primary.id,
       primary.nome,
       primary.subtitle || '',
       primary.metrics,
+      primaryMunicipioId,
       selection.kind,
       selection.id,
       selection.nome,
       selection.subtitle || '',
       selection.metrics,
+      secondaryMunicipioId,
     );
   };
   const primary = shellContext?.comparePrimarySelection ?? null;
