@@ -347,6 +347,89 @@ export function buildEducationSelection(
   }
 
   if (entity.kind === "bairro") {
+    const props = entity.data.geoProps ?? {};
+    const educacao = props.educacao as Record<string, unknown> | undefined;
+    const hasApiData =
+      educacao != null ||
+      "total_escolas" in props ||
+      "total_matriculas" in props ||
+      "pct_com_internet" in props ||
+      "pct_com_biblioteca" in props ||
+      "pct_com_lab_informatica" in props ||
+      "pct_sem_acessibilidade" in props;
+
+    if (hasApiData) {
+      const totalEscolas = educacao?.totalEscolas ?? props.total_escolas;
+      const totalMatriculas = educacao?.totalMatriculas ?? props.total_matriculas;
+
+      return {
+        id: entity.data.id,
+        nome: entity.data.nome,
+        kind: "bairro",
+        subtitle: "Visão territorial detalhada por bairro",
+        sourceEntity: entity,
+        metrics: [
+          {
+            label: "Escolas no bairro",
+            value: formatNum(totalEscolas),
+            description: "Total de escolas no bairro ou no recorte territorial",
+          },
+          {
+            label: "Matrículas",
+            value: formatNum(totalMatriculas),
+            description: "Total de matrículas ativas no bairro ou recorte territorial",
+          },
+        ].filter((metric) => metric.value !== "—"),
+        sections: [
+          {
+            title: "Indicadores educacionais",
+            rows: [
+              {
+                label: "Total de escolas",
+                value: formatNum(totalEscolas),
+                description: "Escolas no bairro/setor",
+              },
+              {
+                label: "Total de matrículas",
+                value: formatNum(totalMatriculas),
+                description: "Matrículas ativas no bairro/setor",
+              },
+              {
+                label: "IDEB médio",
+                value: formatDecimal(educacao?.avgIdeb ?? props.avg_ideb),
+                description: "Índice de Desenvolvimento da Educação Básica médio do recorte",
+              },
+            ].filter((row) => row.value !== "—"),
+          },
+          {
+            title: "Infraestrutura escolar",
+            rows: [
+              {
+                label: "Com internet",
+                value: formatPct(educacao?.pctComInternet ?? props.pct_com_internet),
+                description: "Escolas com acesso à internet",
+              },
+              {
+                label: "Com biblioteca",
+                value: formatPct(educacao?.pctComBiblioteca ?? props.pct_com_biblioteca),
+                description: "Escolas com biblioteca ou sala de leitura",
+              },
+              {
+                label: "Com lab. informática",
+                value: formatPct(educacao?.pctComLabInformatica ?? props.pct_com_lab_informatica),
+                description: "Escolas com laboratório de informática",
+              },
+              {
+                label: "Sem acessibilidade",
+                value: formatPct(educacao?.pctSemAcessibilidade ?? props.pct_sem_acessibilidade),
+                description: "Escolas sem infraestrutura de acessibilidade",
+              },
+            ].filter((row) => row.value !== "—"),
+          },
+        ].filter((section) => section.rows.length > 0),
+      };
+    }
+
     const bairroEscolaDetails = Object.values(ESCOLA_ATLAS_MOCKS).slice(0, 2);
 
     return {

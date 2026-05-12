@@ -3,9 +3,10 @@
 import Fuse from "fuse.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCascadeFilters } from "@/core/filters/use-cascade-filters";
-import { fetchAllSchools } from "@/core/geospatial/geospatial-api";
+import { fetchSchoolsGeoJSON } from "@/core/geospatial/geospatial-api";
 import { getModule } from "@/core/registry/module-registry";
 import {
+  JOAO_PESSOA_IBGE_ID,
   listBairros,
   listEstados,
   listMunicipios,
@@ -42,11 +43,17 @@ function toNumber(value: unknown) {
 async function withFallback<T>(
   request: () => Promise<T[]>,
   fallback: T[],
+  label?: string,
 ): Promise<T[]> {
   try {
     const data = await request();
-    return data.length > 0 ? data : fallback;
-  } catch {
+    if (data.length === 0) {
+      console.warn(`[withFallback] ${label ?? "request"} retornou array vazio, usando fallback`);
+      return fallback;
+    }
+    return data;
+  } catch (err) {
+    console.error(`[withFallback] ${label ?? "request"} falhou, usando fallback:`, err);
     return fallback;
   }
 }
@@ -77,11 +84,21 @@ export function useObservatorioShell() {
     municipioId?: string;
     bairroId?: string;
   } | null>(null);
+  const municipioIdRef = useRef<string | null>(municipioId);
+  const bairroIdRef = useRef<string | null>(bairroId);
   const bootstrapRef = useRef({
     estado: true,
     municipio: true,
     bairro: true,
   });
+
+  useEffect(() => {
+    municipioIdRef.current = municipioId;
+  }, [municipioId]);
+
+  useEffect(() => {
+    bairroIdRef.current = bairroId;
+  }, [bairroId]);
 
   const [loading, setLoading] = useState({
     estados: false,
@@ -115,37 +132,54 @@ export function useObservatorioShell() {
       setLoading((prev) => ({ ...prev, municipios: true }));
       const fallback = MOCK_MUNICIPIOS.filter((item) => item.estadoId === estadoId);
       const data = await withFallback(() => listMunicipios(estadoId), fallback);
+      const sortedData = [...data].sort((a, b) =>
+        a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base", numeric: true }),
+      );
       if (alive) {
-        setMunicipios(data);
+        setMunicipios(sortedData);
         if (pendingPathRef.current?.municipioId) {
-          const target = data.find((item) => item.id === pendingPathRef.current?.municipioId);
+          const target = sortedData.find((item) => item.id === pendingPathRef.current?.municipioId);
           if (target) setMunicipio(target.id);
           pendingPathRef.current = { ...pendingPathRef.current, municipioId: undefined };
-        } else if (bootstrapRef.current.municipio && !municipioId && data[0]) {
-          setMunicipio(data[0].id);
-          bootstrapRef.current.municipio = false;
+        } else if (bootstrapRef.current.municipio && !municipioIdRef.current) {
+          const defaultMunicipio = sortedData.find((m) => m.id === JOAO_PESSOA_IBGE_ID) ?? sortedData[0];
+          if (defaultMunicipio) {
+            setMunicipio(defaultMunicipio.id);
+            bootstrapRef.current.municipio = false;
+          }
         }
       }
       setLoading((prev) => ({ ...prev, municipios: false }));
     }
     loadMunicipios();
     return () => { alive = false; };
-  }, [estadoId, municipioId, setMunicipio]);
+  }, [estadoId, setMunicipio]);
 
   useEffect(() => {
     let alive = true;
     async function loadBairros() {
-      if (!municipioId) { setBairros([]); return; }
+      if (!municipioId) {
+        setBairros([]);
+        setLoading((prev) => ({ ...prev, bairros: false }));
+        return;
+      }
+
       setLoading((prev) => ({ ...prev, bairros: true }));
       const fallback = MOCK_BAIRROS.filter((item) => item.municipioId === municipioId);
-      const data = await withFallback(() => listBairros(municipioId), fallback);
+      const data = await withFallback(
+        () => listBairros(municipioId),
+        fallback,
+        `listBairros(${municipioId})`,
+      );
+
       if (alive) {
+        console.log("[loadBairros] bairros carregados:", data.length, "para município:", municipioId);
         setBairros(data);
         if (pendingPathRef.current?.bairroId) {
           const target = data.find((item) => item.id === pendingPathRef.current?.bairroId);
           if (target) setBairro(target.id);
           pendingPathRef.current = null;
-        } else if (bootstrapRef.current.bairro && !bairroId && data[0]) {
+        } else if (bootstrapRef.current.bairro && !bairroIdRef.current && data[0]) {
           setBairro(data[0].id);
           bootstrapRef.current.bairro = false;
         }
@@ -154,12 +188,23 @@ export function useObservatorioShell() {
     }
     loadBairros();
     return () => { alive = false; };
-  }, [municipioId, bairroId, setBairro]);
+  }, [municipioId, setBairro]);
 
   useEffect(() => {
     let alive = true;
     async function loadEscolas() {
-      if (!municipioId) { setEscolas([]); return; }
+      if (activeLayer !== "escola") {
+        setEscolas([]);
+        setLoading((prev) => ({ ...prev, escolas: false }));
+        return;
+      }
+
+      if (!municipioId) {
+        setEscolas([]);
+        setLoading((prev) => ({ ...prev, escolas: false }));
+        return;
+      }
+
       setLoading((prev) => ({ ...prev, escolas: true }));
       const fallback = MOCK_ESCOLAS.filter((item) =>
         MOCK_BAIRROS.some(
@@ -167,22 +212,30 @@ export function useObservatorioShell() {
         ),
       );
 
-      const geojson = await fetchAllSchools(municipioId);
+      const geojson = await fetchSchoolsGeoJSON();
 
-      const data = geojson?.features?.length
-        ? geojson.features
-            .map((feature) => {
-              const props = feature.properties as Record<string, unknown>;
-              const rawId = String(
-                props.escola_id_inep ?? props.id ?? feature.id ?? "",
-              ).replace(/\.0$/, "");
-              const nome = String(
-                props.escola_nome ?? props.nome ?? props.name ?? rawId,
-              );
-              const bairroNome = String(props.bairro ?? props.bairro_nome ?? "").trim();
-              const bairroMatch = MOCK_BAIRROS.find((bairro) => bairro.nome === bairroNome);
+      const data: Escola[] = geojson?.features?.length
+        ? geojson.features.flatMap((feature) => {
+            const props = feature.properties as Record<string, unknown>;
+            const rawId = String(
+              props.escola_id_inep ?? props.id ?? feature.id ?? "",
+            ).replace(/\.0$/, "");
+            const featureMunicipioId = String(
+              props.municipioIdIbge ?? props.municipio_id_ibge ?? "",
+            ).replace(/\.0$/, "");
 
-              return {
+            if (featureMunicipioId !== municipioId) {
+              return [];
+            }
+
+            const nome = String(
+              props.escola_nome ?? props.nome ?? props.name ?? rawId,
+            );
+            const bairroNome = String(props.bairro ?? props.bairro_nome ?? "").trim();
+            const bairroMatch = MOCK_BAIRROS.find((bairro) => bairro.nome === bairroNome);
+
+            return [
+              {
                 id: rawId,
                 inepId: String(
                   props.escola_id_inep ?? props.school_id_inep ?? rawId,
@@ -197,21 +250,28 @@ export function useObservatorioShell() {
                   String(props.estado_sigla ?? props.uf ?? estadoId ?? "").trim() || undefined,
                 ideb: toNumber(props.ideb),
                 inse: toNumber(props.inse),
-              } satisfies Escola;
-            })
-            .filter((item) => item.id && item.nome)
+              } satisfies Escola,
+            ];
+          })
         : fallback;
 
-      if (alive) setEscolas(data);
+      const sortedData = [...data].sort((a, b) =>
+        a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base", numeric: true }),
+      );
+
+      if (alive) setEscolas(sortedData);
       setLoading((prev) => ({ ...prev, escolas: false }));
     }
     loadEscolas();
     return () => { alive = false; };
-  }, [estadoId, municipioId]);
+  }, [activeLayer, estadoId, municipioId]);
 
   useEffect(() => {
     setSelected(null);
     setDetailsOpen(false);
+    if (activeLayer === "bairro") {
+      bootstrapRef.current.bairro = true;
+    }
   }, [estadoId, municipioId, bairroId, activeLayer]);
 
   const mapEntities: MapEntity[] = useMemo(() => {
@@ -326,7 +386,6 @@ export function useObservatorioShell() {
     applySuggestion,
     applyFilterPath,
     disableBootstrapDefaults,
-    // novos
     activeModuleId,
     setActiveModule,
     sidebarCollapsed,
