@@ -1,4 +1,4 @@
-# ODIN — Observatório de Dados e Indicadores
+# ODIN — Observatório de Dados Integrados do Nordeste
 
 Frontend do sistema ODIN, uma plataforma de observatório territorial com dados de educação, saneamento e demografia para a Paraíba. Desenvolvido com Next.js 15 + App Router, MapLibre GL e Tailwind CSS.
 
