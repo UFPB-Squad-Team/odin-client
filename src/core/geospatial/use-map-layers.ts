@@ -180,41 +180,16 @@ async function fetchJsonFromCandidates(
       if (!response.ok) continue;
       return (await response.json()) as RawGeoJSONCollection;
     } catch {
-      // try next candidate
+      // tenta o próximo candidato
     }
   }
   return null;
 }
 
-function buildStateDataCandidates(
-  layer: Extract<ObservatoryLayer, "bairro" | "escola">,
-  estadoUf: string | null,
-) {
-  if (!estadoUf) return [] as string[];
-  return [
-    `/data/${layer === "bairro" ? "bairros" : "escolas"}/${estadoUf}.json`,
-    `/data/${layer === "bairro" ? "bairros" : "escolas"}.json`,
-  ];
-}
-
 function buildMunicipalityFallbackCandidates(estadoUf: string | null) {
   if (!estadoUf) return [] as string[];
   const code = UF_TO_IBGE_STATE_CODE[estadoUf];
-  return [
-    `/data/municipios/${estadoUf}.json`,
-    code ? `/data/geojs-${code}-mun.json` : "",
-  ].filter(Boolean);
-}
-
-async function fetchStaticLayerCollection(
-  layer: Extract<ObservatoryLayer, "bairro" | "escola">,
-  estadoUf: string | null,
-): Promise<GeoJSONFeatureCollection | null> {
-  const rawCollection = await fetchJsonFromCandidates(
-    buildStateDataCandidates(layer, estadoUf),
-  );
-  if (!rawCollection) return null;
-  return normalizeCollection(rawCollection, layer);
+  return code ? [`/data/geojs-${code}-mun.json`] : [];
 }
 
 async function fetchIbgeMunicipalities(
@@ -240,11 +215,7 @@ async function fetchMunicipalityCollection(
       try {
         return await fetchIbgeMunicipalities(estadoUf);
       } catch {
-        const fallbackRaw = await fetchJsonFromCandidates(
-          buildMunicipalityFallbackCandidates(estadoUf),
-        );
-        if (!fallbackRaw) return null;
-        return normalizeCollection(fallbackRaw, "municipio");
+        return null;
       }
     })(),
     fetchMunicipiosGeoJSON(sgUf),
@@ -252,20 +223,31 @@ async function fetchMunicipalityCollection(
 
   const baseCollection =
     malhasResult.status === "fulfilled" ? malhasResult.value : null;
+  const odinCollection =
+    odinResult.status === "fulfilled" ? odinResult.value : null;
 
-  if (!baseCollection) return null;
+  if (!baseCollection) {
+    const fallbackRaw = await fetchJsonFromCandidates(
+      buildMunicipalityFallbackCandidates(estadoUf),
+    );
+    return fallbackRaw ? normalizeCollection(fallbackRaw, "municipio") : null;
+  }
 
-  // Se ODIN falhou, retorna só as malhas sem indicadores
-  if (
-    odinResult.status !== "fulfilled" ||
-    !odinResult.value?.features?.length
-  ) {
-    return baseCollection;
+  if (!odinCollection?.features?.length) {
+    return {
+      type: "FeatureCollection",
+      features: [...baseCollection.features].sort((a, b) =>
+        String(a.properties.nome ?? "").localeCompare(String(b.properties.nome ?? ""), "pt-BR", {
+          sensitivity: "base",
+          numeric: true,
+        }),
+      ),
+    };
   }
 
   // Monta índice ODIN por código IBGE normalizado (remove ".0" do final)
   const odinByCode = new Map<string, Record<string, unknown>>();
-  for (const feature of odinResult.value.features) {
+  for (const feature of odinCollection.features) {
     const props = feature.properties as Record<string, unknown>;
     const rawId = String(
       props.municipioIdIbge ?? props.co_municipio ?? feature.id ?? "",
@@ -304,7 +286,15 @@ async function fetchMunicipalityCollection(
     };
   });
 
-  return { type: "FeatureCollection", features: mergedFeatures };
+  return {
+    type: "FeatureCollection",
+    features: [...mergedFeatures].sort((a, b) =>
+      String(a.properties.nome ?? "").localeCompare(String(b.properties.nome ?? ""), "pt-BR", {
+        sensitivity: "base",
+        numeric: true,
+      }),
+    ),
+  };
 }
 
 export function resolveLayerByZoom(
@@ -324,7 +314,7 @@ function getRecorteId(
 ) {
   void layer;
   if (layer === "municipio") return estadoId ?? null;
-  if (layer === "bairro") return municipioId ?? estadoId ?? null;
+  if (layer === "bairro") return municipioId ?? null;
   return estadoId ?? null;
 }
 
@@ -336,7 +326,7 @@ function getBackendRecorteId(
 ) {
   void bairroId;
   if (layer === "municipio") return estadoId ?? null;
-  if (layer === "bairro") return municipioId ?? estadoId ?? null;
+  if (layer === "bairro") return municipioId ?? null;
   return estadoId ?? null;
 }
 
@@ -404,9 +394,6 @@ export function useMapLayers({
 
         if (resolvedLayer === "municipio") {
           nextCollection = await fetchMunicipalityCollection(estadoUf);
-        }
-        if (!nextCollection && resolvedLayer === "bairro") {
-          nextCollection = await fetchStaticLayerCollection("bairro", estadoUf);
         }
         if (!nextCollection && resolvedLayer === "escola") {
           nextCollection = await fetchSchoolsGeoJSON();

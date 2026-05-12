@@ -17,6 +17,9 @@ export interface Bairro {
   id: string;
   nome: string;
   municipioId: string;
+  geoProps?: Record<string, unknown>;
+  source?: string;
+  temBairroOficial?: boolean;
 }
 
 export interface Escola {

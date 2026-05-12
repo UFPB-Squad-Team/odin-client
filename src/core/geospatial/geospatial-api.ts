@@ -3,8 +3,47 @@ import type {
   GeoJSONFeatureCollection,
 } from "@/core/types/geospatial";
 import type { ObservatoryLayer } from "@/core/types/territory";
+import {
+  bairrosGeoCache,
+  normalizeNeighborhoodPayload,
+} from "@/core/territory/territory-api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isBrazilLngLat(lng: number, lat: number) {
+  return lng >= -75 && lng <= -30 && lat >= -35 && lat <= 6;
+}
+
+function normalizePointCoordinate(point: unknown): [number, number] | null {
+  if (!Array.isArray(point) || point.length < 2) return null;
+  const x = point[0];
+  const y = point[1];
+  if (!isFiniteNumber(x) || !isFiniteNumber(y)) return null;
+
+  if (isBrazilLngLat(x, y)) return [x, y];
+  if (isBrazilLngLat(y, x)) return [y, x];
+
+  // Fallback neutro quando fora da bbox do Brasil: mantém ordem original.
+  return [x, y];
+}
+
+function normalizeCoordinatesDeep(input: unknown): unknown {
+  if (!Array.isArray(input)) return input;
+
+  if (
+    input.length >= 2 &&
+    isFiniteNumber(input[0]) &&
+    isFiniteNumber(input[1])
+  ) {
+    return normalizePointCoordinate(input);
+  }
+
+  return input.map((item) => normalizeCoordinatesDeep(item));
+}
 
 function endpointUnavailableMessage(endpoint: string) {
   return `Endpoint ${endpoint} indisponível em modo local sem NEXT_PUBLIC_API_BASE_URL.`;
@@ -14,8 +53,83 @@ export async function listCamadas(
   nivel: ObservatoryLayer,
   recorteId: string,
 ): Promise<GeoJSONFeatureCollection | null> {
-  if (!API_BASE_URL) {
-    return null;
+  if (!API_BASE_URL) return null;
+
+  if (nivel === "bairro") {
+    // ── Reutiliza cache populado por listBairros — zero fetch extra ──────────
+    let raw = bairrosGeoCache.get(recorteId);
+
+    if (!raw) {
+      // Cache ainda não populado (ex: usuário navegou direto pela URL):
+      // faz o fetch e salva no cache para não repetir.
+      const response = await fetch(
+        `${API_BASE_URL}/aggregations/neighborhoods?municipio_id=${recorteId}&include_geometria=true`,
+      );
+      if (!response.ok) {
+        throw new Error("aggregations/neighborhoods indisponível");
+      }
+      raw = normalizeNeighborhoodPayload(await response.json());
+      bairrosGeoCache.set(recorteId, raw);
+    }
+
+    const features = raw
+      .map((item) => {
+        const geom = item.geometria as
+          | { type?: string; coordinates?: unknown }
+          | undefined;
+        if (!geom?.type) return null;
+
+        const rawId = String(
+          item._id ?? item.cd_bairro_ibge ?? item.cd_setor ?? "",
+        ).replace(/\.0$/, "");
+        if (!rawId) return null;
+
+        const nome = String(
+          item.bairro ?? item.nm_bairro ?? item.nome_area ?? item.nome ?? rawId,
+        );
+
+        let geometry: GeoJSONFeature["geometry"] | null = null;
+        try {
+          const coords = normalizeCoordinatesDeep(geom.coordinates) as unknown;
+          if (geom.type === "Point") {
+            const point = normalizePointCoordinate(coords);
+            if (!point) return null;
+            geometry = {
+              type: "Point",
+              coordinates: point,
+            };
+          } else if (geom.type === "Polygon") {
+            geometry = {
+              type: "Polygon",
+              coordinates: coords as [number, number][][],
+            } as GeoJSONFeature["geometry"];
+          } else if (geom.type === "MultiPolygon") {
+            geometry = {
+              type: "MultiPolygon",
+              coordinates: coords as [number, number][][][],
+            } as GeoJSONFeature["geometry"];
+          }
+        } catch {
+          geometry = null;
+        }
+
+        if (!geometry) return null;
+
+        return {
+          type: "Feature" as const,
+          id: rawId,
+          geometry,
+          properties: {
+            ...item,
+            id: rawId,
+            nome,
+            nivel: "bairro",
+          },
+        } as GeoJSONFeature;
+      })
+      .filter(Boolean) as GeoJSONFeature[];
+
+    return { type: "FeatureCollection", features };
   }
 
   const response = await fetch(
@@ -221,11 +335,11 @@ export async function fetchAllSchools(
 
   const filteredSchools = municipioId
     ? schools.filter((item) => {
-        const itemMunicipioId = String(
-          item.municipioIdIbge ?? item.municipio_id_ibge ?? "",
-        ).replace(/\.0$/, "");
-        return itemMunicipioId === municipioId;
-      })
+      const itemMunicipioId = String(
+        item.municipioIdIbge ?? item.municipio_id_ibge ?? "",
+      ).replace(/\.0$/, "");
+      return itemMunicipioId === municipioId;
+    })
     : schools;
 
   const features = filteredSchools

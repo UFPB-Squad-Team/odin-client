@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SearchableCombobox } from "@/shell/components/searchable-combobox";
+import { BairroMunicipioSelector } from "@/shell/components/bairro-municipio-selector";
 import { ModuleTabSidebar } from "@/shell/components/module-tab-sidebar";
 import type { Bairro, Estado, Municipio } from "@/core/types/territory";
 import type { ObservatoryLayer } from "@/core/types/territory";
@@ -23,6 +24,7 @@ type SidebarProps = {
   shellContext?: ShellContextType;
   activeIndicatorId?: string | null;
   onIndicatorChange?: (indicatorId: string | null) => void;
+  isLoadingBairros?: boolean;
 };
 
 const LAYERS: Array<{ id: ObservatoryLayer; label: string }> = [
@@ -52,6 +54,7 @@ export function ObservatorioSidebar({
   shellContext,
   activeIndicatorId = null,
   onIndicatorChange,
+  isLoadingBairros = false,
 }: SidebarProps) {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const [isDragging, setIsDragging] = useState(false);
@@ -87,7 +90,7 @@ export function ObservatorioSidebar({
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
-    
+
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
@@ -98,7 +101,33 @@ export function ObservatorioSidebar({
 
   const estadoOptions = estados.map((e) => ({ id: e.id, label: e.nome }));
   const municipioOptions = municipios.map((m) => ({ id: m.id, label: m.nome }));
-  const bairroOptions = bairros.map((b) => ({ id: b.id, label: b.nome }));
+  const bairroOptions = useMemo(
+    () =>
+      [...bairros]
+        .sort((a, b) =>
+          a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base", numeric: true }),
+        )
+        .map((bairro) => ({ id: bairro.id, label: bairro.nome })),
+    [bairros],
+  );
+
+  const municipioOptionsForBairro = useMemo(
+    () =>
+      [...municipios]
+        .sort((a, b) =>
+          a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base", numeric: true }),
+        )
+        .map((municipio) => municipio),
+    [municipios],
+  );
+
+  const temBairroOficialNoMunicipio = bairros.length > 0
+    ? bairros.some((b) => b.temBairroOficial === true)
+      ? true
+      : bairros.every((b) => b.temBairroOficial === false)
+      ? false
+      : undefined
+    : undefined;
 
   return (
     <>
@@ -131,15 +160,19 @@ export function ObservatorioSidebar({
             <div
               onMouseDown={() => setIsDragging(true)}
               className={`absolute -right-1 top-0 w-2 h-full cursor-col-resize z-50 hover:bg-cyan-500/30 transition-colors ${
-                isDragging ? 'bg-cyan-500/50' : ''
+                isDragging ? "bg-cyan-500/50" : ""
               }`}
             />
           )}
 
           <aside className="odin-scroll flex-1 overflow-y-auto p-5 flex flex-col gap-5">
             <div className="shrink-0 rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-600 dark:text-cyan-500">Painel de Filtros</p>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">Explore território por estado, município, bairro e escola.</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-600 dark:text-cyan-500">
+                Painel de Filtros
+              </p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                Explore território por estado, município, bairro e escola.
+              </p>
             </div>
 
             {shellContext && onIndicatorChange && (
@@ -156,39 +189,56 @@ export function ObservatorioSidebar({
             <div className="shrink-0 flex flex-col gap-2 p-1">
               <div className="flex items-center gap-2">
                 <span className="text-cyan-600 dark:text-cyan-500 text-xs">🔍</span>
-                <label className="text-[10px] font-bold uppercase text-zinc-500 tracking-wider">Busca Inteligente</label>
+                <label className="text-[10px] font-bold uppercase text-zinc-500 tracking-wider">
+                  Busca Inteligente
+                </label>
               </div>
               <input
                 placeholder="Ex.: Av. Epitácio Pessoa"
                 className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-200 outline-none focus:border-cyan-500/50 transition-colors"
               />
-              <p className="text-[9px] text-zinc-500 dark:text-zinc-600">Dica: pressione / para focar a busca.</p>
+              <p className="text-[9px] text-zinc-500 dark:text-zinc-600">
+                Dica: pressione / para focar a busca.
+              </p>
             </div>
 
             <div className="flex flex-col gap-4">
-              <SearchableCombobox 
+              <SearchableCombobox
                 ariaLabel="Selecionar Estado"
-                label="ESTADO" 
-                value={estadoId} 
-                options={estadoOptions} 
-                onSelect={onSetEstado} 
+                label="ESTADO"
+                value={estadoId}
+                options={estadoOptions}
+                onSelect={onSetEstado}
               />
-              <SearchableCombobox 
+
+              <SearchableCombobox
                 ariaLabel="Selecionar Município"
-                label="MUNICÍPIO" 
-                value={municipioId} 
-                options={municipioOptions} 
-                onSelect={onSetMunicipio} 
-                disabled={!estadoId} 
+                label="MUNICÍPIO"
+                value={municipioId}
+                options={municipioOptions}
+                onSelect={onSetMunicipio}
+                disabled={!estadoId}
               />
-              <SearchableCombobox 
-                ariaLabel="Selecionar Bairro"
-                label="BAIRRO" 
-                value={bairroId} 
-                options={bairroOptions} 
-                onSelect={onSetBairro} 
-                disabled={!municipioId} 
-              />
+
+              {activeLayer === "bairro" ? (
+                <BairroMunicipioSelector
+                  municipios={municipioOptionsForBairro}
+                  municipioId={municipioId}
+                  onMunicipioChange={onSetMunicipio}
+                  totalBairros={bairros.length}
+                  isLoading={isLoadingBairros}
+                  temBairroOficialNoMunicipio={temBairroOficialNoMunicipio}
+                />
+              ) : (
+                <SearchableCombobox
+                  ariaLabel="Selecionar Bairro"
+                  label="BAIRRO"
+                  value={bairroId}
+                  options={bairroOptions}
+                  onSelect={onSetBairro}
+                  disabled={!municipioId}
+                />
+              )}
             </div>
 
             <div className="shrink-0 pt-4 border-t border-zinc-200 dark:border-zinc-800/50 pb-6">
@@ -201,9 +251,9 @@ export function ObservatorioSidebar({
                     key={layer.id}
                     onClick={() => onLayerChange(layer.id)}
                     className={`py-2 text-[10px] font-bold rounded-lg border transition-all ${
-                      activeLayer === layer.id 
-                      ? "bg-cyan-600 border-cyan-500 text-white shadow-[0_0_10px_rgba(8,145,178,0.2)]" 
-                      : "bg-zinc-100 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-500 hover:border-zinc-400 dark:hover:border-zinc-700"
+                      activeLayer === layer.id
+                        ? "bg-cyan-600 border-cyan-500 text-white shadow-[0_0_10px_rgba(8,145,178,0.2)]"
+                        : "bg-zinc-100 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-500 hover:border-zinc-400 dark:hover:border-zinc-700"
                     }`}
                   >
                     {layer.label}

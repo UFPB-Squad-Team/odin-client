@@ -14,7 +14,16 @@ export function SocioeconomicoDetailPanel({ entity }: ModuleDetailPanelProps) {
         </p>
         <h2 className="text-base font-semibold leading-tight">{selection.nome}</h2>
         <p className="text-[11px] text-muted-foreground mt-1">
-          Fonte: IBGE Censo Demográfico 2022
+          Fonte: {(() => {
+            const props = (selection.sourceEntity?.data as unknown as Record<string, unknown>)?.geoProps as
+              | Record<string, unknown>
+              | undefined;
+            const src = (props?.source ?? (selection.sourceEntity?.data as unknown as Record<string, unknown>)?.source) as
+              | string
+              | undefined;
+            if (src === "setor_indicadores") return "Setor censitário (setor_indicadores)";
+            return "IBGE Censo Demográfico 2022";
+          })()}
         </p>
       </div>
 

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCascadeFilters } from "@/core/filters/use-cascade-filters";
 import { fetchAllSchools } from "@/core/geospatial/geospatial-api";
 import {
+  JOAO_PESSOA_IBGE_ID,
   listBairros,
   listEstados,
   listMunicipios,
@@ -108,14 +109,18 @@ export function useShellFilters(initialState?: InitialState) {
       setLoading((prev) => ({ ...prev, municipios: true }));
       const fallback = MOCK_MUNICIPIOS.filter((m) => m.estadoId === estadoId);
       const data = await withFallback(() => listMunicipios(estadoId), fallback);
+      const sortedData = [...data].sort((a, b) =>
+        a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base", numeric: true }),
+      );
       if (alive) {
-        setMunicipios(data);
+        setMunicipios(sortedData);
         if (pendingPathRef.current?.municipioId) {
-          const target = data.find((m) => m.id === pendingPathRef.current?.municipioId);
+          const target = sortedData.find((m) => m.id === pendingPathRef.current?.municipioId);
           if (target) setMunicipio(target.id);
           pendingPathRef.current = { ...pendingPathRef.current, municipioId: undefined };
-        } else if (bootstrapRef.current.municipio && !municipioId && data[0]) {
-          setMunicipio(data[0].id);
+        } else if (bootstrapRef.current.municipio && !municipioId && sortedData[0]) {
+          const defaultMunicipio = sortedData.find((m) => m.id === JOAO_PESSOA_IBGE_ID) ?? sortedData[0];
+          setMunicipio(defaultMunicipio.id);
           bootstrapRef.current.municipio = false;
         }
       }
@@ -123,7 +128,7 @@ export function useShellFilters(initialState?: InitialState) {
     }
     loadMunicipios();
     return () => { alive = false; };
-  }, [estadoId, municipioId, setMunicipio]);
+  }, [estadoId, setMunicipio]);
 
   useEffect(() => {
     let alive = true;
@@ -147,7 +152,7 @@ export function useShellFilters(initialState?: InitialState) {
     }
     loadBairros();
     return () => { alive = false; };
-  }, [municipioId, bairroId, setBairro]);
+  }, [municipioId, setBairro]);
 
   useEffect(() => {
     let alive = true;
