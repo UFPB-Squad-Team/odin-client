@@ -1,5 +1,22 @@
 export type ObservatoryLayer = "municipio" | "bairro" | "escola";
 
+export type EtapaIndicadores = {
+  alunosPorTurma?: number | null;
+  taxaAprovacao?: number | null;
+  taxaReprovacao?: number | null;
+  horasAulaDiarias?: number | null;
+  tnr?: number | null;
+};
+
+export type EscolaIndicadores = {
+  anoReferencia?: number | null;
+  totalAlunos?: number | null;
+  educacaoInfantil?: EtapaIndicadores;
+  fundamentalAnosIniciais?: EtapaIndicadores;
+  fundamentalAnosFinais?: EtapaIndicadores;
+  ensinoMedio?: EtapaIndicadores;
+};
+
 export interface Estado {
   id: string;
   nome: string;
@@ -31,8 +48,15 @@ export interface Escola {
   municipioId?: string;
   municipioNome?: string;
   estadoSigla?: string;
+  geoProps?: Record<string, unknown>;
+  dependenciaAdministrativa?: string;
+  dependencia_adm?: string;
+  tipoLocalizacao?: string;
+  tipo_localizacao?: string;
   ideb?: number;
   inse?: number;
+  infraestrutura?: Record<string, unknown>;
+  indicadores?: EscolaIndicadores;
 }
 
 export type TerritoryFilters = {

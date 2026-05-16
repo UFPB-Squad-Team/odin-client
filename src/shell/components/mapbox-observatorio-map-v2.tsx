@@ -117,31 +117,11 @@ type MapStyleOption = {
 };
 
 const MAP_STYLE_OPTIONS: MapStyleOption[] = [
-  {
-    id: "demo",
-    label: "Padrão",
-    style: "https://demotiles.maplibre.org/style.json",
-  },
-  {
-    id: "light",
-    label: "Claro",
-    style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-  },
-  {
-    id: "dark",
-    label: "Escuro",
-    style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-  },
-  {
-    id: "voyager",
-    label: "Voyager",
-    style: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-  },
-  {
-    id: "satellite",
-    label: "Satélite",
-    style: SATELLITE_STYLE,
-  },
+  { id: "demo", label: "Padrão", style: "https://demotiles.maplibre.org/style.json" },
+  { id: "light", label: "Claro", style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json" },
+  { id: "dark", label: "Escuro", style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" },
+  { id: "voyager", label: "Voyager", style: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json" },
+  { id: "satellite", label: "Satélite", style: SATELLITE_STYLE },
 ];
 
 const EMPTY_COLLECTION = {
@@ -181,60 +161,67 @@ function buildLayerIds(layer: ObservatoryLayer) {
 }
 
 function collectPoints(feature: GeoJSONFeature): Point[] {
-  if (feature.geometry.type === "Point") {
-    return [feature.geometry.coordinates];
-  }
-
-  if (feature.geometry.type === "Polygon") {
-    return feature.geometry.coordinates.flat() as Point[];
-  }
-
+  if (feature.geometry.type === "Point") return [feature.geometry.coordinates];
+  if (feature.geometry.type === "Polygon") return feature.geometry.coordinates.flat() as Point[];
   return feature.geometry.coordinates.flat(2) as Point[];
 }
 
 function getCentroid(feature: GeoJSONFeature): Point | null {
   const points = collectPoints(feature);
-
-  if (points.length === 0) {
-    return null;
-  }
-
+  if (points.length === 0) return null;
   const totals = points.reduce(
-    (accumulator, [longitude, latitude]) => ({
-      longitude: accumulator.longitude + longitude,
-      latitude: accumulator.latitude + latitude,
-    }),
+    (acc, [lng, lat]) => ({ longitude: acc.longitude + lng, latitude: acc.latitude + lat }),
     { longitude: 0, latitude: 0 },
   );
-
   return [totals.longitude / points.length, totals.latitude / points.length];
 }
 
 function getLayerSubtitle(layer: ObservatoryLayer, entityName: string) {
-  if (layer === "municipio") {
-    return `Limite municipal · ${entityName}`;
-  }
-
-  if (layer === "bairro") {
-    return `Limite de bairro · ${entityName}`;
-  }
-
+  if (layer === "municipio") return `Limite municipal · ${entityName}`;
+  if (layer === "bairro") return `Limite de bairro · ${entityName}`;
   return `Ponto escolar · ${entityName}`;
+}
+
+function normalizeId(raw: unknown): string {
+  return String(raw ?? "").replace(/\.0$/, "").trim();
+}
+
+function resolveChoroplethFeatureId(
+  feature: NonNullable<MapLayerMouseEvent["features"]>[number],
+): string {
+  const props = feature.properties as Record<string, unknown> | undefined;
+  return normalizeId(
+    feature.id ??
+      props?.id ??
+      props?.codarea ??
+      props?.municipioIdIbge ??
+      props?.municipio_id_ibge ??
+      props?.escola_id_inep ??
+      props?.inep ??
+      props?.codigo ??
+      props?.cod ??
+      "",
+  );
 }
 
 function resolveEntityFromFeature(
   feature: NonNullable<MapLayerMouseEvent["features"]>[number],
   entities: MapEntity[],
-) {
-  const entityId = String(feature.id ?? feature.properties?.id ?? "");
-  const normalizedEntityId = slugify(entityId);
+): MapEntity | undefined {
+  const featureId = normalizeId(feature.id ?? feature.properties?.id ?? "");
+  const propsId = normalizeId(feature.properties?.id ?? "");
 
-  return entities.find(
-    (item) =>
-      item.data.id === entityId ||
-      slugify(item.data.id) === normalizedEntityId ||
-      slugify(item.data.nome) === normalizedEntityId,
-  );
+  return entities.find((item) => {
+    const entityId = item.data.id;
+    if (entityId === featureId || entityId === propsId) return true;
+    const slugId = slugify(entityId);
+    if (slugId === slugify(featureId) || slugId === slugify(propsId)) return true;
+    if (item.kind === "escola") {
+      const escola = item.data as Escola;
+      if (escola.inepId && (escola.inepId === featureId || escola.inepId === propsId)) return true;
+    }
+    return false;
+  });
 }
 
 function resolveFeatureLayer(
@@ -242,15 +229,7 @@ function resolveFeatureLayer(
   fallback: ObservatoryLayer,
 ): ObservatoryLayer {
   const rawLayer = String(feature.properties?.nivel ?? "");
-
-  if (
-    rawLayer === "municipio" ||
-    rawLayer === "bairro" ||
-    rawLayer === "escola"
-  ) {
-    return rawLayer;
-  }
-
+  if (rawLayer === "municipio" || rawLayer === "bairro" || rawLayer === "escola") return rawLayer;
   return fallback;
 }
 
@@ -263,8 +242,68 @@ function resolveFeatureTitle(
     feature.properties?.name ??
     feature.properties?.description ??
     feature.properties?.id;
-
   return String(rawName ?? "Sem nome");
+}
+
+function parseIndicadoresFromProps(
+  raw: Record<string, unknown>,
+): import("@/core/types/territory").EscolaIndicadores | undefined {
+  let indicadores = raw.indicadores;
+  if (typeof indicadores === "string") {
+    try { indicadores = JSON.parse(indicadores); } catch { return undefined; }
+  }
+  if (!indicadores || typeof indicadores !== "object") return undefined;
+  const ind = indicadores as Record<string, unknown>;
+
+  function parseEtapa(etapa: unknown): import("@/core/types/territory").EtapaIndicadores | undefined {
+    if (!etapa || typeof etapa !== "object") return undefined;
+    const e = etapa as Record<string, unknown>;
+    if (Object.keys(e).length === 0) return undefined;
+    return {
+      alunosPorTurma: e.alunosPorTurma != null ? Number(e.alunosPorTurma) : undefined,
+      taxaAprovacao: e.taxaAprovacao != null ? Number(e.taxaAprovacao) : undefined,
+      taxaReprovacao: e.taxaReprovacao != null ? Number(e.taxaReprovacao) : undefined,
+      horasAulaDiarias: e.horasAulaDiarias != null ? Number(e.horasAulaDiarias) : undefined,
+      tnr: e.tnr != null ? Number(e.tnr) : undefined,
+    };
+  }
+
+  return {
+    anoReferencia: ind.anoReferencia != null ? Number(ind.anoReferencia) : undefined,
+    totalAlunos: ind.totalAlunos != null ? Number(ind.totalAlunos) : undefined,
+    educacaoInfantil: parseEtapa(ind.educacaoInfantil),
+    fundamentalAnosIniciais: parseEtapa(ind.fundamentalAnosIniciais),
+    fundamentalAnosFinais: parseEtapa(ind.fundamentalAnosFinais),
+    ensinoMedio: parseEtapa(ind.ensinoMedio),
+  };
+}
+
+function buildEscolaFromFeatureProps(
+  props: Record<string, unknown>,
+  fallbackId: string,
+  fallbackNome: string,
+): Escola {
+  const inepRaw = props.escola_id_inep ?? props.inep ?? fallbackId;
+  const idebRaw = props.ideb ?? (props.indicadores as Record<string, unknown> | null)?.idebAnosIniciais;
+  const inseRaw = props.inse;
+
+  return {
+    id: fallbackId,
+    inepId: String(inepRaw).replace(/\.0$/, ""),
+    nome: fallbackNome,
+    bairroId: String(props.bairro ?? ""),
+    bairroNome: props.bairro != null ? String(props.bairro) : undefined,
+    municipioId: props.municipioIdIbge != null ? String(props.municipioIdIbge).replace(/\.0$/, "") : undefined,
+    municipioNome: props.municipio_nome != null ? String(props.municipio_nome) : undefined,
+    estadoSigla: props.estado_sigla != null ? String(props.estado_sigla) : undefined,
+    dependenciaAdministrativa: props.dependencia_adm != null ? String(props.dependencia_adm) : props.dependencia != null ? String(props.dependencia) : undefined,
+    dependencia_adm: props.dependencia_adm != null ? String(props.dependencia_adm) : props.dependencia != null ? String(props.dependencia) : undefined,
+    tipoLocalizacao: props.tipo_localizacao != null ? String(props.tipo_localizacao) : props.zona != null ? String(props.zona) : undefined,
+    tipo_localizacao: props.tipo_localizacao != null ? String(props.tipo_localizacao) : props.zona != null ? String(props.zona) : undefined,
+    ideb: idebRaw != null && Number(idebRaw) !== 0 ? Number(idebRaw) : undefined,
+    inse: inseRaw != null && Number(inseRaw) !== 0 ? Number(inseRaw) : undefined,
+    indicadores: parseIndicadoresFromProps(props),
+  };
 }
 
 export function MapboxObservatorioMap({
@@ -286,9 +325,7 @@ export function MapboxObservatorioMap({
   bairroId,
 }: MapboxObservatorioMapProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(
-    null,
-  );
+  const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(null);
   const [collapsedCards, setCollapsedCards] = useState<MapCardVisibilityState>({
     info: false,
     visual: false,
@@ -300,149 +337,89 @@ export function MapboxObservatorioMap({
     collection,
     error,
     loading: layerLoading,
-  } = useMapLayers({
-    activeLayer,
-    estadoId,
-    municipioId,
-    bairroId,
-    zoom: viewState.zoom,
-  });
+  } = useMapLayers({ activeLayer, estadoId, municipioId, bairroId, zoom: viewState.zoom });
 
   const layerStyle = LAYER_STYLES[resolvedLayer];
   const ids = useMemo(() => buildLayerIds(resolvedLayer), [resolvedLayer]);
   const geojsonData = collection ?? EMPTY_COLLECTION;
 
-  // ── Choropleth ──────────────────────────────────────────────────────────────
-  const { featureColors } = useChoropleth({
-    collection,
-    activeModuleId,
-    activeIndicatorId,
-  });
+  const { featureColors } = useChoropleth({ collection, activeModuleId, activeIndicatorId });
 
-  /**
-   * MapLibre `match` expression: mapeia cada feature.id para sua cor calculada.
-   * Fallback para a cor padrão da camada quando não há choropleth ativo.
-   * Formato: ["match", ["get", "id"], id1, cor1, id2, cor2, ..., fallback]
-   */
   const fillColorExpression = useMemo(() => {
     if (featureColors.size === 0) return layerStyle.color;
-    const pairs: (string | string[])[] = [];
+
+    const pairs: unknown[] = [];
     featureColors.forEach((color, id) => {
       pairs.push(id, color);
     });
-    return ["match", ["get", "id"], ...pairs, layerStyle.color] as unknown as string;
+
+    return [
+      "match",
+      [
+        "to-string",
+        [
+          "coalesce",
+          ["get", "id"],
+          ["get", "codarea"],
+          ["get", "municipioIdIbge"],
+          ["get", "municipio_id_ibge"],
+          ["get", "escola_id_inep"],
+          ["get", "inep"],
+          ["get", "codigo"],
+          ["get", "cod"],
+          ["id"],
+        ],
+      ],
+      ...pairs,
+      layerStyle.color,
+    ] as unknown as string;
   }, [featureColors, layerStyle.color]);
 
   const hasChoropleth = featureColors.size > 0;
-  // ────────────────────────────────────────────────────────────────────────────
-  const mapStyleUrl = useMemo(() => {
-    const style = MAP_STYLE_OPTIONS.find(
-      (option) => option.id === visualControls.styleId,
-    );
 
+  const mapStyleUrl = useMemo(() => {
+    const style = MAP_STYLE_OPTIONS.find((o) => o.id === visualControls.styleId);
     return style?.style ?? MAP_STYLE_OPTIONS[0].style;
   }, [visualControls.styleId]);
+
   const fillOpacityFactor = clamp(visualControls.fillOpacity / 100, 0.2, 1);
-  const effectiveFillOpacity = clamp(
-    Math.min(layerStyle.opacity, 0.2) * fillOpacityFactor,
-    0.04,
-    0.32,
-  );
+  const effectiveFillOpacity = clamp(Math.min(layerStyle.opacity, 0.2) * fillOpacityFactor, 0.04, 0.32);
   const pointScaleFactor = clamp(visualControls.pointScale / 100, 0.7, 1.6);
-  const areAllCardsCollapsed =
-    collapsedCards.info && collapsedCards.visual && collapsedCards.entities;
+  const areAllCardsCollapsed = collapsedCards.info && collapsedCards.visual && collapsedCards.entities;
 
   const heatmapData = useMemo<PointFeatureCollection>(() => {
     const features = geojsonData.features ?? [];
-    const fallbackPreviewPoints: Array<{
-      coordinates: Point;
-      id: string;
-      nome: string;
-      nivel: ObservatoryLayer;
-      intensity: number;
-    }> = [
-      {
-        id: "preview-recife",
-        nome: "Recife",
-        nivel: resolvedLayer,
-        coordinates: [-34.9011, -8.0476],
-        intensity: 1,
-      },
-      {
-        id: "preview-joao-pessoa",
-        nome: "João Pessoa",
-        nivel: resolvedLayer,
-        coordinates: [-34.8731, -7.1195],
-        intensity: 0.82,
-      },
-      {
-        id: "preview-campina-grande",
-        nome: "Campina Grande",
-        nivel: resolvedLayer,
-        coordinates: [-35.8811, -7.2291],
-        intensity: 0.68,
-      },
-      {
-        id: "preview-fortaleza",
-        nome: "Fortaleza",
-        nivel: resolvedLayer,
-        coordinates: [-38.5267, -3.7319],
-        intensity: 0.55,
-      },
-      {
-        id: "preview-natal",
-        nome: "Natal",
-        nivel: resolvedLayer,
-        coordinates: [-35.2099, -5.7793],
-        intensity: 0.5,
-      },
+    const fallbackPreviewPoints = [
+      { id: "preview-recife", nome: "Recife", nivel: resolvedLayer, coordinates: [-34.9011, -8.0476] as Point, intensity: 1 },
+      { id: "preview-joao-pessoa", nome: "João Pessoa", nivel: resolvedLayer, coordinates: [-34.8731, -7.1195] as Point, intensity: 0.82 },
+      { id: "preview-campina-grande", nome: "Campina Grande", nivel: resolvedLayer, coordinates: [-35.8811, -7.2291] as Point, intensity: 0.68 },
+      { id: "preview-fortaleza", nome: "Fortaleza", nivel: resolvedLayer, coordinates: [-38.5267, -3.7319] as Point, intensity: 0.55 },
+      { id: "preview-natal", nome: "Natal", nivel: resolvedLayer, coordinates: [-35.2099, -5.7793] as Point, intensity: 0.5 },
     ];
 
     const sourceFeatures: PointFeature[] =
       features.length > 0
         ? features.flatMap((feature, index) => {
             const centroid = getCentroid(feature);
-            if (!centroid) {
-              return [];
-            }
-
+            if (!centroid) return [];
             const rawProperties = feature.properties as Record<string, unknown>;
             const rawIdeb = rawProperties.ideb;
             const intensity =
               typeof rawIdeb === "number"
                 ? Math.max(0.35, Math.min(1, rawIdeb / 10))
                 : Math.max(0.35, 1 - index * 0.08);
-
-            return [
-              {
-                type: "Feature",
-                id: String(feature.id),
-                properties: {
-                  id: feature.properties.id,
-                  nome: feature.properties.nome,
-                  nivel: feature.properties.nivel,
-                  intensity,
-                },
-                geometry: {
-                  type: "Point",
-                  coordinates: centroid,
-                },
-              },
-            ];
+            return [{
+              type: "Feature",
+              id: String(feature.id),
+              properties: { id: feature.properties.id, nome: feature.properties.nome, nivel: feature.properties.nivel, intensity },
+              geometry: { type: "Point", coordinates: centroid },
+            }];
           })
-        : fallbackPreviewPoints.map((point) => ({
+        : fallbackPreviewPoints.map((p) => ({
             type: "Feature",
-            id: point.id,
-            properties: {
-              id: point.id,
-              nome: point.nome,
-              nivel: point.nivel,
-              intensity: point.intensity,
-            },
-            geometry: {
-              type: "Point",
-              coordinates: point.coordinates,
-            },
+            id: p.id,
+            properties: { id: p.id, nome: p.nome, nivel: p.nivel, intensity: p.intensity },
+            geometry: { type: "Point", coordinates: p.coordinates },
           }));
 
     return { type: "FeatureCollection", features: sourceFeatures };
@@ -450,66 +427,61 @@ export function MapboxObservatorioMap({
 
   const handleFeatureClick = (event: MapLayerMouseEvent) => {
     const feature = event.features?.[0];
-    if (!feature) {
-      return;
-    }
+    if (!feature) return;
 
     const entity = resolveEntityFromFeature(feature, entities);
-
     if (entity) {
       onEntityClick(entity);
       return;
     }
 
-    if (resolvedLayer === "escola") {
-      const fallbackId = String(
-        feature.properties?.id ?? feature.properties?.escola_id_inep ?? feature.id ?? "",
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const fallbackId = normalizeId(props.id ?? feature.id ?? "");
+    const fallbackNome = resolveFeatureTitle(feature);
+
+    if (!fallbackId) return;
+
+    if (resolvedLayer === "municipio") {
+      const municipioIdIbge = normalizeId(
+        props.municipioIdIbge ?? props.co_municipio ?? props.id ?? feature.id ?? "",
       );
-      const fallbackNome = resolveFeatureTitle(feature);
+      const nome = String(
+        props.municipio ?? props.nome ?? props.name ?? props.description ?? fallbackNome,
+      );
+      const estadoSigla = String(props.sg_uf ?? props.uf ?? estadoId ?? "").toLowerCase();
 
-      if (fallbackId) {
-        const fallbackSchool = {
-          id: fallbackId,
-          inepId: String(
-            feature.properties?.escola_id_inep ?? feature.properties?.school_id_inep ?? fallbackId,
-          ).replace(/\.0$/, ""),
-          nome: fallbackNome,
-          bairroId: "",
-          bairroNome: String(feature.properties?.bairro ?? "") || undefined,
-          municipioId: String(
-            feature.properties?.municipioIdIbge ?? feature.properties?.municipio_id_ibge ?? "",
-          ) || undefined,
-          municipioNome: String(feature.properties?.municipio_nome ?? "") || undefined,
-          estadoSigla: String(feature.properties?.estado_sigla ?? feature.properties?.uf ?? "") || undefined,
-          ideb: typeof feature.properties?.ideb === "number" ? feature.properties.ideb : undefined,
-          inse: typeof feature.properties?.inse === "number" ? feature.properties.inse : undefined,
-        } satisfies Escola;
-
-        onEntityClick({
-          kind: "escola",
-          data: fallbackSchool,
-        });
-      }
+      onEntityClick({
+        kind: "municipio",
+        data: {
+          id: municipioIdIbge || fallbackId,
+          nome,
+          estadoId: estadoSigla,
+          geoProps: props,
+        },
+      });
+      return;
     }
 
-    // Fallback para bairros: quando a lista de `entities` não contém o bairro
-    // (por exemplo, bairros foram carregados via GeoJSON apenas no mapa),
-    // constrói uma entidade temporária a partir das propriedades da feature
-    if (resolvedLayer === "bairro") {
-      const fallbackId = String(feature.properties?.id ?? feature.id ?? "").replace(/\.0$/, "");
-      const fallbackNome = resolveFeatureTitle(feature);
-      const municipioId = String(feature.properties?.municipioIdIbge ?? feature.properties?.municipio_id_ibge ?? "").replace(/\.0$/, "") || undefined;
+    if (resolvedLayer === "escola") {
+      const escola = buildEscolaFromFeatureProps(props, fallbackId, fallbackNome);
+      onEntityClick({ kind: "escola", data: escola });
+      return;
+    }
 
-      if (fallbackId) {
-        const fallbackBairro = {
+    if (resolvedLayer === "bairro") {
+      const bairroMunicipioId = normalizeId(
+        props.municipioIdIbge ?? props.municipio_id_ibge ?? "",
+      );
+      onEntityClick({
+        kind: "bairro",
+        data: {
           id: fallbackId,
           nome: fallbackNome,
-          municipioId: municipioId ?? "",
-          geoProps: feature.properties ?? {},
-        };
-
-        onEntityClick({ kind: "bairro", data: fallbackBairro });
-      }
+          municipioId: bairroMunicipioId ?? municipioId ?? "",
+          geoProps: props,
+        },
+      });
+      return;
     }
   };
 
@@ -522,12 +494,11 @@ export function MapboxObservatorioMap({
     }
 
     const entity = resolveEntityFromFeature(feature, entities);
-    const entityId = String(feature.id ?? feature.properties?.id ?? "");
+    const entityId = resolveChoroplethFeatureId(feature);
     const layer = resolveFeatureLayer(feature, resolvedLayer);
     const title = entity?.data.nome ?? resolveFeatureTitle(feature);
 
     setHoveredId(entityId || null);
-
     setHoverTooltip({
       x: event.point.x,
       y: event.point.y,
@@ -544,25 +515,13 @@ export function MapboxObservatorioMap({
     setHoverTooltip(null);
   };
 
-  const handleResetVisual = () => {
-    onResetVisual();
-  };
-
   const toggleCard = (card: keyof MapCardVisibilityState) => {
-    setCollapsedCards((current) => ({
-      ...current,
-      [card]: !current[card],
-    }));
+    setCollapsedCards((current) => ({ ...current, [card]: !current[card] }));
   };
 
   const toggleAllCards = () => {
-    const nextCollapsed = !areAllCardsCollapsed;
-
-    setCollapsedCards({
-      info: nextCollapsed,
-      visual: nextCollapsed,
-      entities: nextCollapsed,
-    });
+    const next = !areAllCardsCollapsed;
+    setCollapsedCards({ info: next, visual: next, entities: next });
   };
 
   return (
@@ -570,29 +529,12 @@ export function MapboxObservatorioMap({
       {isLoading || layerLoading ? (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-zinc-950/25 backdrop-blur-sm">
           <div className="rounded-lg border border-zinc-300 bg-white/95 px-6 py-4 text-center shadow-lg dark:border-zinc-700 dark:bg-zinc-900/95">
-            <svg
-              className="mx-auto h-6 w-6 animate-spin text-cyan-500"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
+            <svg className="mx-auto h-6 w-6 animate-spin text-cyan-500" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
             <p className="mt-3 text-sm font-medium text-zinc-700 dark:text-zinc-200">
-              {error
-                ? "Carregando fallback local..."
-                : "Carregando geometrias..."}
+              {error ? "Carregando fallback local..." : "Carregando geometrias..."}
             </p>
           </div>
         </div>
@@ -614,10 +556,7 @@ export function MapboxObservatorioMap({
           ]}
           onClick={handleFeatureClick}
           onMouseMove={handleHover}
-          onMouseLeave={() => {
-            setHoveredId(null);
-            setHoverTooltip(null);
-          }}
+          onMouseLeave={() => { setHoveredId(null); setHoverTooltip(null); }}
           dragPan
           scrollZoom
           doubleClickZoom
@@ -627,62 +566,22 @@ export function MapboxObservatorioMap({
         >
           <NavigationControl position="bottom-right" visualizePitch={false} />
 
-          <Source
-            key={ids.heatSource}
-            id={ids.heatSource}
-            type="geojson"
-            data={heatmapData as never}
-          >
+          <Source key={ids.heatSource} id={ids.heatSource} type="geojson" data={heatmapData as never}>
             <Layer
               id={ids.heatHalo}
               type="heatmap"
               paint={{
-                "heatmap-weight": [
-                  "interpolate",
-                  ["linear"],
-                  ["get", "intensity"],
-                  0,
-                  0,
-                  1,
-                  1,
-                ],
-                "heatmap-intensity": [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  5,
-                  0.6,
-                  9,
-                  1,
-                  13,
-                  1.4,
-                ],
-                "heatmap-radius": [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  5,
-                  18,
-                  9,
-                  30,
-                  13,
-                  42,
-                ],
+                "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity"], 0, 0, 1, 1],
+                "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 9, 1, 13, 1.4],
+                "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 5, 18, 9, 30, 13, 42],
                 "heatmap-opacity": 0.85,
                 "heatmap-color": [
-                  "interpolate",
-                  ["linear"],
-                  ["heatmap-density"],
-                  0,
-                  "rgba(255,255,255,0)",
-                  0.2,
-                  "rgba(120, 203, 255, 0.28)",
-                  0.4,
-                  "rgba(45, 212, 191, 0.48)",
-                  0.65,
-                  "rgba(168, 85, 247, 0.68)",
-                  1,
-                  "rgba(14, 165, 233, 0.9)",
+                  "interpolate", ["linear"], ["heatmap-density"],
+                  0, "rgba(255,255,255,0)",
+                  0.2, "rgba(120, 203, 255, 0.28)",
+                  0.4, "rgba(45, 212, 191, 0.48)",
+                  0.65, "rgba(168, 85, 247, 0.68)",
+                  1, "rgba(14, 165, 233, 0.9)",
                 ],
               }}
             />
@@ -690,15 +589,7 @@ export function MapboxObservatorioMap({
               id={ids.heat}
               type="circle"
               paint={{
-                "circle-radius": [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  8,
-                  5,
-                  13,
-                  10,
-                ],
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 5, 13, 10],
                 "circle-color": "#ffffff",
                 "circle-opacity": 0.18,
                 "circle-blur": 0.8,
@@ -706,12 +597,7 @@ export function MapboxObservatorioMap({
             />
           </Source>
 
-          <Source
-            key={ids.source}
-            id={ids.source}
-            type="geojson"
-            data={geojsonData as never}
-          >
+          <Source key={ids.source} id={ids.source} type="geojson" data={geojsonData as never}>
             <Layer
               id={ids.fill}
               type="fill"
@@ -726,17 +612,7 @@ export function MapboxObservatorioMap({
               type="circle"
               filter={["==", ["geometry-type"], "Point"]}
               paint={{
-                "circle-radius": [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  9,
-                  3.5 * pointScaleFactor,
-                  12,
-                  5.5 * pointScaleFactor,
-                  15,
-                  8 * pointScaleFactor,
-                ],
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3.5 * pointScaleFactor, 12, 5.5 * pointScaleFactor, 15, 8 * pointScaleFactor],
                 "circle-color": fillColorExpression,
                 "circle-stroke-color": "#ffffff",
                 "circle-stroke-width": 1.25,
@@ -746,54 +622,21 @@ export function MapboxObservatorioMap({
             <Layer
               id={ids.line}
               type="line"
-              paint={{
-                "line-color": layerStyle.hoverColor,
-                "line-width": 1.25,
-                "line-opacity": 0.85,
-              }}
+              paint={{ "line-color": layerStyle.hoverColor, "line-width": 1.25, "line-opacity": 0.85 }}
               filter={["!=", ["geometry-type"], "Point"]}
             />
             <Layer
               id={ids.hoverFill}
               type="fill"
-              filter={
-                hoveredId
-                  ? [
-                      "all",
-                      ["!=", ["geometry-type"], "Point"],
-                      ["==", ["get", "id"], hoveredId],
-                    ]
-                  : ["==", ["id"], "__none__"]
-              }
-              paint={{
-                "fill-color": layerStyle.hoverColor,
-                "fill-opacity": 0.52,
-              }}
+              filter={hoveredId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], hoveredId]] : ["==", ["id"], "__none__"]}
+              paint={{ "fill-color": layerStyle.hoverColor, "fill-opacity": 0.52 }}
             />
             <Layer
               id={ids.hoverPoint}
               type="circle"
-              filter={
-                hoveredId
-                  ? [
-                      "all",
-                      ["==", ["geometry-type"], "Point"],
-                      ["==", ["get", "id"], hoveredId],
-                    ]
-                  : ["==", ["id"], "__none__"]
-              }
+              filter={hoveredId ? ["all", ["==", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], hoveredId]] : ["==", ["id"], "__none__"]}
               paint={{
-                "circle-radius": [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  9,
-                  5 * pointScaleFactor,
-                  12,
-                  8 * pointScaleFactor,
-                  15,
-                  10 * pointScaleFactor,
-                ],
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 5 * pointScaleFactor, 12, 8 * pointScaleFactor, 15, 10 * pointScaleFactor],
                 "circle-color": layerStyle.hoverColor,
                 "circle-stroke-color": "#ffffff",
                 "circle-stroke-width": 2,
@@ -803,61 +646,21 @@ export function MapboxObservatorioMap({
             <Layer
               id={ids.hoverLine}
               type="line"
-              filter={
-                hoveredId
-                  ? [
-                      "all",
-                      ["!=", ["geometry-type"], "Point"],
-                      ["==", ["get", "id"], hoveredId],
-                    ]
-                  : ["==", ["id"], "__none__"]
-              }
-              paint={{
-                "line-color": layerStyle.selectedColor,
-                "line-width": 2.5,
-              }}
+              filter={hoveredId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], hoveredId]] : ["==", ["id"], "__none__"]}
+              paint={{ "line-color": layerStyle.selectedColor, "line-width": 2.5 }}
             />
             <Layer
               id={ids.selectedFill}
               type="fill"
-              filter={
-                selectedId
-                  ? [
-                      "all",
-                      ["!=", ["geometry-type"], "Point"],
-                      ["==", ["get", "id"], selectedId],
-                    ]
-                  : ["==", ["id"], "__none__"]
-              }
-              paint={{
-                "fill-color": layerStyle.selectedColor,
-                "fill-opacity": 0.65,
-              }}
+              filter={selectedId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], selectedId]] : ["==", ["id"], "__none__"]}
+              paint={{ "fill-color": layerStyle.selectedColor, "fill-opacity": 0.65 }}
             />
             <Layer
               id={ids.selectedPoint}
               type="circle"
-              filter={
-                selectedId
-                  ? [
-                      "all",
-                      ["==", ["geometry-type"], "Point"],
-                      ["==", ["get", "id"], selectedId],
-                    ]
-                  : ["==", ["id"], "__none__"]
-              }
+              filter={selectedId ? ["all", ["==", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], selectedId]] : ["==", ["id"], "__none__"]}
               paint={{
-                "circle-radius": [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  9,
-                  6 * pointScaleFactor,
-                  12,
-                  9 * pointScaleFactor,
-                  15,
-                  12 * pointScaleFactor,
-                ],
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 6 * pointScaleFactor, 12, 9 * pointScaleFactor, 15, 12 * pointScaleFactor],
                 "circle-color": layerStyle.selectedColor,
                 "circle-stroke-color": "#ffffff",
                 "circle-stroke-width": 2.5,
@@ -867,19 +670,8 @@ export function MapboxObservatorioMap({
             <Layer
               id={ids.selectedLine}
               type="line"
-              filter={
-                selectedId
-                  ? [
-                      "all",
-                      ["!=", ["geometry-type"], "Point"],
-                      ["==", ["get", "id"], selectedId],
-                    ]
-                  : ["==", ["id"], "__none__"]
-              }
-              paint={{
-                "line-color": "#ffffff",
-                "line-width": 3,
-              }}
+              filter={selectedId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], selectedId]] : ["==", ["id"], "__none__"]}
+              paint={{ "line-color": "#ffffff", "line-width": 3 }}
             />
           </Source>
         </Map>
@@ -897,9 +689,7 @@ export function MapboxObservatorioMap({
 
       <div className="absolute left-2 top-4 z-20 min-w-[12rem] rounded-lg border border-zinc-300/90 bg-white/90 px-2 py-2 text-xs text-zinc-700 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-200 sm:left-4 sm:top-4 sm:px-3 sm:py-2">
         <div className="flex items-center justify-between gap-3">
-          <p className="font-semibold text-cyan-600 dark:text-cyan-400">
-            Mapa interativo
-          </p>
+          <p className="font-semibold text-cyan-600 dark:text-cyan-400">Mapa interativo</p>
           <button
             type="button"
             onClick={() => toggleCard("info")}
@@ -910,9 +700,7 @@ export function MapboxObservatorioMap({
         </div>
         {!collapsedCards.info ? (
           <>
-            <p className="mt-0.5 text-[11px] sm:text-xs">
-              Camada: {resolvedLayer}
-            </p>
+            <p className="mt-0.5 text-[11px] sm:text-xs">Camada: {resolvedLayer}</p>
             <p className="mt-1 text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
               Features: {collection?.features.length ?? 0}
             </p>
@@ -937,23 +725,14 @@ export function MapboxObservatorioMap({
         {!collapsedCards.visual ? (
           <>
             <label className="mt-3 block">
-              <span className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-                Estilo base
-              </span>
+              <span className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">Estilo base</span>
               <select
                 value={visualControls.styleId}
-                onChange={(event) =>
-                  onVisualControlsChange({
-                    ...visualControls,
-                    styleId: event.target.value as MapStyleId,
-                  })
-                }
+                onChange={(e) => onVisualControlsChange({ ...visualControls, styleId: e.target.value as MapStyleId })}
                 className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
               >
-                {MAP_STYLE_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
+                {MAP_STYLE_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
                 ))}
               </select>
             </label>
@@ -963,16 +742,8 @@ export function MapboxObservatorioMap({
                 Opacidade dos limites ({visualControls.fillOpacity}%)
               </span>
               <input
-                type="range"
-                min={20}
-                max={100}
-                value={visualControls.fillOpacity}
-                onChange={(event) =>
-                  onVisualControlsChange({
-                    ...visualControls,
-                    fillOpacity: Number(event.target.value),
-                  })
-                }
+                type="range" min={20} max={100} value={visualControls.fillOpacity}
+                onChange={(e) => onVisualControlsChange({ ...visualControls, fillOpacity: Number(e.target.value) })}
                 className="w-full"
               />
             </label>
@@ -982,16 +753,8 @@ export function MapboxObservatorioMap({
                 Tamanho dos pontos ({visualControls.pointScale}%)
               </span>
               <input
-                type="range"
-                min={70}
-                max={160}
-                value={visualControls.pointScale}
-                onChange={(event) =>
-                  onVisualControlsChange({
-                    ...visualControls,
-                    pointScale: Number(event.target.value),
-                  })
-                }
+                type="range" min={70} max={160} value={visualControls.pointScale}
+                onChange={(e) => onVisualControlsChange({ ...visualControls, pointScale: Number(e.target.value) })}
                 className="w-full"
               />
             </label>
@@ -1006,7 +769,7 @@ export function MapboxObservatorioMap({
               </button>
               <button
                 type="button"
-                onClick={handleResetVisual}
+                onClick={onResetVisual}
                 className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-2 py-1.5 text-xs font-medium text-cyan-700 transition hover:bg-cyan-500/20 dark:border-cyan-600 dark:text-cyan-300"
               >
                 Reset visual
@@ -1054,8 +817,7 @@ export function MapboxObservatorioMap({
                       aria-label={`Selecionar ${entity.data.nome}`}
                     >
                       <div className="font-medium">{entity.data.nome}</div>
-                      {entity.kind === "escola" &&
-                      typeof entity.data.ideb === "number" ? (
+                      {entity.kind === "escola" && typeof entity.data.ideb === "number" ? (
                         <div className="text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
                           IDEB: {entity.data.ideb.toFixed(1)}
                         </div>

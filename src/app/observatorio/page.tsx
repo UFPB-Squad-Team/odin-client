@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ModuleBootstrap } from "./module-bootstrap";
 import { ObservatorioShell } from "@/shell/components/observatorio-shell";
 
 function ObservatorioFallback() {
@@ -12,6 +13,7 @@ function ObservatorioFallback() {
 export default function ObservatorioPage() {
   return (
     <Suspense fallback={<ObservatorioFallback />}>
+      <ModuleBootstrap />
       <ObservatorioShell />
     </Suspense>
   );

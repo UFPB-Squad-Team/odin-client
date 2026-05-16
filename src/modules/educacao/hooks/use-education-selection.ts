@@ -160,16 +160,6 @@ function formatDecimal(value: unknown, decimals = 1): string {
   return num.toFixed(decimals);
 }
 
-function formatBool(value: boolean | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return value ? "Sim" : "Não";
-}
-
-function formatSala(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return String(value);
-}
-
 function etapaRows(label: string, etapa: EtapaIndicadores | undefined) {
   if (!etapa || Object.values(etapa).every((v) => !v)) return [];
   return [
@@ -474,20 +464,25 @@ export function buildEducationSelection(
   // escola
   const raw = entity.data as EscolaEntityData;
 
+  console.log("Construindo seleção para escola com dados:", raw);
+
   const indicadores = raw.indicadores;
-  const infra = raw.infraestrutura;
-  const salas = infra?.salas;
-  const internet = infra?.internet;
-  const equipamentos = infra?.equipamentos;
 
   const totalAlunos = indicadores?.totalAlunos;
   const inepId = raw.inepId ?? raw.id;
   const ibgeMunicipio = raw.municipioId ?? "—";
-  const escolaMunicipio = raw.municipioNome ?? "—";
-  const escolaBairro = raw.bairroNome ?? "—";
-  const escolaUf = raw.estadoSigla ?? "—";
-  const escolaDependencia = raw.dependencia_adm ?? "Não informado";
-  const escolaZona = raw.tipo_localizacao ?? "—";
+  const geoProps = (raw.geoProps ?? {}) as Record<string, unknown>;
+  const escolaMunicipio = raw.municipioNome ?? String(geoProps.municipio_nome ?? geoProps.municipio ?? "—");
+  const escolaBairro = raw.bairroNome ?? String(geoProps.bairro_nome ?? geoProps.bairro ?? "—");
+  const escolaUf = raw.estadoSigla ?? String(geoProps.estado_sigla ?? geoProps.uf ?? "—");
+  const escolaDependencia =
+    raw.dependencia_adm ??
+    raw.dependenciaAdministrativa ??
+    String(geoProps.dependencia_adm ?? geoProps.dependencia ?? "Não informado");
+  const escolaZona =
+    raw.tipo_localizacao ??
+    raw.tipoLocalizacao ??
+    String(geoProps.tipo_localizacao ?? geoProps.zona ?? geoProps.zonaLocalizacao ?? "—");
   const escolaAno = indicadores?.anoReferencia ?? null;
   const etapasSections = [
   ...etapaRows("Ed. infantil", indicadores?.educacaoInfantil),
@@ -531,49 +526,6 @@ return {
     },
     ...(etapasSections.length > 0
       ? [{ title: "Indicadores por etapa", rows: etapasSections }]
-      : []),
-    {
-      title: "Infraestrutura",
-      rows: [
-        { label: "Salas utilizadas", value: formatSala(salas?.utilizadas), description: "" },
-        { label: "Salas climatizadas", value: formatSala(salas?.climatizadas), description: "" },
-        { label: "Salas acessíveis", value: formatSala(salas?.acessiveis), description: "" },
-        { label: "Biblioteca", value: formatBool(infra?.possuiBiblioteca), description: "" },
-        { label: "Quadra esportes", value: formatBool(infra?.possuiQuadraEsportes), description: "" },
-        { label: "Refeitório", value: formatBool(infra?.possuiRefeitorio), description: "" },
-        { label: "Lab. informática", value: formatBool(infra?.possuiLaboratorioInformatica), description: "" },
-        { label: "Lab. ciências", value: formatBool(infra?.possuiLaboratorioCiencias), description: "" },
-        { label: "Acessibilidade PCD", value: formatBool(infra?.possuiAcessibilidadePcd), description: "" },
-        { label: "Pátio coberto", value: formatBool(infra?.possuiPatioCoberto), description: "" },
-        { label: "Esgoto rede pública", value: formatBool(infra?.possuiEsgotoRedePublica), description: "" },
-      ].filter((row) => row.value !== "—"),
-    },
-    ...(internet
-      ? [
-          {
-            title: "Conectividade",
-            rows: [
-              { label: "Internet", value: formatBool(internet.possuiInternet), description: "" },
-              { label: "Para alunos", value: formatBool(internet.internetParaAlunos), description: "" },
-              { label: "Administrativa", value: formatBool(internet.internetAdministrativa), description: "" },
-            ],
-          },
-        ]
-      : []),
-    ...(equipamentos
-      ? [
-          {
-            title: "Equipamentos",
-            rows: [
-              { label: "Computador (aluno)", value: formatBool(equipamentos.desktopAluno), description: "" },
-              { label: "Notebook (aluno)", value: formatBool(equipamentos.computadorPortatilAluno), description: "" },
-              { label: "Tablet (aluno)", value: formatBool(equipamentos.tabletAluno), description: "" },
-              { label: "Multimídia", value: formatBool(equipamentos.multimidia), description: "" },
-              { label: "Lousa digital", value: formatBool(equipamentos.lousaDigital), description: "" },
-              { label: "Impressora", value: formatBool(equipamentos.impressora), description: "" },
-            ].filter((row) => row.value !== "—"),
-          },
-        ]
       : []),
   ],
 };

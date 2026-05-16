@@ -24,10 +24,10 @@ export function useEntitySelection(
   function selectEntity(entity: MapEntity) {
     // Delega a construção do ObservatorySelection para o módulo ativo
     // O Shell não conhece a lógica de nenhum módulo específico
-    const module = activeModuleId ? getModule(activeModuleId) : undefined;
+    const activeModule = activeModuleId ? getModule(activeModuleId) : undefined;
 
-    if (module?.buildSelection) {
-      setSelected(module.buildSelection(entity));
+    if (activeModule?.buildSelection) {
+      setSelected(activeModule.buildSelection(entity));
     } else {
       // Fallback genérico quando o módulo não implementa buildSelection
       setSelected({

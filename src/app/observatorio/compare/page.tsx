@@ -3,6 +3,8 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useShellContext } from "@/shell/context/shell-context";
 import { getModule } from "@/core/registry/module-registry";
 import { listBairros } from "@/core/territory/territory-api";
@@ -306,10 +308,12 @@ function RadarChart({
   groups,
   nameA,
   nameB,
+  isDark,
 }: {
   groups: MetricGroup[];
   nameA: string;
   nameB: string;
+  isDark: boolean;
 }) {
   const allMetrics = groups.flatMap((g) => g.metrics);
   if (allMetrics.length === 0) return null;
@@ -352,7 +356,7 @@ function RadarChart({
             cy={center}
             r={radius * t}
             fill="none"
-            className="stroke-zinc-700/40"
+            className={isDark ? "stroke-zinc-700/40" : "stroke-zinc-300/70"}
             strokeWidth={0.5}
           />
         ))}
@@ -363,20 +367,20 @@ function RadarChart({
             y1={center}
             x2={center + Math.cos(angle(i)) * radius}
             y2={center + Math.sin(angle(i)) * radius}
-            className="stroke-zinc-700/30"
+            className={isDark ? "stroke-zinc-700/30" : "stroke-zinc-300/70"}
             strokeWidth={0.5}
           />
         ))}
         <polygon
           points={pointsFor(valuesA)}
-          fill="rgba(6,182,212,0.15)"
+          fill={isDark ? "rgba(6,182,212,0.15)" : "rgba(6,182,212,0.10)"}
           stroke="#06b6d4"
           strokeWidth={2}
           strokeLinejoin="round"
         />
         <polygon
           points={pointsFor(valuesB)}
-          fill="rgba(168,85,247,0.15)"
+          fill={isDark ? "rgba(168,85,247,0.15)" : "rgba(168,85,247,0.10)"}
           stroke="#a855f7"
           strokeWidth={2}
           strokeLinejoin="round"
@@ -400,7 +404,7 @@ function RadarChart({
               fontSize={9}
               textAnchor={anchor}
               dominantBaseline="middle"
-              className="fill-zinc-400"
+              className={isDark ? "fill-zinc-400" : "fill-zinc-500"}
             >
               {shortLabel}
             </text>
@@ -410,11 +414,11 @@ function RadarChart({
       <div className="flex gap-4 text-xs">
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-4 rounded-sm bg-cyan-400" />
-          <span className="text-zinc-400 truncate max-w-[100px]">{nameA}</span>
+          <span className={isDark ? "text-zinc-400 truncate max-w-[100px]" : "text-zinc-600 truncate max-w-[100px]"}>{nameA}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-4 rounded-sm bg-purple-500" />
-          <span className="text-zinc-400 truncate max-w-[100px]">{nameB}</span>
+          <span className={isDark ? "text-zinc-400 truncate max-w-[100px]" : "text-zinc-600 truncate max-w-[100px]"}>{nameB}</span>
         </div>
       </div>
     </div>
@@ -426,10 +430,12 @@ function CompareBar({
   a,
   b,
   higherIsBetter,
+  isDark,
 }: {
   a: number;
   b: number;
   higherIsBetter: boolean;
+  isDark: boolean;
 }) {
   if (a === 0 && b === 0) return null;
   const total = a + b;
@@ -442,11 +448,11 @@ function CompareBar({
     <div className="flex h-1.5 w-full overflow-hidden rounded-full">
       <div
         style={{ width: `${pctA}%` }}
-        className={`transition-all ${aWins && a !== b ? "bg-cyan-400" : "bg-zinc-600"}`}
+        className={`transition-all ${aWins && a !== b ? "bg-cyan-400" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
       />
       <div
         style={{ width: `${pctB}%` }}
-        className={`transition-all ${bWins && a !== b ? "bg-purple-500" : "bg-zinc-600"}`}
+        className={`transition-all ${bWins && a !== b ? "bg-purple-500" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
       />
     </div>
   );
@@ -458,6 +464,8 @@ export default function ComparePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const didPreselect = useRef(false);
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   const [compareKind, setCompareKind] = useState<CompareEntityKind>("municipio");
   const [bairroMunicipioId, setBairroMunicipioId] = useState<string>("");
@@ -468,6 +476,45 @@ export default function ComparePage() {
   const [searchA, setSearchA] = useState("");
   const [searchB, setSearchB] = useState("");
   const bairroCacheRef = useRef<Record<string, Bairro[]>>({});
+  const isDark = mounted ? resolvedTheme !== "light" : true;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const theme = isDark
+    ? {
+        page: "bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.14),_transparent_35%),linear-gradient(180deg,_#09090b,_#0f172a)] text-zinc-100",
+        surface: "border-zinc-800 bg-zinc-900/50",
+        surfaceStrong: "border-zinc-800 bg-zinc-950/70",
+        surfaceSoft: "border-zinc-800 bg-zinc-900/40",
+        border: "border-zinc-800",
+        borderSoft: "border-zinc-700",
+        text: "text-zinc-100",
+        textSoft: "text-zinc-300",
+        muted: "text-zinc-400",
+        mutedStrong: "text-zinc-500",
+        input: "border-zinc-700 bg-zinc-950 text-zinc-100 placeholder-zinc-600",
+        button: "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800",
+        buttonSoft: "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
+        empty: "border-zinc-800 text-zinc-600",
+      }
+    : {
+        page: "bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.10),_transparent_35%),linear-gradient(180deg,_#fafafa,_#eef4f9)] text-zinc-900",
+        surface: "border-zinc-200 bg-white/90 shadow-sm shadow-cyan-500/5",
+        surfaceStrong: "border-zinc-200 bg-white/95 shadow-sm shadow-cyan-500/5",
+        surfaceSoft: "border-zinc-200 bg-zinc-50/80",
+        border: "border-zinc-200",
+        borderSoft: "border-zinc-300",
+        text: "text-zinc-900",
+        textSoft: "text-zinc-700",
+        muted: "text-zinc-500",
+        mutedStrong: "text-zinc-600",
+        input: "border-zinc-300 bg-white text-zinc-900 placeholder-zinc-400",
+        button: "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50",
+        buttonSoft: "border-zinc-300 text-zinc-600 hover:border-zinc-500 hover:text-zinc-900",
+        empty: "border-zinc-300 text-zinc-500",
+      };
 
   const activeModuleId = ctx.activeModuleId ?? null;
 
@@ -743,20 +790,19 @@ export default function ComparePage() {
 
   return (
     <main
-      className="min-h-screen w-full"
+      className={`min-h-screen w-full ${theme.page}`}
       style={{
-        background: "linear-gradient(135deg, #09090b 0%, #0f0f14 50%, #09090b 100%)",
         fontFamily: "'DM Sans', system-ui, sans-serif",
       }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-        .metric-row:hover { background: rgba(255,255,255,0.03); }
+        .metric-row:hover { background: ${isDark ? "rgba(255,255,255,0.03)" : "rgba(15,23,42,0.03)"}; }
         .select-enter { animation: fadeUp 0.15s ease; }
         @keyframes fadeUp { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
         .winner-glow-a { box-shadow: 0 0 0 1px rgba(6,182,212,0.4), 0 4px 24px rgba(6,182,212,0.12); }
         .winner-glow-b { box-shadow: 0 0 0 1px rgba(168,85,247,0.4), 0 4px 24px rgba(168,85,247,0.12); }
-        ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+        ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: ${isDark ? "#3f3f46" : "#cbd5e1"}; border-radius: 2px; }
       `}</style>
 
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -767,24 +813,25 @@ export default function ComparePage() {
               ODIN · Observatório
             </p>
             <h1
-              className="mt-1 text-2xl font-bold text-white"
+              className={`mt-1 text-2xl font-bold ${theme.text}`}
               style={{ letterSpacing: "-0.02em" }}
             >
               Comparar territórios
             </h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className={`mt-1 text-sm ${theme.muted}`}>
               Análise lado a lado de indicadores por município ou bairro
             </p>
           </div>
-          <div className="flex items-center gap-2 pt-1">
-            <div className="mr-2 flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 p-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <ThemeToggle />
+            <div className={`mr-2 flex items-center gap-1 rounded-md border p-1 ${theme.borderSoft} ${isDark ? "bg-zinc-900" : "bg-white"}`}>
               <button
                 type="button"
                 onClick={() => setCompareKind("municipio")}
                 className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${
                   compareKind === "municipio"
                     ? "bg-cyan-600 text-white"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    : `${theme.mutedStrong} hover:text-cyan-600`
                 }`}
               >
                 Município
@@ -795,7 +842,7 @@ export default function ComparePage() {
                 className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${
                   compareKind === "bairro"
                     ? "bg-purple-600 text-white"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    : `${theme.mutedStrong} hover:text-purple-600`
                 }`}
               >
                 Bairro
@@ -804,13 +851,13 @@ export default function ComparePage() {
             <button
               type="button"
               onClick={clear}
-              className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-zinc-500 hover:text-zinc-200"
+              className={`rounded-md border px-3 py-1.5 text-xs transition ${theme.buttonSoft}`}
             >
               Limpar
             </button>
             <Link
               href="/observatorio"
-              className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 transition hover:bg-zinc-800"
+              className={`rounded-md border px-3 py-1.5 text-xs transition ${theme.button}`}
             >
               ← Voltar ao mapa
             </Link>
@@ -823,13 +870,13 @@ export default function ComparePage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
-            <span className="text-sm text-zinc-500">Carregando dados de comparação…</span>
+            <span className={`text-sm ${theme.muted}`}>Carregando dados de comparação…</span>
           </div>
         ) : (
           <>
             {compareKind === "bairro" && (
-              <div className="mb-4 grid gap-2 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 sm:grid-cols-[1fr_240px] sm:items-center">
-                <p className="text-sm text-zinc-500">
+              <div className={`mb-4 grid gap-2 rounded-xl border px-4 py-3 sm:grid-cols-[1fr_240px] sm:items-center ${theme.surfaceSoft}`}>
+                <p className={`text-sm ${theme.muted}`}>
                   Escolha o município para listar e comparar seus bairros.
                 </p>
                 <select
@@ -841,7 +888,7 @@ export default function ComparePage() {
                     setSearchA("");
                     setSearchB("");
                   }}
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${theme.input}`}
                 >
                   {bairroMunicipioOptions.map((item) => (
                     <option key={item.id} value={item.id}>
@@ -853,7 +900,7 @@ export default function ComparePage() {
             )}
 
             {compareKind === "bairro" && compareItems.length === 0 && !isLoadingBairroItems && (
-              <div className="mb-4 rounded-xl border border-zinc-800 px-4 py-3 text-sm text-zinc-500">
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${theme.empty}`}>
                 Nenhum bairro disponível para o município selecionado.
               </div>
             )}
@@ -868,6 +915,7 @@ export default function ComparePage() {
                 onSearch={setSearchA}
                 onSelect={(m) => { setPrimaryId(m.id); setSearchA(""); }}
                 onClear={() => { setPrimaryId(""); setSearchA(""); }}
+                isDark={isDark}
               />
 
               <div className="flex flex-col items-center justify-center pt-7 gap-2">
@@ -876,7 +924,7 @@ export default function ComparePage() {
                   onClick={swap}
                   disabled={!primaryId || !secondaryId}
                   title="Trocar"
-                  className="rounded-full border border-zinc-700 p-2 text-zinc-400 transition hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+                  className={`rounded-full border p-2 transition disabled:opacity-30 ${theme.buttonSoft}`}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
@@ -893,6 +941,7 @@ export default function ComparePage() {
                 onSearch={setSearchB}
                 onSelect={(m) => { setSecondaryId(m.id); setSearchB(""); }}
                 onClear={() => { setSecondaryId(""); setSearchB(""); }}
+                isDark={isDark}
               />
             </div>
 
@@ -919,8 +968,8 @@ export default function ComparePage() {
                 )}
 
                 {!hasAnyData && (
-                  <div className="rounded-xl border border-zinc-800 px-4 py-6 text-center">
-                    <p className="text-sm text-zinc-500">
+                  <div className={`rounded-xl border px-4 py-6 text-center ${theme.surfaceSoft}`}>
+                    <p className={`text-sm ${theme.muted}`}>
                       Dados agregados ainda não disponíveis para este recorte.
                       Os indicadores são preenchidos conforme o Censo Escolar.
                     </p>
@@ -933,15 +982,15 @@ export default function ComparePage() {
                     {groups.map((group) => (
                       <div
                         key={group.label}
-                        className="rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden"
+                        className={`overflow-hidden rounded-xl border ${theme.surface}`}
                       >
-                        <div className="border-b border-zinc-800 px-4 py-2.5">
-                          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+                        <div className={`border-b px-4 py-2.5 ${theme.border}`}>
+                          <h3 className={`text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
                             {group.label}
                           </h3>
                         </div>
                         <div>
-                          <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 px-4 py-2 text-[10px] font-medium uppercase tracking-widest text-zinc-600">
+                          <div className={`grid grid-cols-[1fr_1fr_1fr] gap-4 px-4 py-2 text-[10px] font-medium uppercase tracking-widest ${theme.mutedStrong}`}>
                             <span>Indicador</span>
                             <span className="text-right text-cyan-600">{selectedA.nome.split(" ")[0]}</span>
                             <span className="text-right text-purple-600">{selectedB.nome.split(" ")[0]}</span>
@@ -966,12 +1015,12 @@ export default function ComparePage() {
                             return (
                               <div
                                 key={m.key}
-                                className="metric-row grid grid-cols-[1fr_1fr_1fr] items-center gap-4 border-t border-zinc-800/60 px-4 py-3 transition-colors"
+                                className={`metric-row grid grid-cols-[1fr_1fr_1fr] items-center gap-4 border-t px-4 py-3 transition-colors ${theme.border}`}
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm text-zinc-400">{m.label}</span>
+                                  <span className={`text-sm ${theme.muted}`}>{m.label}</span>
                                   {isCompetitive && !m.higherIsBetter && (
-                                    <span className="rounded border border-zinc-700 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-zinc-500">
+                                    <span className={`rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${theme.mutedStrong} ${theme.borderSoft}`}>
                                       menor melhor
                                     </span>
                                   )}
@@ -979,12 +1028,12 @@ export default function ComparePage() {
 
                                 <div className="text-right">
                                   {noData ? (
-                                    <span className="text-sm text-zinc-700">—</span>
+                                    <span className={theme.mutedStrong}>—</span>
                                   ) : (
                                     <div className="flex flex-col items-end gap-1">
                                       <span
                                         className={`text-sm font-semibold tabular-nums ${
-                                          aWins ? "text-cyan-400" : aVal === "—" ? "text-zinc-700" : "text-zinc-300"
+                                          aWins ? "text-cyan-400" : aVal === "—" ? theme.mutedStrong : theme.textSoft
                                         }`}
                                       >
                                         {aVal}
@@ -993,7 +1042,7 @@ export default function ComparePage() {
                                         )}
                                       </span>
                                       {isCompetitive && m.a > 0 && m.b > 0 && (
-                                        <CompareBar a={m.a} b={m.b} higherIsBetter={m.higherIsBetter} />
+                                        <CompareBar a={m.a} b={m.b} higherIsBetter={m.higherIsBetter} isDark={isDark} />
                                       )}
                                     </div>
                                   )}
@@ -1001,12 +1050,12 @@ export default function ComparePage() {
 
                                 <div className="text-right">
                                   {noData ? (
-                                    <span className="text-sm text-zinc-700">—</span>
+                                    <span className={theme.mutedStrong}>—</span>
                                   ) : (
                                     <div className="flex flex-col items-end gap-1">
                                       <span
                                         className={`text-sm font-semibold tabular-nums ${
-                                          bWins ? "text-purple-400" : bVal === "—" ? "text-zinc-700" : "text-zinc-300"
+                                          bWins ? "text-purple-400" : bVal === "—" ? theme.mutedStrong : theme.textSoft
                                         }`}
                                       >
                                         {bVal}
@@ -1026,8 +1075,8 @@ export default function ComparePage() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
-                      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+                    <div className={`rounded-xl border p-4 ${theme.surface}`}>
+                      <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
                         Radar
                       </p>
                       {hasAnyData ? (
@@ -1035,23 +1084,25 @@ export default function ComparePage() {
                           groups={groups}
                           nameA={selectedA.nome}
                           nameB={selectedB.nome}
+                          isDark={isDark}
                         />
                       ) : (
                         <div className="flex h-40 items-center justify-center">
-                          <p className="text-xs text-zinc-600">Sem dados</p>
+                          <p className={`text-xs ${theme.mutedStrong}`}>Sem dados</p>
                         </div>
                       )}
                     </div>
 
                     {hasAnyData && (
-                      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
-                        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-500">
+                      <div className={`rounded-xl border p-4 ${theme.surface}`}>
+                        <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
                           Placar
                         </p>
                         <ScoreCard
                           groups={groups}
                           nameA={selectedA.nome}
                           nameB={selectedB.nome}
+                          isDark={isDark}
                         />
                       </div>
                     )}
@@ -1059,32 +1110,32 @@ export default function ComparePage() {
                     <div className="space-y-2">
                       {selectedA && (
                         <div
-                          className={`rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 ${winner === "a" ? "winner-glow-a" : ""}`}
+                          className={`rounded-xl border p-3 ${theme.surface} ${winner === "a" ? "winner-glow-a" : ""}`}
                         >
-                          <p className="text-[10px] text-zinc-500">
+                          <p className={`text-[10px] ${theme.muted}`}>
                             {compareKind === "bairro" ? "Bairro A" : "Município A"}
                           </p>
-                          <p className="mt-0.5 text-sm font-medium text-white">{selectedA.nome}</p>
+                          <p className={`mt-0.5 text-sm font-medium ${theme.text}`}>{selectedA.nome}</p>
                           {selectionA?.metrics?.map((m) => (
                             <div key={m.label} className="mt-1 flex justify-between text-xs">
-                              <span className="text-zinc-500">{m.label}</span>
-                              <span className="font-medium text-zinc-300">{m.value}</span>
+                              <span className={theme.muted}>{m.label}</span>
+                              <span className={`font-medium ${theme.textSoft}`}>{m.value}</span>
                             </div>
                           ))}
                         </div>
                       )}
                       {selectedB && (
                         <div
-                          className={`rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 ${winner === "b" ? "winner-glow-b" : ""}`}
+                          className={`rounded-xl border p-3 ${theme.surface} ${winner === "b" ? "winner-glow-b" : ""}`}
                         >
-                          <p className="text-[10px] text-zinc-500">
+                          <p className={`text-[10px] ${theme.muted}`}>
                             {compareKind === "bairro" ? "Bairro B" : "Município B"}
                           </p>
-                          <p className="mt-0.5 text-sm font-medium text-white">{selectedB.nome}</p>
+                          <p className={`mt-0.5 text-sm font-medium ${theme.text}`}>{selectedB.nome}</p>
                           {selectionB?.metrics?.map((m) => (
                             <div key={m.label} className="mt-1 flex justify-between text-xs">
-                              <span className="text-zinc-500">{m.label}</span>
-                              <span className="font-medium text-zinc-300">{m.value}</span>
+                              <span className={theme.muted}>{m.label}</span>
+                              <span className={`font-medium ${theme.textSoft}`}>{m.value}</span>
                             </div>
                           ))}
                         </div>
@@ -1094,8 +1145,8 @@ export default function ComparePage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-zinc-800 py-16 text-center">
-                <p className="text-sm text-zinc-600">
+              <div className={`rounded-xl border border-dashed py-16 text-center ${theme.empty}`}>
+                <p className={`text-sm ${theme.mutedStrong}`}>
                   Selecione dois {compareKind === "bairro" ? "bairros" : "municípios"} para iniciar a comparação
                 </p>
               </div>
@@ -1111,10 +1162,12 @@ function ScoreCard({
   groups,
   nameA,
   nameB,
+  isDark,
 }: {
   groups: MetricGroup[];
   nameA: string;
   nameB: string;
+  isDark: boolean;
 }) {
   let scoreA = 0;
   let scoreB = 0;
@@ -1144,14 +1197,16 @@ function ScoreCard({
     <div className="space-y-2">
       <div className="flex justify-between text-xs">
         <span className="text-cyan-400 font-semibold">{nameA.split(" ")[0]}</span>
-        <span className="text-zinc-600 text-[10px]">{ties > 0 ? `${ties} empate${ties > 1 ? "s" : ""}` : ""}</span>
+        <span className={isDark ? "text-zinc-600 text-[10px]" : "text-zinc-500 text-[10px]"}>
+          {ties > 0 ? `${ties} empate${ties > 1 ? "s" : ""}` : ""}
+        </span>
         <span className="text-purple-400 font-semibold">{nameB.split(" ")[0]}</span>
       </div>
-      <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
+      <div className={`flex h-2 overflow-hidden rounded-full ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
         <div style={{ width: `${pctA}%` }} className="bg-cyan-500 transition-all" />
         <div style={{ width: `${pctB}%` }} className="bg-purple-500 transition-all" />
       </div>
-      <div className="flex justify-between text-xs text-zinc-500">
+      <div className={`flex justify-between text-xs ${isDark ? "text-zinc-500" : "text-zinc-600"}`}>
         <span>{scoreA} indicador{scoreA !== 1 ? "es" : ""}</span>
         <span>{scoreB} indicador{scoreB !== 1 ? "es" : ""}</span>
       </div>
@@ -1168,6 +1223,7 @@ function MunicipioSelector({
   onSearch,
   onSelect,
   onClear,
+  isDark,
 }: {
   label: string;
   color: "cyan" | "purple";
@@ -1177,10 +1233,15 @@ function MunicipioSelector({
   onSearch: (q: string) => void;
   onSelect: (m: CompareEntity) => void;
   onClear: () => void;
+  isDark: boolean;
 }) {
   const accent = color === "cyan" ? "text-cyan-400" : "text-purple-400";
   const border = color === "cyan" ? "border-cyan-500/40" : "border-purple-500/40";
   const ring = color === "cyan" ? "focus:ring-cyan-500/30" : "focus:ring-purple-500/30";
+  const panel = isDark ? "bg-zinc-900/60" : "bg-white";
+  const input = isDark
+    ? "border-zinc-700 bg-zinc-900 text-white placeholder-zinc-600"
+    : "border-zinc-300 bg-white text-zinc-900 placeholder-zinc-400";
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -1189,18 +1250,24 @@ function MunicipioSelector({
         {label}
       </p>
       {selected ? (
-        <div className={`rounded-xl border ${border} bg-zinc-900/60 p-3`}>
+        <div className={`rounded-xl border ${border} ${panel} p-3`}>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="font-semibold text-white">{selected.nome}</p>
+              <p className={`font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>{selected.nome}</p>
               {selected.estadoId && (
-                <p className="mt-0.5 text-xs text-zinc-500">{selected.estadoId.toUpperCase()}</p>
+                <p className={isDark ? "mt-0.5 text-xs text-zinc-500" : "mt-0.5 text-xs text-zinc-600"}>
+                  {selected.estadoId.toUpperCase()}
+                </p>
               )}
             </div>
             <button
               type="button"
               onClick={onClear}
-              className="mt-0.5 rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition"
+              className={`mt-0.5 rounded border px-2 py-0.5 text-[10px] transition ${
+                isDark
+                  ? "border-zinc-700 text-zinc-500 hover:text-zinc-300"
+                  : "border-zinc-300 text-zinc-600 hover:text-zinc-900"
+              }`}
             >
               Trocar
             </button>
@@ -1213,21 +1280,23 @@ function MunicipioSelector({
             value={search}
             onChange={(e) => onSearch(e.target.value)}
             placeholder={`Buscar ${label.toLowerCase().replace(" a", "").replace(" b", "")}…`}
-            className={`w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white placeholder-zinc-600 outline-none ring-0 transition focus:border-zinc-600 focus:ring-1 ${ring}`}
+            className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none ring-0 transition focus:border-zinc-600 focus:ring-1 ${input} ${ring}`}
           />
           {filtered.length > 0 && (
-            <ul className="select-enter absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+            <ul
+              className={`select-enter absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-xl border py-1 shadow-xl ${
+                isDark ? "border-zinc-700 bg-zinc-900" : "border-zinc-200 bg-white"
+              }`}
+            >
               {filtered.map((m) => (
                 <li key={m.id}>
                   <button
                     type="button"
                     onMouseDown={() => onSelect(m)}
-                    className="w-full px-3 py-2 text-left transition hover:bg-zinc-800"
+                    className={`w-full px-3 py-2 text-left transition ${isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-100"}`}
                   >
-                    <div className="text-sm text-zinc-200">{m.nome}</div>
-                    {m.estadoId && (
-                      <div className="text-[10px] text-zinc-600">{m.estadoId.toUpperCase()}</div>
-                    )}
+                    <div className={isDark ? "text-sm text-zinc-200" : "text-sm text-zinc-900"}>{m.nome}</div>
+                    {m.estadoId && <div className={isDark ? "text-[10px] text-zinc-600" : "text-[10px] text-zinc-500"}>{m.estadoId.toUpperCase()}</div>}
                   </button>
                 </li>
               ))}

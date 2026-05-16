@@ -6,6 +6,28 @@ import type { GeoJSONFeatureCollection } from "@/core/types/geospatial";
 import { computeChoroplethStats, normalizeValue } from "./normalize";
 import type { ChoroplethColors } from "./types";
 
+type GeoJSONFeature = GeoJSONFeatureCollection["features"][number];
+
+function normalizeFeatureId(value: unknown): string {
+  return String(value ?? "").replace(/\.0$/, "").trim();
+}
+
+function resolveFeatureId(feature: GeoJSONFeature): string {
+  const props = feature.properties as Record<string, unknown>;
+  return normalizeFeatureId(
+    feature.id ??
+      props.id ??
+      props.codarea ??
+      props.municipioIdIbge ??
+      props.municipio_id_ibge ??
+      props.escola_id_inep ??
+      props.inep ??
+      props.codigo ??
+      props.cod ??
+      "",
+  );
+}
+
 interface UseChoroplethArgs {
   collection: GeoJSONFeatureCollection | null;
   activeModuleId: string | null;
@@ -42,11 +64,11 @@ export function useChoropleth({
 
     if (!collection || !activeModuleId || !activeIndicatorId) return empty;
 
-    const module = getModule(activeModuleId);
-    if (!module?.indicatorValueExtractor || !module?.getMapLayerStyle)
+    const activeModule = getModule(activeModuleId);
+    if (!activeModule?.indicatorValueExtractor || !activeModule?.getMapLayerStyle)
       return empty;
 
-    const extractor = module.indicatorValueExtractor(activeIndicatorId);
+    const extractor = activeModule.indicatorValueExtractor(activeIndicatorId);
     if (!extractor) return empty;
 
     const stats = computeChoroplethStats(collection, extractor);
@@ -55,14 +77,14 @@ export function useChoropleth({
     const featureColors: ChoroplethColors = new Map();
 
     for (const feature of collection.features) {
-      const featureId = String(feature.id ?? feature.properties?.id ?? "");
+      const featureId = resolveFeatureId(feature);
       if (!featureId) continue;
 
       const raw = extractor(feature.properties as Record<string, unknown>);
       if (raw === null || !isFinite(raw)) continue;
 
       const normalized = normalizeValue(raw, stats.min, stats.max);
-      const style = module.getMapLayerStyle(activeIndicatorId, normalized);
+      const style = activeModule.getMapLayerStyle(activeIndicatorId, normalized);
       featureColors.set(featureId, style.color);
     }
 
