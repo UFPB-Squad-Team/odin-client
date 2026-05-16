@@ -97,7 +97,7 @@ export function ObservatorioDetailPanel({
       selection.kind,
       selection.id,
       selection.nome,
-      selection.subtitle || '',
+      selection.subtitle || "",
       selection.metrics,
       primaryMunicipioId,
     );
@@ -122,24 +122,27 @@ export function ObservatorioDetailPanel({
       primary.kind,
       primary.id,
       primary.nome,
-      primary.subtitle || '',
+      primary.subtitle || "",
       primary.metrics,
       primaryMunicipioId,
       selection.kind,
       selection.id,
       selection.nome,
-      selection.subtitle || '',
+      selection.subtitle || "",
       selection.metrics,
       secondaryMunicipioId,
     );
   };
+
   const primary = shellContext?.comparePrimarySelection ?? null;
   const isSameAsPrimary = Boolean(
     primary &&
-    selection &&
-    primary.id === selection.id &&
-    primary.kind === selection.kind,
+      selection &&
+      primary.id === selection.id &&
+      primary.kind === selection.kind,
   );
+
+  const showCompareButton = selection?.kind !== "escola";
 
   return (
     <>
@@ -176,7 +179,7 @@ export function ObservatorioDetailPanel({
           </div>
 
           <div className="flex flex-shrink-0 items-center gap-1.5">
-            {selection && shellContext ? (
+            {selection && shellContext && showCompareButton ? (
               <>
                 {!primary ? (
                   <button
@@ -186,24 +189,9 @@ export function ObservatorioDetailPanel({
                     className="inline-flex items-center gap-1.5 rounded-md border border-cyan-600 bg-cyan-50 px-2 py-1 text-[10px] font-medium text-cyan-700 transition hover:bg-cyan-100 disabled:opacity-60 dark:border-cyan-500/30 dark:bg-cyan-900/30 dark:text-cyan-200 sm:px-3 sm:py-1.5 sm:text-xs"
                   >
                     {isNavigating ? (
-                      <svg
-                        className="h-3 w-3 animate-spin"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                        />
+                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                       </svg>
                     ) : null}
                     Comparar
@@ -220,24 +208,9 @@ export function ObservatorioDetailPanel({
                     className="inline-flex items-center gap-1.5 rounded-md border border-indigo-600 bg-indigo-50 px-2 py-1 text-[10px] font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-600/30 dark:bg-indigo-900/30 dark:text-indigo-200 sm:px-3 sm:py-1.5 sm:text-xs"
                   >
                     {isNavigating ? (
-                      <svg
-                        className="h-3 w-3 animate-spin"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                        />
+                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                       </svg>
                     ) : null}
                     Comparar com selecionado
@@ -258,9 +231,7 @@ export function ObservatorioDetailPanel({
 
         {selection ? (
           (() => {
-            const activeModule = activeModuleId
-              ? getModule(activeModuleId)
-              : undefined;
+            const activeModule = activeModuleId ? getModule(activeModuleId) : undefined;
             if (activeModule?.DetailPanel && shellContext && onNavigate) {
               const entity: MapEntity =
                 selection.sourceEntity ??
@@ -269,34 +240,60 @@ export function ObservatorioDetailPanel({
                   shellContext.selectedEntity.data.id === selection.id
                   ? shellContext.selectedEntity
                   : ({
-                    kind: selection.kind,
-                    data:
-                      selection.kind === "municipio"
-                        ? {
-                          id: selection.id,
-                          nome: selection.nome,
-                          estadoId: shellContext.filters.estadoId ?? "",
-                          geoProps: undefined,
-                        }
-                        : selection.kind === "bairro"
+                      kind: selection.kind,
+                      data:
+                        selection.kind === "municipio"
                           ? {
-                            id: selection.id,
-                            nome: selection.nome,
-                            municipioId:
-                              shellContext.filters.municipioId ?? "",
-                          }
-                          : {
-                            id: selection.id,
-                            nome: selection.nome,
-                            bairroId: "",
-                          },
-                  } as MapEntity));
+                              id: selection.id,
+                              nome: selection.nome,
+                              estadoId: shellContext.filters.estadoId ?? "",
+                              geoProps: undefined,
+                            }
+                          : selection.kind === "bairro"
+                            ? {
+                                id: selection.id,
+                                nome: selection.nome,
+                                municipioId: shellContext.filters.municipioId ?? "",
+                              }
+                            : {
+                                id: selection.id,
+                                nome: selection.nome,
+                                bairroId: "",
+                              },
+                    } as MapEntity));
+
+              const showNeighborhoodSummary = selection.kind === "bairro";
+              const municipalityName =
+                shellContext.municipios.find(
+                  (municipio) => municipio.id === shellContext.filters.municipioId,
+                )?.nome ??
+                (shellContext.selectedEntity?.kind === "municipio"
+                  ? shellContext.selectedEntity.data.nome
+                  : undefined);
+
               return (
-                <activeModule.DetailPanel
-                  entity={entity}
-                  shellContext={shellContext}
-                  onNavigate={onNavigate}
-                />
+                <div className="flex flex-col gap-4">
+                  {showNeighborhoodSummary ? (
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950/60 dark:text-zinc-200">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                        Bairro selecionado
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
+                        {selection.nome}
+                      </div>
+                      {municipalityName ? (
+                        <div className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                          Município: {municipalityName}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <activeModule.DetailPanel
+                    entity={entity}
+                    shellContext={shellContext}
+                    onNavigate={onNavigate}
+                  />
+                </div>
               );
             }
 
@@ -328,16 +325,13 @@ export function ObservatorioDetailPanel({
                     return (
                       <>
                         <div className="text-[11px]">
-                          IBGE:{" "}
-                          <strong className="ml-1">{String(ibge)}</strong>
+                          IBGE: <strong className="ml-1">{String(ibge)}</strong>
                         </div>
                         <div className="text-[11px]">
-                          INEP:{" "}
-                          <strong className="ml-1">{String(inep)}</strong>
+                          INEP: <strong className="ml-1">{String(inep)}</strong>
                         </div>
                         <div className="text-[11px]">
-                          Alunos:{" "}
-                          <strong className="ml-1">{String(alunos)}</strong>
+                          Alunos: <strong className="ml-1">{String(alunos)}</strong>
                         </div>
                       </>
                     );
@@ -349,9 +343,7 @@ export function ObservatorioDetailPanel({
                     key={metric.label}
                     className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-[12px] dark:border-zinc-700 dark:bg-zinc-950/70 sm:px-3 sm:py-2 sm:text-sm"
                   >
-                    <span className="text-zinc-600 dark:text-zinc-300">
-                      {metric.label}
-                    </span>
+                    <span className="text-zinc-600 dark:text-zinc-300">{metric.label}</span>
                     <strong className="truncate">{metric.value}</strong>
                   </div>
                 ))}
@@ -370,9 +362,7 @@ export function ObservatorioDetailPanel({
                           key={`${section.title}-${row.label}`}
                           className="flex items-center justify-between gap-2 text-[12px] sm:text-sm"
                         >
-                          <span className="text-zinc-600 dark:text-zinc-300">
-                            {row.label}
-                          </span>
+                          <span className="text-zinc-600 dark:text-zinc-300">{row.label}</span>
                           <strong className="text-right">{row.value}</strong>
                         </div>
                       ))}

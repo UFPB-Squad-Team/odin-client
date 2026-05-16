@@ -9,7 +9,6 @@ import { MapboxObservatorioMap } from "@/shell/components/mapbox-observatorio-ma
 import { ObservatorioSidebar } from "@/shell/components/observatorio-sidebar";
 import { ShareLinkButton } from "@/shell/components/share-link-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { ModuleBootstrap } from "@/shell/components/module-bootstrap";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
 import type { ShellContextType } from "@/core/types/shell";
 import type { ObservatoryLayer } from "@/core/types/territory";
@@ -583,7 +582,6 @@ export function ObservatorioShell() {
 
   return (
     <>
-      <ModuleBootstrap />
       <main className="relative h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-900 transition-colors dark:text-zinc-100">
         <header className="relative z-[50] border-b border-zinc-200/80 bg-white/90 px-3 py-3 backdrop-blur dark:border-zinc-800/80 dark:bg-zinc-950/85 sm:px-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

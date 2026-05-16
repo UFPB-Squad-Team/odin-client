@@ -248,8 +248,19 @@ export function useObservatorioShell() {
                   String(props.municipio_nome ?? props.municipio ?? "").trim() || undefined,
                 estadoSigla:
                   String(props.estado_sigla ?? props.uf ?? estadoId ?? "").trim() || undefined,
+                dependenciaAdministrativa:
+                  String(props.dependencia_adm ?? props.dependencia ?? "").trim() || undefined,
+                dependencia_adm:
+                  String(props.dependencia_adm ?? props.dependencia ?? "").trim() || undefined,
+                tipoLocalizacao:
+                  String(props.tipo_localizacao ?? props.zona ?? props.zonaLocalizacao ?? "").trim() || undefined,
+                tipo_localizacao:
+                  String(props.tipo_localizacao ?? props.zona ?? props.zonaLocalizacao ?? "").trim() || undefined,
                 ideb: toNumber(props.ideb),
                 inse: toNumber(props.inse),
+                geoProps: props,
+                indicadores: props.indicadores as Escola["indicadores"],
+                infraestrutura: props.infraestrutura as Escola["infraestrutura"],
               } satisfies Escola,
             ];
           })

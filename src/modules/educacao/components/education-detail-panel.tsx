@@ -5,7 +5,6 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ModuleDetailPanelProps } from "@/core/types/module";
 import { buildEducationSelection } from "@/modules/educacao/hooks/use-education-selection";
-import { buildSocioeconomicoSelection } from "@/modules/socioeconomico/hooks/use-socioeconomico-selection";
 import { IndicatorTooltip } from "@/components/ui/indicator-tooltip";
 
 const DIMENSION = {
@@ -30,27 +29,6 @@ const DIMENSION = {
 } as const;
 
 type DimensionKey = keyof typeof DIMENSION;
-
-function resolveSourceBadge(
-  entity: ModuleDetailPanelProps["entity"],
-): { label: string; isWarning: boolean } {
-  const data = entity.data as unknown as Record<string, unknown>;
-  const geoProps = data.geoProps as Record<string, unknown> | undefined;
-  const source = (geoProps?.source ?? data.source) as string | undefined;
-  const temBairroOficial = (data.temBairroOficial ?? geoProps?.tem_bairro_oficial) as boolean | undefined;
-
-  if (source === "setor_indicadores" || temBairroOficial === false) {
-    return { label: "Setor censitário", isWarning: true };
-  }
-  if (source === "bairros_indicadores" || source === "municipio_indicadores") {
-    return { label: "IBGE 2022", isWarning: false };
-  }
-  if (entity.kind === "municipio") {
-    const hasApiData = geoProps?.socioeconomico != null;
-    return { label: hasApiData ? "IBGE 2022" : "IBGE · mock", isWarning: false };
-  }
-  return { label: "IBGE · mock", isWarning: false };
-}
 
 function DetailSection({
   title,
@@ -188,6 +166,26 @@ function DimensionDivider({ label, dimension }: { label: string; dimension: Dime
   );
 }
 
+function SocioRow({ label, value, description }: { label: string; value: string; description?: string }) {
+  return (
+    <IndicatorRow label={label} value={value} description={description} />
+  );
+}
+
+function formatPct(value: unknown) {
+  if (value === null || value === undefined) return "—";
+  const num = Number(value);
+  if (Number.isNaN(num)) return "—";
+  return `${num.toFixed(1)}%`;
+}
+
+function formatNum(value: unknown) {
+  if (value === null || value === undefined) return "—";
+  const num = Number(value);
+  if (Number.isNaN(num)) return "—";
+  return num.toLocaleString("pt-BR");
+}
+
 function DataQualityNote({ source, temBairroOficial }: { source?: string; temBairroOficial?: boolean }) {
   if (source === "setor_indicadores" || temBairroOficial === false) {
     return (
@@ -199,16 +197,143 @@ function DataQualityNote({ source, temBairroOficial }: { source?: string; temBai
   return null;
 }
 
-export function EducationDetailPanel({ entity, onNavigate }: ModuleDetailPanelProps) {
+function SocioeconomicoSections({ socio }: { socio: Record<string, unknown> }) {
+  const socioPop = socio?.populacao as Record<string, unknown> | undefined;
+  const socioEducacao = socio?.educacaoPopulacao as Record<string, unknown> | undefined;
+  const socioSaneamento = socio?.saneamento as Record<string, unknown> | undefined;
+  const socioRaca = socio?.raca as Record<string, unknown> | undefined;
+  const socioHabitacao = socio?.habitacao as Record<string, unknown> | undefined;
+  const socioFamilia = socio?.familia as Record<string, unknown> | undefined;
+  const socioEtaria = socio?.estruturaEtaria as Record<string, unknown> | undefined;
+  const socioMortalidade = socio?.mortalidade as Record<string, unknown> | undefined;
+
+  return (
+    <>
+      <DimensionDivider label="Socioeconômico" dimension="socioeconomico" />
+
+      <div className="grid grid-cols-2 gap-2">
+        {socioPop?.total != null && (
+          <MetricCard
+            label="População"
+            value={formatNum(socioPop.total)}
+            description="População residente total"
+            dimension="socioeconomico"
+          />
+        )}
+        {socioEducacao?.taxaAnalfabetismo15Mais != null && (
+          <MetricCard
+            label="Analfabetismo 15+"
+            value={formatPct(socioEducacao.taxaAnalfabetismo15Mais)}
+            description="Taxa de analfabetismo da população com 15 anos ou mais"
+            dimension="socioeconomico"
+          />
+        )}
+      </div>
+
+      {(socioSaneamento?.pctAguaRedeGeral != null ||
+        socioSaneamento?.pctEsgotoRedeGeral != null ||
+        socioSaneamento?.pctLixoColetado != null) && (
+        <DetailSection title="Saneamento básico" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen>
+          {socioSaneamento?.pctAguaRedeGeral != null && (
+            <SocioRow
+              label="Água rede geral"
+              value={formatPct(socioSaneamento.pctAguaRedeGeral)}
+              description="Domicílios com abastecimento de água por rede geral"
+            />
+          )}
+          {socioSaneamento?.pctEsgotoRedeGeral != null && (
+            <SocioRow
+              label="Esgoto rede geral"
+              value={formatPct(socioSaneamento.pctEsgotoRedeGeral)}
+              description="Domicílios com esgotamento sanitário por rede geral"
+            />
+          )}
+          {socioSaneamento?.pctLixoColetado != null && (
+            <SocioRow
+              label="Lixo coletado"
+              value={formatPct(socioSaneamento.pctLixoColetado)}
+              description="Domicílios com coleta de lixo"
+            />
+          )}
+        </DetailSection>
+      )}
+
+      {(socioRaca?.pctPretaParda != null ||
+        socioEtaria?.pctCriancas0a9 != null ||
+        socioEtaria?.pctIdosos60Mais != null ||
+        socioFamilia?.pctResponsavelFeminino != null) && (
+        <DetailSection title="Perfil demográfico" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen={false}>
+          {socioRaca?.pctPretaParda != null && (
+            <SocioRow
+              label="Pop. preta/parda"
+              value={formatPct(socioRaca.pctPretaParda)}
+              description="Percentual da população que se declara preta ou parda"
+            />
+          )}
+          {socioEtaria?.pctCriancas0a9 != null && (
+            <SocioRow
+              label="Crianças 0–9 anos"
+              value={formatPct(socioEtaria.pctCriancas0a9)}
+              description="Percentual da população entre 0 e 9 anos"
+            />
+          )}
+          {socioEtaria?.pctIdosos60Mais != null && (
+            <SocioRow
+              label="Idosos 60+ anos"
+              value={formatPct(socioEtaria.pctIdosos60Mais)}
+              description="Percentual da população com 60 anos ou mais"
+            />
+          )}
+          {socioFamilia?.pctResponsavelFeminino != null && (
+            <SocioRow
+              label="Chefes femininas"
+              value={formatPct(socioFamilia.pctResponsavelFeminino)}
+              description="Percentual de domicílios com responsável do sexo feminino"
+            />
+          )}
+        </DetailSection>
+      )}
+
+      {(socioHabitacao?.pctDomImprovisado != null ||
+        socioHabitacao?.pctDomSuperlotado != null) && (
+        <DetailSection title="Habitação" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen={false}>
+          {socioHabitacao?.pctDomImprovisado != null && (
+            <SocioRow
+              label="Domicílios improvisados"
+              value={formatPct(socioHabitacao.pctDomImprovisado)}
+              description="Percentual de domicílios em estruturas improvisadas"
+            />
+          )}
+          {socioHabitacao?.pctDomSuperlotado != null && (
+            <SocioRow
+              label="Domicílios superlotados"
+              value={formatPct(socioHabitacao.pctDomSuperlotado)}
+              description="Percentual de domicílios com mais de 3 moradores por dormitório"
+            />
+          )}
+        </DetailSection>
+      )}
+
+      {socioMortalidade != null && Object.keys(socioMortalidade).length > 0 && (
+        <DetailSection title="Mortalidade" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen={false}>
+          {Object.entries(socioMortalidade).map(([key, val]) => (
+            <SocioRow key={key} label={key} value={formatNum(val)} />
+          ))}
+        </DetailSection>
+      )}
+    </>
+  );
+}
+
+export function EducationDetailPanel({ entity }: ModuleDetailPanelProps) {
   const edu = buildEducationSelection(entity);
-  const socio = buildSocioeconomicoSelection(entity);
 
   const data = entity.data as unknown as Record<string, unknown>;
   const geoProps = data.geoProps as Record<string, unknown> | undefined;
   const entitySource = (geoProps?.source ?? data.source) as string | undefined;
   const temBairroOficial = (data.temBairroOficial ?? geoProps?.tem_bairro_oficial) as boolean | undefined;
-
-  const { label: socioSourceLabel, isWarning: socioSourceIsWarning } = resolveSourceBadge(entity);
+  const socio = (geoProps?.socioeconomico as Record<string, unknown> | undefined) ?? undefined;
+  const hasSocioeconomico = entity.kind !== "escola" && socio != null;
 
   return (
     <div className="flex flex-col gap-2.5 p-4">
@@ -235,34 +360,9 @@ export function EducationDetailPanel({ entity, onNavigate }: ModuleDetailPanelPr
         </DetailSection>
       ))}
 
-      {entity.kind !== "escola" && (
-        <>
-          <DimensionDivider label="Contexto Socioeconômico" dimension="socioeconomico" />
-
-          {socio.metrics && socio.metrics.length > 0 && (
-            <div className="grid grid-cols-2 gap-2">
-              {socio.metrics.map((m) => (
-                <MetricCard key={m.label} label={m.label} value={m.value} description={m.description} dimension="socioeconomico" />
-              ))}
-            </div>
-          )}
-
-          {socio.sections?.map((section) => (
-            <DetailSection
-              key={section.title}
-              title={section.title}
-              dimension="socioeconomico"
-              source={socioSourceLabel}
-              sourceIsWarning={socioSourceIsWarning}
-              defaultOpen={false}
-            >
-              {section.rows.map((row) => (
-                <IndicatorRow key={row.label} label={row.label} value={row.value} description={row.description} />
-              ))}
-            </DetailSection>
-          ))}
-        </>
-      )}
+      {hasSocioeconomico && socio ? (
+        <SocioeconomicoSections socio={socio} />
+      ) : null}
 
       {entity.kind === "escola" && (
         <Link
@@ -273,13 +373,13 @@ export function EducationDetailPanel({ entity, onNavigate }: ModuleDetailPanelPr
         </Link>
       )}
 
-      {(entity.kind === "municipio" || entity.kind === "bairro") && (
-        <button
-          className="mt-2 w-full rounded-lg border border-cyan-500/40 bg-cyan-500/5 px-3 py-2.5 text-sm font-medium text-cyan-700 dark:text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-500/60 transition-colors"
-          onClick={() => onNavigate(entity)}
+      {entity.kind === "municipio" && (
+        <Link
+          href={`/observatorio/municipios/${entity.data.id}/schools`}
+          className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-500/5 px-3 py-2.5 text-sm font-medium text-cyan-700 transition-colors hover:border-cyan-500/60 hover:bg-cyan-500/10 dark:text-cyan-300"
         >
-          Ver escolas deste {entity.kind === "municipio" ? "município" : "bairro"} →
-        </button>
+          Ver escolas deste município →
+        </Link>
       )}
     </div>
   );

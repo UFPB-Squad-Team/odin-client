@@ -1,6 +1,12 @@
 // Tipos exclusivos do módulo Educação.
 // NÃO redefinir Estado, Municipio, Bairro, Escola — esses vêm de @/core/types/territory.
 
+import type {
+  EscolaIndicadores,
+} from "@/core/types/territory";
+
+export type { EtapaIndicadores, EscolaIndicadores } from "@/core/types/territory";
+
 export type EducationIndicatorId =
   | "pct_com_internet"
   | "pct_com_biblioteca"
@@ -45,24 +51,6 @@ export interface EducationResumoMunicipio {
 }
 
 export type EducationResumoBairro = EducationResumoMunicipio;
-
-/** Dados de uma etapa de ensino retornados pela API */
-export type EtapaIndicadores = {
-  alunosPorTurma?: number | null;
-  taxaAprovacao?: number | null;
-  taxaReprovacao?: number | null;
-  horasAulaDiarias?: number | null;
-  tnr?: number | null;
-};
-
-export type EscolaIndicadores = {
-  anoReferencia?: number | null;
-  totalAlunos?: number | null;
-  educacaoInfantil?: EtapaIndicadores;
-  fundamentalAnosIniciais?: EtapaIndicadores;
-  fundamentalAnosFinais?: EtapaIndicadores;
-  ensinoMedio?: EtapaIndicadores;
-};
 
 export type EscolaEquipamentos = {
   computadorPortatilAluno?: boolean;
@@ -118,8 +106,11 @@ export type EscolaEntityData = {
   municipioId?: string;
   municipioNome?: string;
   estadoSigla?: string;
+  geoProps?: Record<string, unknown>;
   dependencia_adm?: string;
+  dependenciaAdministrativa?: string;
   tipo_localizacao?: string;
+  tipoLocalizacao?: string;
   ideb?: number | null;
   inse?: number | null;
   indicadores?: EscolaIndicadores;

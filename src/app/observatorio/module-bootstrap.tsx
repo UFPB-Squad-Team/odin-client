@@ -1,8 +1,5 @@
 "use client";
 
-// Bootstrap de módulos — executado apenas no cliente, uma única vez.
-// Separado do page.tsx para evitar execução no servidor (SSR).
-
 import { useEffect } from "react";
 import { getModule, registerModule } from "@/core/registry/module-registry";
 

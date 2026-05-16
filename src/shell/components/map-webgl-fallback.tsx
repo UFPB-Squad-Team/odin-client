@@ -38,7 +38,7 @@ export function MapWebGLFallback({ onRetry }: MapWebGLFallbackProps) {
             Como resolver:
           </p>
           <ul className="mt-2 space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
-            <li>• No Chrome: acesse <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-700">chrome://settings/system</code> e ative "Usar aceleração de hardware"</li>
+            <li>• No Chrome: acesse <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-700">chrome://settings/system</code> e ative &quot;Usar aceleração de hardware&quot;</li>
             <li>• Reinicie o navegador após ativar</li>
             <li>• Em ambientes corporativos, a GPU pode estar bloqueada por política</li>
           </ul>
