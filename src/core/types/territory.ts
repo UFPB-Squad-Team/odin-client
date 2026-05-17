@@ -39,6 +39,18 @@ export interface Bairro {
   temBairroOficial?: boolean;
 }
 
+export type EscolaMatriculas = {
+  totalAlunos?: number | null;
+  educacaoInfantil?: number | null;
+  educacaoInfantilCreche?: number | null;
+  educacaoInfantilPreEscola?: number | null;
+  fundamentalTotal?: number | null;
+  fundamentalAnosIniciais?: number | null;
+  fundamentalAnosFinais?: number | null;
+  ensinoMedio?: number | null;
+  eja?: number | null;
+};
+
 export interface Escola {
   id: string;
   inepId?: string;
@@ -57,6 +69,7 @@ export interface Escola {
   inse?: number;
   infraestrutura?: Record<string, unknown>;
   indicadores?: EscolaIndicadores;
+  matriculas?: EscolaMatriculas;
 }
 
 export type TerritoryFilters = {

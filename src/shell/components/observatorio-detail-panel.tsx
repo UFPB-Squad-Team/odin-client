@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getModule } from "@/core/registry/module-registry";
+import { listModules } from "@/core/registry/module-registry";
+import { TerritoryDetailPanel } from "@/shell/components/territory-detail-panel";
 import type {
   ObservatorySelection,
   ShellContextType,
@@ -20,7 +21,7 @@ type DetailPanelProps = {
 
 function layerLabel(kind: ObservatorySelection["kind"]) {
   if (kind === "municipio") return "Município";
-  if (kind === "bairro") return "Bairro";
+  if (kind === "bairro") return "Vizinhança";
   return "Escola";
 }
 
@@ -231,36 +232,46 @@ export function ObservatorioDetailPanel({
 
         {selection ? (
           (() => {
-            const activeModule = activeModuleId ? getModule(activeModuleId) : undefined;
-            if (activeModule?.DetailPanel && shellContext && onNavigate) {
-              const entity: MapEntity =
-                selection.sourceEntity ??
-                (shellContext.selectedEntity &&
+            if (shellContext && onNavigate) {
+              // Resolve a entidade com dados completos (geoProps)
+              const entity: MapEntity = (() => {
+                // 1. sourceEntity do selection (mais completo)
+                if (selection.sourceEntity) return selection.sourceEntity;
+
+                // 2. selectedEntity do shell context
+                if (
+                  shellContext.selectedEntity &&
                   shellContext.selectedEntity.kind === selection.kind &&
                   shellContext.selectedEntity.data.id === selection.id
-                  ? shellContext.selectedEntity
-                  : ({
-                      kind: selection.kind,
-                      data:
-                        selection.kind === "municipio"
-                          ? {
-                              id: selection.id,
-                              nome: selection.nome,
-                              estadoId: shellContext.filters.estadoId ?? "",
-                              geoProps: undefined,
-                            }
-                          : selection.kind === "bairro"
-                            ? {
-                                id: selection.id,
-                                nome: selection.nome,
-                                municipioId: shellContext.filters.municipioId ?? "",
-                              }
-                            : {
-                                id: selection.id,
-                                nome: selection.nome,
-                                bairroId: "",
-                              },
-                    } as MapEntity));
+                ) {
+                  return shellContext.selectedEntity;
+                }
+
+                // 3. Busca na lista de entidades do shell
+                if (selection.kind === "municipio") {
+                  const found = shellContext.municipios.find((m) => m.id === selection.id);
+                  if (found) return { kind: "municipio" as const, data: found };
+                }
+                if (selection.kind === "bairro") {
+                  const found = shellContext.bairros.find((b) => b.id === selection.id);
+                  if (found) return { kind: "bairro" as const, data: found };
+                }
+                if (selection.kind === "escola") {
+                  const found = shellContext.escolas.find((e) => e.id === selection.id);
+                  if (found) return { kind: "escola" as const, data: found };
+                }
+
+                // 4. Fallback mínimo
+                return {
+                  kind: selection.kind,
+                  data:
+                    selection.kind === "municipio"
+                      ? { id: selection.id, nome: selection.nome, estadoId: shellContext.filters.estadoId ?? "" }
+                      : selection.kind === "bairro"
+                        ? { id: selection.id, nome: selection.nome, municipioId: shellContext.filters.municipioId ?? "" }
+                        : { id: selection.id, nome: selection.nome, bairroId: "" },
+                } as MapEntity;
+              })();
 
               const showNeighborhoodSummary = selection.kind === "bairro";
               const municipalityName =
@@ -276,7 +287,7 @@ export function ObservatorioDetailPanel({
                   {showNeighborhoodSummary ? (
                     <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-3 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950/60 dark:text-zinc-200">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                        Bairro selecionado
+                        Vizinhança selecionada
                       </div>
                       <div className="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
                         {selection.nome}
@@ -288,11 +299,7 @@ export function ObservatorioDetailPanel({
                       ) : null}
                     </div>
                   ) : null}
-                  <activeModule.DetailPanel
-                    entity={entity}
-                    shellContext={shellContext}
-                    onNavigate={onNavigate}
-                  />
+                  <TerritoryDetailPanel entity={entity} />
                 </div>
               );
             }
@@ -314,10 +321,10 @@ export function ObservatorioDetailPanel({
                       raw.municipio_id_ibge ??
                       raw.municipio_id ??
                       "—") as string;
-                    const indicadores = raw.indicadores as
+                    const matriculasObj = raw.matriculas as
                       | Record<string, unknown>
                       | undefined;
-                    const alunos = (indicadores?.totalAlunos ??
+                    const alunos = (matriculasObj?.totalAlunos ??
                       raw.totalAlunos ??
                       raw.total_alunos ??
                       raw.alunos ??

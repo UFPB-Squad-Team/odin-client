@@ -82,7 +82,7 @@ export async function listMunicipios(estadoId: string): Promise<Municipio[]> {
   if (!response.ok) throw new Error(`aggregations/cities falhou: ${response.status}`);
 
   const geojson = (await response.json()) as {
-    features: Array<{ properties: Record<string, unknown>; id?: string }>;
+    features: Array<{ properties: Record<string, unknown>; id?: string; geometry?: { type: string; coordinates: [number, number] } }>;
   };
 
   console.log("[listMunicipios] features recebidas:", geojson.features?.length);
@@ -94,7 +94,9 @@ export async function listMunicipios(estadoId: string): Promise<Municipio[]> {
       const id = rawId.replace(/\.0$/, "");
       const nome = normalizeMunicipioLabel(props, id);
       const uf = String(props.uf ?? props.sg_uf ?? estadoId).toLowerCase();
-      return { id, nome, estadoId: uf, geoProps: props } satisfies Municipio;
+      // Inclui centróide da geometry (Point) no geoProps para auto-pan
+      const centroide = feature.geometry?.type === "Point" ? feature.geometry.coordinates : undefined;
+      return { id, nome, estadoId: uf, geoProps: { ...props, _centroide: centroide } } satisfies Municipio;
     })
     .filter((m) => m.id && m.nome);
 
@@ -117,10 +119,12 @@ export async function listBairros(municipioId: string): Promise<Bairro[]> {
   bairrosGeoCache.set(municipioId, payload);
 
   return payload
-    .map((raw) => {
+    .map((raw, index) => {
       const idRaw = String(raw._id ?? raw.cd_bairro_ibge ?? raw.cd_setor ?? raw.id ?? "");
       const id = idRaw.replace(/\.0$/, "");
-      const nome = String(raw.bairro ?? raw.nm_bairro ?? raw.nome_area ?? raw.nome ?? id);
+      const rawNome = String(raw.bairro ?? raw.nm_bairro ?? raw.nome_area ?? raw.nome ?? "");
+      // Se o nome é vazio ou puramente numérico (código de setor), usa nome amigável
+      const nome = rawNome && !/^\d+$/.test(rawNome) ? rawNome : `Área ${index + 1}`;
       const municipioIdApi = String(
         raw.municipioIdIbge ?? raw.municipio_id_ibge ?? "",
       ).replace(/\.0$/, "");

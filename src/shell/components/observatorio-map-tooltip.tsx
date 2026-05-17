@@ -14,7 +14,7 @@ type ObservatorioMapTooltipProps = {
 
 const LAYER_LABELS: Record<ObservatoryLayer, string> = {
   municipio: "Município",
-  bairro: "Bairro",
+  bairro: "Vizinhança",
   escola: "Escola",
 };
 

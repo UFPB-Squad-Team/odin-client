@@ -153,7 +153,7 @@ export async function fetchMunicipiosGeoJSON(
   if (!API_BASE_URL) return null;
 
   const response = await fetch(
-    `${API_BASE_URL}/aggregations/cities?sg_uf=${sgUf}`,
+    `${API_BASE_URL}/aggregations/cities?sg_uf=${sgUf}&include_geometria=true`,
   );
 
   if (!response.ok) return null;

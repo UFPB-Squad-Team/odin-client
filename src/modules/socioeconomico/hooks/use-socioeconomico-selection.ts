@@ -45,22 +45,35 @@ export function buildSocioeconomicoSelection(
     const familia = socio?.familia as Record<string, unknown> | undefined;
     const mortalidade = socio?.mortalidade as Record<string, unknown> | undefined;
     const habitacao = socio?.habitacao as Record<string, unknown> | undefined;
+    const genero = socio?.genero as Record<string, unknown> | undefined;
 
     const totalPopulacao = populacao?.total ?? mock?.total_populacao;
-    const totalDomicilios = populacao?.totalDomiciliosParticulares;
+    const totalDomicilios = populacao?.totalDomicilios ?? populacao?.totalDomiciliosParticulares;
     const mediaHabitantes = populacao?.mediaMoradoresPorDomicilio ?? mock?.media_moradores_por_domicilio;
     const pctAguaRede = saneamento?.pctAguaRedeGeral ?? mock?.pct_agua_rede_geral;
     const pctEsgotoRede = saneamento?.pctEsgotoRedeGeral ?? mock?.pct_esgoto_rede_geral;
     const pctLixoColetado = saneamento?.pctLixoColetado ?? mock?.pct_lixo_coletado;
+    const pctAguaNaoEncanada = saneamento?.pctAguaNaoEncanada;
+    const pctDomSemBanheiro = saneamento?.pctDomSemBanheiro;
     const pctPretaParda = raca?.pctPretaParda ?? mock?.pct_preta_parda;
+    const pctBranca = raca?.pctBranca;
+    const pctIndigena = raca?.pctIndigena;
     const pctCriancas = estruturaEtaria?.pctCriancas0a9 ?? mock?.pct_criancas_0_9;
     const pctIdosos = estruturaEtaria?.pctIdosos60Mais ?? mock?.pct_idosos_60_mais;
+    const pctJovens15a29 = estruturaEtaria?.pctJovens15a29;
+    const pctAdultos30a59 = estruturaEtaria?.pctAdultos30a59;
     const taxaAnalfabetismo = educacaoPopulacao?.taxaAnalfabetismo15Mais ?? mock?.taxa_analfabetismo_15_mais;
     const pctResponsavelFeminino = familia?.pctResponsavelFeminino;
+    const pctPopMasculina = genero?.pctPopMasculina;
+    const pctPopFeminina = genero?.pctPopFeminina;
     const totalObitos = mortalidade?.totalObitosDomicilios;
     const obitosInfantis = mortalidade?.obitosInfantis0a4;
     const pctDomImprovisado = habitacao?.pctDomImprovisado;
     const pctDomSuperlotado = habitacao?.pctDomSuperlotado;
+    const pctDomUnipessoal = habitacao?.pctDomUnipessoal;
+    const pctDomTipoCasa = habitacao?.pctDomTipoCasa;
+    const pctDomTipoApto = habitacao?.pctDomTipoApto;
+    const pctDomDegradado = habitacao?.pctDomDegradado;
 
     const fonte = (socio?.fonte as string | undefined) ?? "IBGE Censo Demográfico 2022";
     const anoRef = (socio?.anoReferencia as number | undefined) ?? 2022;
@@ -90,16 +103,29 @@ export function buildSocioeconomicoSelection(
             { label: "Água rede geral", value: formatPct(pctAguaRede), description: "Domicílios com abastecimento de água por rede geral" },
             { label: "Esgoto rede geral", value: formatPct(pctEsgotoRede), description: "Domicílios com esgotamento sanitário por rede geral" },
             { label: "Lixo coletado", value: formatPct(pctLixoColetado), description: "Domicílios com coleta de lixo" },
+            ...(pctAguaNaoEncanada != null ? [{ label: "Sem água encanada", value: formatPct(pctAguaNaoEncanada), description: "Domicílios sem água encanada" }] : []),
+            ...(pctDomSemBanheiro != null ? [{ label: "Sem banheiro", value: formatPct(pctDomSemBanheiro), description: "Domicílios sem banheiro" }] : []),
+          ],
+        },
+        {
+          title: "Gênero",
+          rows: [
+            ...(pctPopMasculina != null ? [{ label: "Pop. masculina", value: formatPct(pctPopMasculina), description: "Percentual da população do sexo masculino" }] : []),
+            ...(pctPopFeminina != null ? [{ label: "Pop. feminina", value: formatPct(pctPopFeminina), description: "Percentual da população do sexo feminino" }] : []),
           ],
         },
         {
           title: "Perfil demográfico",
           rows: [
             { label: "Pop. preta/parda", value: formatPct(pctPretaParda), description: "Percentual da população que se declara preta ou parda" },
+            ...(pctBranca != null ? [{ label: "Pop. branca", value: formatPct(pctBranca), description: "Percentual da população que se declara branca" }] : []),
+            ...(pctIndigena != null ? [{ label: "Pop. indígena", value: formatPct(pctIndigena), description: "Percentual da população que se declara indígena" }] : []),
             { label: "Crianças 0–9 anos", value: formatPct(pctCriancas), description: "Percentual da população entre 0 e 9 anos" },
+            ...(pctJovens15a29 != null ? [{ label: "Jovens 15–29 anos", value: formatPct(pctJovens15a29), description: "Percentual da população entre 15 e 29 anos" }] : []),
+            ...(pctAdultos30a59 != null ? [{ label: "Adultos 30–59 anos", value: formatPct(pctAdultos30a59), description: "Percentual da população entre 30 e 59 anos" }] : []),
             { label: "Idosos 60+ anos", value: formatPct(pctIdosos), description: "Percentual da população com 60 anos ou mais" },
             { label: "Média hab./domicílio", value: formatNum(mediaHabitantes), description: "Média de moradores por domicílio particular" },
-            ...(totalDomicilios != null ? [{ label: "Domicílios particulares", value: formatNum(totalDomicilios), description: "Total de domicílios particulares recenseados" }] : []),
+            ...(totalDomicilios != null ? [{ label: "Total de domicílios", value: formatNum(totalDomicilios), description: "Total de domicílios recenseados" }] : []),
             ...(pctResponsavelFeminino != null ? [{ label: "Chefes de família femininas", value: formatPct(pctResponsavelFeminino), description: "Percentual de domicílios com responsável do sexo feminino" }] : []),
           ],
         },
@@ -108,6 +134,10 @@ export function buildSocioeconomicoSelection(
           rows: [
             ...(pctDomImprovisado != null ? [{ label: "Domicílios improvisados", value: formatPct(pctDomImprovisado), description: "Percentual de domicílios em estruturas improvisadas" }] : []),
             ...(pctDomSuperlotado != null ? [{ label: "Domicílios superlotados", value: formatPct(pctDomSuperlotado), description: "Percentual de domicílios com mais de 3 moradores por dormitório" }] : []),
+            ...(pctDomUnipessoal != null ? [{ label: "Domicílios unipessoais", value: formatPct(pctDomUnipessoal), description: "Percentual de domicílios com apenas 1 morador" }] : []),
+            ...(pctDomTipoCasa != null ? [{ label: "Tipo casa", value: formatPct(pctDomTipoCasa), description: "Percentual de domicílios do tipo casa" }] : []),
+            ...(pctDomTipoApto != null ? [{ label: "Tipo apartamento", value: formatPct(pctDomTipoApto), description: "Percentual de domicílios do tipo apartamento" }] : []),
+            ...(pctDomDegradado != null ? [{ label: "Degradado/inacabado", value: formatPct(pctDomDegradado), description: "Percentual de domicílios degradados ou inacabados" }] : []),
           ],
         },
         {
@@ -139,6 +169,7 @@ export function buildSocioeconomicoSelection(
   const familia = socio?.familia as Record<string, unknown> | undefined;
   const mortalidade = socio?.mortalidade as Record<string, unknown> | undefined;
   const habitacao = socio?.habitacao as Record<string, unknown> | undefined;
+  const genero = socio?.genero as Record<string, unknown> | undefined;
 
   const hasRealSocioData = socio != null;
   const hasRealEducacaoData = educacao != null;
@@ -186,16 +217,30 @@ export function buildSocioeconomicoSelection(
                 { label: "Água rede geral", value: formatPct(saneamento?.pctAguaRedeGeral), description: "Domicílios com abastecimento de água por rede geral" },
                 { label: "Esgoto rede geral", value: formatPct(saneamento?.pctEsgotoRedeGeral), description: "Domicílios com esgotamento sanitário por rede geral" },
                 { label: "Lixo coletado", value: formatPct(saneamento?.pctLixoColetado), description: "Domicílios com coleta de lixo" },
+                ...(saneamento?.pctAguaNaoEncanada != null ? [{ label: "Sem água encanada", value: formatPct(saneamento.pctAguaNaoEncanada), description: "Domicílios sem água encanada" }] : []),
+                ...(saneamento?.pctDomSemBanheiro != null ? [{ label: "Sem banheiro", value: formatPct(saneamento.pctDomSemBanheiro), description: "Domicílios sem banheiro" }] : []),
               ].filter((r) => r.value !== "—"),
+            },
+            {
+              title: "Gênero",
+              rows: [
+                ...(genero?.pctPopMasculina != null ? [{ label: "Pop. masculina", value: formatPct(genero.pctPopMasculina), description: "Percentual da população do sexo masculino" }] : []),
+                ...(genero?.pctPopFeminina != null ? [{ label: "Pop. feminina", value: formatPct(genero.pctPopFeminina), description: "Percentual da população do sexo feminino" }] : []),
+              ],
             },
             {
               title: "Perfil demográfico",
               rows: [
                 { label: "Pop. preta/parda", value: formatPct(raca?.pctPretaParda), description: "Percentual da população que se declara preta ou parda" },
+                ...(raca?.pctBranca != null ? [{ label: "Pop. branca", value: formatPct(raca.pctBranca), description: "Percentual da população que se declara branca" }] : []),
+                ...(raca?.pctIndigena != null ? [{ label: "Pop. indígena", value: formatPct(raca.pctIndigena), description: "Percentual da população que se declara indígena" }] : []),
                 { label: "Crianças 0–9 anos", value: formatPct(estruturaEtaria?.pctCriancas0a9), description: "Percentual da população entre 0 e 9 anos" },
+                ...(estruturaEtaria?.pctJovens15a29 != null ? [{ label: "Jovens 15–29 anos", value: formatPct(estruturaEtaria.pctJovens15a29), description: "Percentual da população entre 15 e 29 anos" }] : []),
+                ...(estruturaEtaria?.pctAdultos30a59 != null ? [{ label: "Adultos 30–59 anos", value: formatPct(estruturaEtaria.pctAdultos30a59), description: "Percentual da população entre 30 e 59 anos" }] : []),
                 { label: "Idosos 60+ anos", value: formatPct(estruturaEtaria?.pctIdosos60Mais), description: "Percentual da população com 60 anos ou mais" },
                 { label: "Média hab./domicílio", value: formatNum(populacao?.mediaMoradoresPorDomicilio), description: "Média de moradores por domicílio particular" },
-                ...(populacao?.totalDomiciliosParticulares != null ? [{ label: "Domicílios particulares", value: formatNum(populacao.totalDomiciliosParticulares), description: "Total de domicílios particulares recenseados" }] : []),
+                ...(populacao?.totalDomicilios != null ? [{ label: "Total de domicílios", value: formatNum(populacao.totalDomicilios), description: "Total de domicílios recenseados" }] : []),
+                ...(populacao?.totalDomiciliosParticulares != null && populacao?.totalDomicilios == null ? [{ label: "Domicílios particulares", value: formatNum(populacao.totalDomiciliosParticulares), description: "Total de domicílios particulares recenseados" }] : []),
                 ...(familia?.pctResponsavelFeminino != null ? [{ label: "Chefes de família femininas", value: formatPct(familia.pctResponsavelFeminino), description: "Percentual de domicílios com responsável do sexo feminino" }] : []),
               ].filter((r) => r.value !== "—"),
             },
@@ -204,6 +249,10 @@ export function buildSocioeconomicoSelection(
               rows: [
                 ...(habitacao?.pctDomImprovisado != null ? [{ label: "Domicílios improvisados", value: formatPct(habitacao.pctDomImprovisado), description: "Percentual de domicílios em estruturas improvisadas" }] : []),
                 ...(habitacao?.pctDomSuperlotado != null ? [{ label: "Domicílios superlotados", value: formatPct(habitacao.pctDomSuperlotado), description: "Percentual de domicílios com mais de 3 moradores por dormitório" }] : []),
+                ...(habitacao?.pctDomUnipessoal != null ? [{ label: "Domicílios unipessoais", value: formatPct(habitacao.pctDomUnipessoal), description: "Percentual de domicílios com apenas 1 morador" }] : []),
+                ...(habitacao?.pctDomTipoCasa != null ? [{ label: "Tipo casa", value: formatPct(habitacao.pctDomTipoCasa), description: "Percentual de domicílios do tipo casa" }] : []),
+                ...(habitacao?.pctDomTipoApto != null ? [{ label: "Tipo apartamento", value: formatPct(habitacao.pctDomTipoApto), description: "Percentual de domicílios do tipo apartamento" }] : []),
+                ...(habitacao?.pctDomDegradado != null ? [{ label: "Degradado/inacabado", value: formatPct(habitacao.pctDomDegradado), description: "Percentual de domicílios degradados ou inacabados" }] : []),
               ].filter((r) => r.value !== "—"),
             },
             {

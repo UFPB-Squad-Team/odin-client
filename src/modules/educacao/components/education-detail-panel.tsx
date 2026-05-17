@@ -190,7 +190,7 @@ function DataQualityNote({ source, temBairroOficial }: { source?: string; temBai
   if (source === "setor_indicadores" || temBairroOficial === false) {
     return (
       <div className="rounded-md border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
-        Dados baseados em setores censitários — este município não possui delimitação oficial de bairros.
+        Dados baseados em setores censitários — este município não possui delimitação oficial de vizinhanças.
       </div>
     );
   }
@@ -206,6 +206,7 @@ function SocioeconomicoSections({ socio }: { socio: Record<string, unknown> }) {
   const socioFamilia = socio?.familia as Record<string, unknown> | undefined;
   const socioEtaria = socio?.estruturaEtaria as Record<string, unknown> | undefined;
   const socioMortalidade = socio?.mortalidade as Record<string, unknown> | undefined;
+  const socioGenero = socio?.genero as Record<string, unknown> | undefined;
 
   return (
     <>
@@ -232,7 +233,9 @@ function SocioeconomicoSections({ socio }: { socio: Record<string, unknown> }) {
 
       {(socioSaneamento?.pctAguaRedeGeral != null ||
         socioSaneamento?.pctEsgotoRedeGeral != null ||
-        socioSaneamento?.pctLixoColetado != null) && (
+        socioSaneamento?.pctLixoColetado != null ||
+        socioSaneamento?.pctAguaNaoEncanada != null ||
+        socioSaneamento?.pctDomSemBanheiro != null) && (
         <DetailSection title="Saneamento básico" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen>
           {socioSaneamento?.pctAguaRedeGeral != null && (
             <SocioRow
@@ -255,11 +258,49 @@ function SocioeconomicoSections({ socio }: { socio: Record<string, unknown> }) {
               description="Domicílios com coleta de lixo"
             />
           )}
+          {socioSaneamento?.pctAguaNaoEncanada != null && (
+            <SocioRow
+              label="Sem água encanada"
+              value={formatPct(socioSaneamento.pctAguaNaoEncanada)}
+              description="Domicílios sem água encanada"
+            />
+          )}
+          {socioSaneamento?.pctDomSemBanheiro != null && (
+            <SocioRow
+              label="Sem banheiro"
+              value={formatPct(socioSaneamento.pctDomSemBanheiro)}
+              description="Domicílios sem banheiro"
+            />
+          )}
+        </DetailSection>
+      )}
+
+      {(socioGenero?.pctPopMasculina != null ||
+        socioGenero?.pctPopFeminina != null) && (
+        <DetailSection title="Gênero" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen={false}>
+          {socioGenero?.pctPopMasculina != null && (
+            <SocioRow
+              label="Pop. masculina"
+              value={formatPct(socioGenero.pctPopMasculina)}
+              description="Percentual da população do sexo masculino"
+            />
+          )}
+          {socioGenero?.pctPopFeminina != null && (
+            <SocioRow
+              label="Pop. feminina"
+              value={formatPct(socioGenero.pctPopFeminina)}
+              description="Percentual da população do sexo feminino"
+            />
+          )}
         </DetailSection>
       )}
 
       {(socioRaca?.pctPretaParda != null ||
+        socioRaca?.pctBranca != null ||
+        socioRaca?.pctIndigena != null ||
         socioEtaria?.pctCriancas0a9 != null ||
+        socioEtaria?.pctJovens15a29 != null ||
+        socioEtaria?.pctAdultos30a59 != null ||
         socioEtaria?.pctIdosos60Mais != null ||
         socioFamilia?.pctResponsavelFeminino != null) && (
         <DetailSection title="Perfil demográfico" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen={false}>
@@ -270,11 +311,39 @@ function SocioeconomicoSections({ socio }: { socio: Record<string, unknown> }) {
               description="Percentual da população que se declara preta ou parda"
             />
           )}
+          {socioRaca?.pctBranca != null && (
+            <SocioRow
+              label="Pop. branca"
+              value={formatPct(socioRaca.pctBranca)}
+              description="Percentual da população que se declara branca"
+            />
+          )}
+          {socioRaca?.pctIndigena != null && (
+            <SocioRow
+              label="Pop. indígena"
+              value={formatPct(socioRaca.pctIndigena)}
+              description="Percentual da população que se declara indígena"
+            />
+          )}
           {socioEtaria?.pctCriancas0a9 != null && (
             <SocioRow
               label="Crianças 0–9 anos"
               value={formatPct(socioEtaria.pctCriancas0a9)}
               description="Percentual da população entre 0 e 9 anos"
+            />
+          )}
+          {socioEtaria?.pctJovens15a29 != null && (
+            <SocioRow
+              label="Jovens 15–29 anos"
+              value={formatPct(socioEtaria.pctJovens15a29)}
+              description="Percentual da população entre 15 e 29 anos"
+            />
+          )}
+          {socioEtaria?.pctAdultos30a59 != null && (
+            <SocioRow
+              label="Adultos 30–59 anos"
+              value={formatPct(socioEtaria.pctAdultos30a59)}
+              description="Percentual da população entre 30 e 59 anos"
             />
           )}
           {socioEtaria?.pctIdosos60Mais != null && (
@@ -291,11 +360,22 @@ function SocioeconomicoSections({ socio }: { socio: Record<string, unknown> }) {
               description="Percentual de domicílios com responsável do sexo feminino"
             />
           )}
+          {socioPop?.totalDomicilios != null && (
+            <SocioRow
+              label="Total de domicílios"
+              value={formatNum(socioPop.totalDomicilios)}
+              description="Total de domicílios recenseados"
+            />
+          )}
         </DetailSection>
       )}
 
       {(socioHabitacao?.pctDomImprovisado != null ||
-        socioHabitacao?.pctDomSuperlotado != null) && (
+        socioHabitacao?.pctDomSuperlotado != null ||
+        socioHabitacao?.pctDomUnipessoal != null ||
+        socioHabitacao?.pctDomTipoCasa != null ||
+        socioHabitacao?.pctDomTipoApto != null ||
+        socioHabitacao?.pctDomDegradado != null) && (
         <DetailSection title="Habitação" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen={false}>
           {socioHabitacao?.pctDomImprovisado != null && (
             <SocioRow
@@ -311,14 +391,53 @@ function SocioeconomicoSections({ socio }: { socio: Record<string, unknown> }) {
               description="Percentual de domicílios com mais de 3 moradores por dormitório"
             />
           )}
+          {socioHabitacao?.pctDomUnipessoal != null && (
+            <SocioRow
+              label="Domicílios unipessoais"
+              value={formatPct(socioHabitacao.pctDomUnipessoal)}
+              description="Percentual de domicílios com apenas 1 morador"
+            />
+          )}
+          {socioHabitacao?.pctDomTipoCasa != null && (
+            <SocioRow
+              label="Tipo casa"
+              value={formatPct(socioHabitacao.pctDomTipoCasa)}
+              description="Percentual de domicílios do tipo casa"
+            />
+          )}
+          {socioHabitacao?.pctDomTipoApto != null && (
+            <SocioRow
+              label="Tipo apartamento"
+              value={formatPct(socioHabitacao.pctDomTipoApto)}
+              description="Percentual de domicílios do tipo apartamento"
+            />
+          )}
+          {socioHabitacao?.pctDomDegradado != null && (
+            <SocioRow
+              label="Degradado/inacabado"
+              value={formatPct(socioHabitacao.pctDomDegradado)}
+              description="Percentual de domicílios degradados ou inacabados"
+            />
+          )}
         </DetailSection>
       )}
 
       {socioMortalidade != null && Object.keys(socioMortalidade).length > 0 && (
         <DetailSection title="Mortalidade" dimension="socioeconomico" source="IBGE Censo 2022" defaultOpen={false}>
-          {Object.entries(socioMortalidade).map(([key, val]) => (
-            <SocioRow key={key} label={key} value={formatNum(val)} />
-          ))}
+          {socioMortalidade?.totalObitosDomicilios != null && (
+            <SocioRow
+              label="Óbitos registrados"
+              value={formatNum(socioMortalidade.totalObitosDomicilios)}
+              description="Total de óbitos em domicílios recenseados"
+            />
+          )}
+          {socioMortalidade?.obitosInfantis0a4 != null && (
+            <SocioRow
+              label="Óbitos infantis (0–4 anos)"
+              value={formatNum(socioMortalidade.obitosInfantis0a4)}
+              description="Óbitos de crianças entre 0 e 4 anos"
+            />
+          )}
         </DetailSection>
       )}
     </>

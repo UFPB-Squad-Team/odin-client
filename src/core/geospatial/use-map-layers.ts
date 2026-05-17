@@ -45,12 +45,7 @@ type RawGeoJSONCollection = {
   features: RawGeoJSONFeature[];
 };
 
-const MUNICIPALITY_CODE_TO_ENTITY_ID: Record<string, string> = {
-  "2507507": "jp",
-  "2504009": "cg",
-  "2611606": "rec",
-  "2304400": "for",
-};
+const MUNICIPALITY_CODE_TO_ENTITY_ID: Record<string, string> = {};
 
 const UF_TO_IBGE_STATE_CODE: Record<string, string> = {
   ma: "21",
@@ -203,92 +198,70 @@ async function fetchIbgeMunicipalities(
   return normalizeCollection(rawCollection, "municipio");
 }
 
+function computeFeatureCentroid(
+  feature: { geometry?: { type?: string; coordinates?: unknown } },
+): [number, number] | null {
+  const geom = feature.geometry;
+  if (!geom?.type || !geom.coordinates) return null;
+
+  let points: [number, number][] = [];
+
+  if (geom.type === "Point") {
+    return geom.coordinates as [number, number];
+  }
+  if (geom.type === "Polygon") {
+    points = (geom.coordinates as number[][][])[0] as [number, number][];
+  }
+  if (geom.type === "MultiPolygon") {
+    points = (geom.coordinates as number[][][][]).flatMap((poly) => poly[0]) as [number, number][];
+  }
+
+  if (points.length === 0) return null;
+
+  const sumLng = points.reduce((acc, p) => acc + p[0], 0);
+  const sumLat = points.reduce((acc, p) => acc + p[1], 0);
+  return [sumLng / points.length, sumLat / points.length];
+}
+
 async function fetchMunicipalityCollection(
   estadoUf: string | null,
 ): Promise<GeoJSONFeatureCollection | null> {
   if (!estadoUf) return null;
 
   const sgUf = estadoUf.toUpperCase();
+  const collection = await fetchMunicipiosGeoJSON(sgUf);
 
-  const [malhasResult, odinResult] = await Promise.allSettled([
-    (async () => {
-      try {
-        return await fetchIbgeMunicipalities(estadoUf);
-      } catch {
-        return null;
-      }
-    })(),
-    fetchMunicipiosGeoJSON(sgUf),
-  ]);
+  if (!collection?.features?.length) return null;
 
-  const baseCollection =
-    malhasResult.status === "fulfilled" ? malhasResult.value : null;
-  const odinCollection =
-    odinResult.status === "fulfilled" ? odinResult.value : null;
-
-  if (!baseCollection) {
-    const fallbackRaw = await fetchJsonFromCandidates(
-      buildMunicipalityFallbackCandidates(estadoUf),
-    );
-    return fallbackRaw ? normalizeCollection(fallbackRaw, "municipio") : null;
-  }
-
-  if (!odinCollection?.features?.length) {
-    return {
-      type: "FeatureCollection",
-      features: [...baseCollection.features].sort((a, b) =>
-        String(a.properties.nome ?? "").localeCompare(String(b.properties.nome ?? ""), "pt-BR", {
-          sensitivity: "base",
-          numeric: true,
-        }),
-      ),
-    };
-  }
-
-  // Monta índice ODIN por código IBGE normalizado (remove ".0" do final)
-  const odinByCode = new Map<string, Record<string, unknown>>();
-  for (const feature of odinCollection.features) {
+  // Normaliza IDs e propriedades para consistência com o choropleth
+  const features = collection.features.map((feature) => {
     const props = feature.properties as Record<string, unknown>;
     const rawId = String(
       props.municipioIdIbge ?? props.co_municipio ?? feature.id ?? "",
-    );
-    const normalizedId = rawId.replace(/\.0$/, "");
-    if (normalizedId) odinByCode.set(normalizedId, props);
-  }
-
-  // Merge: geometria das malhas + indicadores do ODIN
-  const mergedFeatures = baseCollection.features.map((feature) => {
-    // O arquivo local usa properties.id como código IBGE
-    const featureId = String(
-      feature.properties.codarea ??
-        feature.properties.id ??
-        feature.id ??
-        "",
     ).replace(/\.0$/, "");
+    const nome = String(
+      props.municipio ?? props.nome ?? props.name ?? rawId,
+    );
 
-    const odinProps = odinByCode.get(featureId) ?? {};
-    const hasOdin = Object.keys(odinProps).length > 0;
+    // Computa centróide a partir da geometria para auto-pan
+    const centroide = computeFeatureCentroid(feature);
 
     return {
       ...feature,
+      id: rawId,
       properties: {
-        ...feature.properties,
-        ...(hasOdin ? odinProps : {}),
-        // Garante que id e nome do mapa prevalecem
-        id: featureId || feature.properties.id,
-        nome:
-          feature.properties.nome ??
-          String(odinProps.municipio ?? feature.properties.name ?? featureId),
+        ...props,
+        id: rawId,
+        nome,
         nivel: "municipio" as const,
-        // Marca se tem dados reais do ODIN
-        _hasOdinData: hasOdin,
+        ...(centroide ? { _centroide: centroide } : {}),
       },
     };
-  });
+  }) as GeoJSONFeatureCollection["features"];
 
   return {
     type: "FeatureCollection",
-    features: [...mergedFeatures].sort((a, b) =>
+    features: features.sort((a, b) =>
       String(a.properties.nome ?? "").localeCompare(String(b.properties.nome ?? ""), "pt-BR", {
         sensitivity: "base",
         numeric: true,

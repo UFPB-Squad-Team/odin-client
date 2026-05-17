@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRef, useMemo, useState } from "react";
 import Map, {
   Layer,
   NavigationControl,
   Source,
   type MapLayerMouseEvent,
+  type MapRef,
 } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
 import { useMapLayers } from "@/core/geospatial/use-map-layers";
 import { useChoropleth } from "@/core/choropleth/use-choropleth";
+import { aggregateFeaturesInRadius } from "@/shell/components/radius-analysis/aggregate-features";
+import { registerMarkerImages } from "@/shell/components/map-markers";
 import { ObservatorioMapTooltip } from "@/shell/components/observatorio-map-tooltip";
 import { LAYER_STYLES, type GeoJSONFeature } from "@/core/types/geospatial";
 import type { Escola, ObservatoryLayer } from "@/core/types/territory";
@@ -32,6 +35,9 @@ type MapboxObservatorioMapProps = {
   estadoId?: string | null;
   municipioId?: string | null;
   bairroId?: string | null;
+  radiusMode?: boolean;
+  radiusMeters?: number;
+  onRadiusResult?: (result: import("@/shell/components/radius-analysis").RadiusAnalysisResult | null) => void;
 };
 
 type ViewState = {
@@ -178,12 +184,35 @@ function getCentroid(feature: GeoJSONFeature): Point | null {
 
 function getLayerSubtitle(layer: ObservatoryLayer, entityName: string) {
   if (layer === "municipio") return `Limite municipal · ${entityName}`;
-  if (layer === "bairro") return `Limite de bairro · ${entityName}`;
+  if (layer === "bairro") return `Vizinhança · ${entityName}`;
   return `Ponto escolar · ${entityName}`;
 }
 
 function normalizeId(raw: unknown): string {
   return String(raw ?? "").replace(/\.0$/, "").trim();
+}
+
+function generateRadiusCircle(centerLng: number, centerLat: number, radiusMeters: number): [number, number][] {
+  const coords: [number, number][] = [];
+  const R = 6371000;
+  const segments = 64;
+
+  for (let i = 0; i <= segments; i++) {
+    const angle = (2 * Math.PI * i) / segments;
+    const lat = Math.asin(
+      Math.sin((centerLat * Math.PI) / 180) * Math.cos(radiusMeters / R) +
+        Math.cos((centerLat * Math.PI) / 180) * Math.sin(radiusMeters / R) * Math.cos(angle),
+    );
+    const lng =
+      ((centerLng * Math.PI) / 180) +
+      Math.atan2(
+        Math.sin(angle) * Math.sin(radiusMeters / R) * Math.cos((centerLat * Math.PI) / 180),
+        Math.cos(radiusMeters / R) - Math.sin((centerLat * Math.PI) / 180) * Math.sin(lat),
+      );
+    coords.push([(lng * 180) / Math.PI, (lat * 180) / Math.PI]);
+  }
+
+  return coords;
 }
 
 function resolveChoroplethFeatureId(
@@ -270,7 +299,7 @@ function parseIndicadoresFromProps(
 
   return {
     anoReferencia: ind.anoReferencia != null ? Number(ind.anoReferencia) : undefined,
-    totalAlunos: ind.totalAlunos != null ? Number(ind.totalAlunos) : undefined,
+    totalAlunos: undefined,
     educacaoInfantil: parseEtapa(ind.educacaoInfantil),
     fundamentalAnosIniciais: parseEtapa(ind.fundamentalAnosIniciais),
     fundamentalAnosFinais: parseEtapa(ind.fundamentalAnosFinais),
@@ -303,6 +332,8 @@ function buildEscolaFromFeatureProps(
     ideb: idebRaw != null && Number(idebRaw) !== 0 ? Number(idebRaw) : undefined,
     inse: inseRaw != null && Number(inseRaw) !== 0 ? Number(inseRaw) : undefined,
     indicadores: parseIndicadoresFromProps(props),
+    matriculas: props.matriculas != null ? props.matriculas as import("@/core/types/territory").EscolaMatriculas : undefined,
+    geoProps: props,
   };
 }
 
@@ -323,9 +354,35 @@ export function MapboxObservatorioMap({
   estadoId,
   municipioId,
   bairroId,
+  radiusMode = false,
+  radiusMeters = 1000,
+  onRadiusResult,
 }: MapboxObservatorioMapProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(null);
+  const [radiusCenter, setRadiusCenter] = useState<[number, number] | null>(null);
+  const mapRef = useRef<MapRef | null>(null);
+  const [markersReady, setMarkersReady] = useState(false);
+
+  // Register marker images on map load and style changes
+  const handleMapLoad = () => {
+    const map = mapRef.current?.getMap();
+    if (map) {
+      registerMarkerImages(map);
+      setMarkersReady(true);
+    }
+  };
+
+  const handleStyleData = () => {
+    const map = mapRef.current?.getMap();
+    if (map) {
+      // Re-register after style change (images are lost)
+      setTimeout(() => {
+        registerMarkerImages(map);
+        setMarkersReady(true);
+      }, 100);
+    }
+  };
   const [collapsedCards, setCollapsedCards] = useState<MapCardVisibilityState>({
     info: false,
     visual: false,
@@ -343,7 +400,7 @@ export function MapboxObservatorioMap({
   const ids = useMemo(() => buildLayerIds(resolvedLayer), [resolvedLayer]);
   const geojsonData = collection ?? EMPTY_COLLECTION;
 
-  const { featureColors } = useChoropleth({ collection, activeModuleId, activeIndicatorId });
+  const { featureColors, stats } = useChoropleth({ collection, activeModuleId, activeIndicatorId });
 
   const fillColorExpression = useMemo(() => {
     if (featureColors.size === 0) return layerStyle.color;
@@ -385,7 +442,6 @@ export function MapboxObservatorioMap({
   const fillOpacityFactor = clamp(visualControls.fillOpacity / 100, 0.2, 1);
   const effectiveFillOpacity = clamp(Math.min(layerStyle.opacity, 0.2) * fillOpacityFactor, 0.04, 0.32);
   const pointScaleFactor = clamp(visualControls.pointScale / 100, 0.7, 1.6);
-  const areAllCardsCollapsed = collapsedCards.info && collapsedCards.visual && collapsedCards.entities;
 
   const heatmapData = useMemo<PointFeatureCollection>(() => {
     const features = geojsonData.features ?? [];
@@ -426,8 +482,24 @@ export function MapboxObservatorioMap({
   }, [geojsonData, resolvedLayer]);
 
   const handleFeatureClick = (event: MapLayerMouseEvent) => {
+    // Radius mode: compute aggregation instead of selecting entity
+    if (radiusMode && onRadiusResult) {
+      const { lng, lat } = event.lngLat;
+      setRadiusCenter([lng, lat]);
+
+      if (collection) {
+        const result = aggregateFeaturesInRadius(collection, { longitude: lng, latitude: lat }, radiusMeters);
+        onRadiusResult(result);
+      }
+      return;
+    }
+
     const feature = event.features?.[0];
     if (!feature) return;
+
+    // Auto-pan to clicked location (don't change zoom if already zoomed in enough)
+    const { lng, lat } = event.lngLat;
+    onViewStateChange({ longitude: lng, latitude: lat, zoom: viewState.zoom });
 
     const entity = resolveEntityFromFeature(feature, entities);
     if (entity) {
@@ -519,11 +591,6 @@ export function MapboxObservatorioMap({
     setCollapsedCards((current) => ({ ...current, [card]: !current[card] }));
   };
 
-  const toggleAllCards = () => {
-    const next = !areAllCardsCollapsed;
-    setCollapsedCards({ info: next, visual: next, entities: next });
-  };
-
   return (
     <section className="relative h-full overflow-hidden bg-zinc-100 dark:bg-zinc-950/60">
       {isLoading || layerLoading ? (
@@ -542,8 +609,11 @@ export function MapboxObservatorioMap({
 
       <div className="absolute inset-0 z-0">
         <Map
+          ref={mapRef}
           {...viewState}
           onMove={(event) => onViewStateChange(event.viewState)}
+          onLoad={handleMapLoad}
+          onStyleData={handleStyleData}
           mapStyle={mapStyleUrl}
           attributionControl={false}
           interactiveLayerIds={[
@@ -561,7 +631,7 @@ export function MapboxObservatorioMap({
           scrollZoom
           doubleClickZoom
           touchZoomRotate
-          cursor={hoveredId || selectedId ? "pointer" : "grab"}
+          cursor={radiusMode ? "crosshair" : hoveredId || selectedId ? "pointer" : "grab"}
           style={{ width: "100%", height: "100%" }}
         >
           <NavigationControl position="bottom-right" visualizePitch={false} />
@@ -612,10 +682,14 @@ export function MapboxObservatorioMap({
               type="circle"
               filter={["==", ["geometry-type"], "Point"]}
               paint={{
-                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3.5 * pointScaleFactor, 12, 5.5 * pointScaleFactor, 15, 8 * pointScaleFactor],
-                "circle-color": fillColorExpression,
+                "circle-radius": ["interpolate", ["linear"], ["zoom"],
+                  9, 4 * pointScaleFactor,
+                  12, 6 * pointScaleFactor,
+                  15, 9 * pointScaleFactor,
+                ],
+                "circle-color": resolvedLayer === "escola" ? "#06b6d4" : fillColorExpression,
                 "circle-stroke-color": "#ffffff",
-                "circle-stroke-width": 1.25,
+                "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 1.5, 15, 2.5],
                 "circle-opacity": 0.92,
               }}
             />
@@ -674,115 +748,43 @@ export function MapboxObservatorioMap({
               paint={{ "line-color": "#ffffff", "line-width": 3 }}
             />
           </Source>
+
+          {/* Radius analysis circle */}
+          {radiusMode && radiusCenter && (
+            <Source
+              id="radius-circle"
+              type="geojson"
+              data={{
+                type: "FeatureCollection",
+                features: [{
+                  type: "Feature",
+                  properties: {},
+                  geometry: {
+                    type: "Polygon",
+                    coordinates: [generateRadiusCircle(radiusCenter[0], radiusCenter[1], radiusMeters)],
+                  },
+                }],
+              } as never}
+            >
+              <Layer
+                id="radius-circle-fill"
+                type="fill"
+                paint={{ "fill-color": "#06b6d4", "fill-opacity": 0.12 }}
+              />
+              <Layer
+                id="radius-circle-line"
+                type="line"
+                paint={{ "line-color": "#06b6d4", "line-width": 2, "line-dasharray": [3, 2] }}
+              />
+            </Source>
+          )}
         </Map>
       </div>
 
-      <div className="absolute right-2 top-2 z-30 flex gap-2 sm:right-4 sm:top-4">
-        <button
-          type="button"
-          onClick={toggleAllCards}
-          className="rounded-md border border-zinc-300/90 bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-zinc-700 shadow-sm backdrop-blur transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-100 dark:hover:bg-zinc-800"
-        >
-          {areAllCardsCollapsed ? "Expandir todos" : "Minimizar todos"}
-        </button>
-      </div>
-
-      <div className="absolute left-2 top-4 z-20 min-w-[12rem] rounded-lg border border-zinc-300/90 bg-white/90 px-2 py-2 text-xs text-zinc-700 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-200 sm:left-4 sm:top-4 sm:px-3 sm:py-2">
-        <div className="flex items-center justify-between gap-3">
-          <p className="font-semibold text-cyan-600 dark:text-cyan-400">Mapa interativo</p>
-          <button
-            type="button"
-            onClick={() => toggleCard("info")}
-            className="rounded border border-zinc-300 px-2 py-0.5 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            {collapsedCards.info ? "Expandir" : "Minimizar"}
-          </button>
-        </div>
-        {!collapsedCards.info ? (
-          <>
-            <p className="mt-0.5 text-[11px] sm:text-xs">Camada: {resolvedLayer}</p>
-            <p className="mt-1 text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
-              Features: {collection?.features.length ?? 0}
-            </p>
-          </>
-        ) : null}
-      </div>
-
-      <div className="absolute right-2 top-16 z-20 w-72 rounded-xl border border-zinc-300/90 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90 sm:right-4 sm:top-16">
+      <div className="absolute left-2 bottom-2 z-20 max-w-[22rem] rounded-xl border border-zinc-300/90 bg-white/90 p-2 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 sm:bottom-4 sm:left-4 sm:p-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-700 dark:text-zinc-200">
-            Visual do mapa
-          </p>
-          <button
-            type="button"
-            onClick={() => toggleCard("visual")}
-            className="rounded border border-zinc-300 px-2 py-0.5 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            {collapsedCards.visual ? "Expandir" : "Minimizar"}
-          </button>
-        </div>
-
-        {!collapsedCards.visual ? (
-          <>
-            <label className="mt-3 block">
-              <span className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">Estilo base</span>
-              <select
-                value={visualControls.styleId}
-                onChange={(e) => onVisualControlsChange({ ...visualControls, styleId: e.target.value as MapStyleId })}
-                className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-              >
-                {MAP_STYLE_OPTIONS.map((o) => (
-                  <option key={o.id} value={o.id}>{o.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="mt-3 block">
-              <span className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-                Opacidade dos limites ({visualControls.fillOpacity}%)
-              </span>
-              <input
-                type="range" min={20} max={100} value={visualControls.fillOpacity}
-                onChange={(e) => onVisualControlsChange({ ...visualControls, fillOpacity: Number(e.target.value) })}
-                className="w-full"
-              />
-            </label>
-
-            <label className="mt-3 block">
-              <span className="mb-1 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300">
-                Tamanho dos pontos ({visualControls.pointScale}%)
-              </span>
-              <input
-                type="range" min={70} max={160} value={visualControls.pointScale}
-                onChange={(e) => onVisualControlsChange({ ...visualControls, pointScale: Number(e.target.value) })}
-                className="w-full"
-              />
-            </label>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleRecenter}
-                className="rounded-md border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-              >
-                Centralizar
-              </button>
-              <button
-                type="button"
-                onClick={onResetVisual}
-                className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-2 py-1.5 text-xs font-medium text-cyan-700 transition hover:bg-cyan-500/20 dark:border-cyan-600 dark:text-cyan-300"
-              >
-                Reset visual
-              </button>
-            </div>
-          </>
-        ) : null}
-      </div>
-
-      <div className="absolute inset-x-2 bottom-2 z-20 rounded-xl border border-zinc-300/90 bg-white/90 p-2 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 sm:inset-x-4 sm:bottom-4 sm:p-3 md:inset-x-auto md:right-4 md:w-[28rem]">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400 sm:text-xs">
-            Camada {resolvedLayer} · {collection?.features.length ?? 0} features
+          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+            {resolvedLayer} · {collection?.features.length ?? 0} features
           </p>
           <button
             type="button"
@@ -842,6 +844,76 @@ export function MapboxObservatorioMap({
       />
 
       <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-violet-500/10" />
+
+      {/* Visual controls — top-left compact panel */}
+      <div className="absolute top-2 left-2 z-20 sm:top-4 sm:left-4">
+        <div className="rounded-xl border border-zinc-300/90 bg-white/95 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleCard("visual")}
+            className="flex items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-600 transition hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800 w-full"
+          >
+            <span>⚙</span>
+            <span>Visual</span>
+          </button>
+
+          {!collapsedCards.visual && (
+            <div className="px-3 pb-3 pt-1 w-52 border-t border-zinc-200/60 dark:border-zinc-700/60">
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-medium text-zinc-600 dark:text-zinc-300">Estilo</span>
+                <select
+                  value={visualControls.styleId}
+                  onChange={(e) => onVisualControlsChange({ ...visualControls, styleId: e.target.value as MapStyleId })}
+                  className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  {MAP_STYLE_OPTIONS.map((o) => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="mt-2 block">
+                <span className="mb-1 block text-[10px] font-medium text-zinc-600 dark:text-zinc-300">
+                  Opacidade ({visualControls.fillOpacity}%)
+                </span>
+                <input
+                  type="range" min={20} max={100} value={visualControls.fillOpacity}
+                  onChange={(e) => onVisualControlsChange({ ...visualControls, fillOpacity: Number(e.target.value) })}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="mt-2 block">
+                <span className="mb-1 block text-[10px] font-medium text-zinc-600 dark:text-zinc-300">
+                  Pontos ({visualControls.pointScale}%)
+                </span>
+                <input
+                  type="range" min={70} max={160} value={visualControls.pointScale}
+                  onChange={(e) => onVisualControlsChange({ ...visualControls, pointScale: Number(e.target.value) })}
+                  className="w-full"
+                />
+              </label>
+
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleRecenter}
+                  className="rounded-md border border-zinc-300 px-2 py-1 text-[10px] font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  Centralizar
+                </button>
+                <button
+                  type="button"
+                  onClick={onResetVisual}
+                  className="rounded-md border border-cyan-500/60 bg-cyan-500/10 px-2 py-1 text-[10px] font-medium text-cyan-700 transition hover:bg-cyan-500/20 dark:border-cyan-600 dark:text-cyan-300"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

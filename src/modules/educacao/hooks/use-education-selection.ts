@@ -467,8 +467,9 @@ export function buildEducationSelection(
   console.log("Construindo seleção para escola com dados:", raw);
 
   const indicadores = raw.indicadores;
+  const matriculas = raw.matriculas ?? (raw.geoProps?.matriculas as Record<string, unknown> | undefined);
 
-  const totalAlunos = indicadores?.totalAlunos;
+  const totalAlunos = matriculas?.totalAlunos != null ? Number(matriculas.totalAlunos) : null;
   const inepId = raw.inepId ?? raw.id;
   const ibgeMunicipio = raw.municipioId ?? "—";
   const geoProps = (raw.geoProps ?? {}) as Record<string, unknown>;
@@ -490,6 +491,20 @@ export function buildEducationSelection(
   ...etapaRows("Fund. finais", indicadores?.fundamentalAnosFinais),
   ...etapaRows("Ensino médio", indicadores?.ensinoMedio),
 ];
+
+  const matriculasRows = matriculas
+    ? [
+        ...(matriculas.totalAlunos != null && Number(matriculas.totalAlunos) > 0 ? [{ label: "Total de alunos (censo)", value: formatNum(matriculas.totalAlunos), description: "Soma INF+FUND+MED+EJA do censo escolar" }] : []),
+        ...(matriculas.educacaoInfantil != null && Number(matriculas.educacaoInfantil) > 0 ? [{ label: "Educação infantil", value: formatNum(matriculas.educacaoInfantil), description: "Matrículas em educação infantil" }] : []),
+        ...(matriculas.educacaoInfantilCreche != null && Number(matriculas.educacaoInfantilCreche) > 0 ? [{ label: "Creche", value: formatNum(matriculas.educacaoInfantilCreche), description: "Matrículas em creche" }] : []),
+        ...(matriculas.educacaoInfantilPreEscola != null && Number(matriculas.educacaoInfantilPreEscola) > 0 ? [{ label: "Pré-escola", value: formatNum(matriculas.educacaoInfantilPreEscola), description: "Matrículas em pré-escola" }] : []),
+        ...(matriculas.fundamentalTotal != null && Number(matriculas.fundamentalTotal) > 0 ? [{ label: "Fundamental (total)", value: formatNum(matriculas.fundamentalTotal), description: "Matrículas no ensino fundamental" }] : []),
+        ...(matriculas.fundamentalAnosIniciais != null && Number(matriculas.fundamentalAnosIniciais) > 0 ? [{ label: "Fund. anos iniciais", value: formatNum(matriculas.fundamentalAnosIniciais), description: "Matrículas nos anos iniciais do fundamental" }] : []),
+        ...(matriculas.fundamentalAnosFinais != null && Number(matriculas.fundamentalAnosFinais) > 0 ? [{ label: "Fund. anos finais", value: formatNum(matriculas.fundamentalAnosFinais), description: "Matrículas nos anos finais do fundamental" }] : []),
+        ...(matriculas.ensinoMedio != null && Number(matriculas.ensinoMedio) > 0 ? [{ label: "Ensino médio", value: formatNum(matriculas.ensinoMedio), description: "Matrículas no ensino médio" }] : []),
+        ...(matriculas.eja != null && Number(matriculas.eja) > 0 ? [{ label: "EJA", value: formatNum(matriculas.eja), description: "Matrículas em Educação de Jovens e Adultos" }] : []),
+      ]
+    : [];
 
 return {
   id: entity.data.id,
@@ -524,6 +539,9 @@ return {
         { label: "Zona", value: escolaZona, description: "" },
       ],
     },
+    ...(matriculasRows.length > 0
+      ? [{ title: "Matrículas por etapa", rows: matriculasRows }]
+      : []),
     ...(etapasSections.length > 0
       ? [{ title: "Indicadores por etapa", rows: etapasSections }]
       : []),

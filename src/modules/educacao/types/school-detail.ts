@@ -1,3 +1,5 @@
+import type { EscolaMatriculas } from "@/core/types/territory";
+
 export type SchoolDetail = {
   id: string;
   escola_id_inep?: string | number;
@@ -51,4 +53,5 @@ export type SchoolDetail = {
       utilizadas?: number;
     };
   };
+  matriculas?: EscolaMatriculas;
 };

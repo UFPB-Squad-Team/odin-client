@@ -88,6 +88,8 @@ function extractComparableMetrics(
   const sbRaca = (sb.raca ?? {}) as Record<string, unknown>;
   const saHabitacao = (sa.habitacao ?? {}) as Record<string, unknown>;
   const sbHabitacao = (sb.habitacao ?? {}) as Record<string, unknown>;
+  const saGenero = (sa.genero ?? {}) as Record<string, unknown>;
+  const sbGenero = (sb.genero ?? {}) as Record<string, unknown>;
 
   const redeEscolarMetrics: MetricGroup["metrics"] = [
     {
@@ -180,10 +182,37 @@ function extractComparableMetrics(
           competitive: false,
         },
         {
+          key: "totalDomicilios",
+          label: "Total de domicílios",
+          a: parseNum(saPopulacao.totalDomicilios),
+          b: parseNum(sbPopulacao.totalDomicilios),
+          format: "int",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
           key: "pctCriancas0a9",
           label: "Crianças (0-9)",
           a: parseNum(saEstruturaEtaria.pctCriancas0a9),
           b: parseNum(sbEstruturaEtaria.pctCriancas0a9),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "pctJovens15a29",
+          label: "Jovens (15-29)",
+          a: parseNum(saEstruturaEtaria.pctJovens15a29),
+          b: parseNum(sbEstruturaEtaria.pctJovens15a29),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "pctAdultos30a59",
+          label: "Adultos (30-59)",
+          a: parseNum(saEstruturaEtaria.pctAdultos30a59),
+          b: parseNum(sbEstruturaEtaria.pctAdultos30a59),
           format: "pct",
           higherIsBetter: true,
           competitive: false,
@@ -198,10 +227,46 @@ function extractComparableMetrics(
           competitive: false,
         },
         {
+          key: "pctPopMasculina",
+          label: "Pop. masculina",
+          a: parseNum(saGenero.pctPopMasculina),
+          b: parseNum(sbGenero.pctPopMasculina),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "pctPopFeminina",
+          label: "Pop. feminina",
+          a: parseNum(saGenero.pctPopFeminina),
+          b: parseNum(sbGenero.pctPopFeminina),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
           key: "pctPretaParda",
           label: "Pop. preta/parda",
           a: parseNum(saRaca.pctPretaParda),
           b: parseNum(sbRaca.pctPretaParda),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "pctBranca",
+          label: "Pop. branca",
+          a: parseNum(saRaca.pctBranca),
+          b: parseNum(sbRaca.pctBranca),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "pctIndigena",
+          label: "Pop. indígena",
+          a: parseNum(saRaca.pctIndigena),
+          b: parseNum(sbRaca.pctIndigena),
           format: "pct",
           higherIsBetter: true,
           competitive: false,
@@ -236,6 +301,22 @@ function extractComparableMetrics(
           higherIsBetter: true,
         },
         {
+          key: "aguaNaoEncanada",
+          label: "Sem água encanada",
+          a: parseNum(saSaneamento.pctAguaNaoEncanada),
+          b: parseNum(sbSaneamento.pctAguaNaoEncanada),
+          format: "pct",
+          higherIsBetter: false,
+        },
+        {
+          key: "domSemBanheiro",
+          label: "Sem banheiro",
+          a: parseNum(saSaneamento.pctDomSemBanheiro),
+          b: parseNum(sbSaneamento.pctDomSemBanheiro),
+          format: "pct",
+          higherIsBetter: false,
+        },
+        {
           key: "aguaInadequada",
           label: "Água inadequada",
           a: parseNum(saSaneamento.pctAguaInadequada),
@@ -262,7 +343,7 @@ function extractComparableMetrics(
       ],
     },
     {
-      label: "Vulnerabilidade social",
+      label: "Habitação e vulnerabilidade",
       metrics: [
         {
           key: "taxaAlfabetizacao15Mais",
@@ -282,11 +363,46 @@ function extractComparableMetrics(
         },
         {
           key: "domNaoSuperlotado",
-          label: "Domicílios não superlotados",
+          label: "Dom. não superlotados",
           a: Math.max(0, 100 - parseNum(saHabitacao.pctDomSuperlotado)),
           b: Math.max(0, 100 - parseNum(sbHabitacao.pctDomSuperlotado)),
           format: "pct",
           higherIsBetter: true,
+        },
+        {
+          key: "domUnipessoal",
+          label: "Dom. unipessoais",
+          a: parseNum(saHabitacao.pctDomUnipessoal),
+          b: parseNum(sbHabitacao.pctDomUnipessoal),
+          format: "pct",
+          higherIsBetter: false,
+          competitive: false,
+        },
+        {
+          key: "domTipoCasa",
+          label: "Dom. tipo casa",
+          a: parseNum(saHabitacao.pctDomTipoCasa),
+          b: parseNum(sbHabitacao.pctDomTipoCasa),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "domTipoApto",
+          label: "Dom. tipo apartamento",
+          a: parseNum(saHabitacao.pctDomTipoApto),
+          b: parseNum(sbHabitacao.pctDomTipoApto),
+          format: "pct",
+          higherIsBetter: true,
+          competitive: false,
+        },
+        {
+          key: "domDegradado",
+          label: "Dom. degradado/inacabado",
+          a: parseNum(saHabitacao.pctDomDegradado),
+          b: parseNum(sbHabitacao.pctDomDegradado),
+          format: "pct",
+          higherIsBetter: false,
         },
       ],
     },
@@ -645,7 +761,7 @@ export default function ComparePage() {
       id: selectedA.id,
       nome: selectedA.nome,
       kind: compareKind,
-      subtitle: compareKind === "bairro" ? "Bairro" : "Município",
+      subtitle: compareKind === "bairro" ? "Vizinhança" : "Município",
     };
   }, [selectedA, activeModuleId, compareKind]);
 
@@ -673,7 +789,7 @@ export default function ComparePage() {
       id: selectedB.id,
       nome: selectedB.nome,
       kind: compareKind,
-      subtitle: compareKind === "bairro" ? "Bairro" : "Município",
+      subtitle: compareKind === "bairro" ? "Vizinhança" : "Município",
     };
   }, [selectedB, activeModuleId, compareKind]);
 
@@ -819,7 +935,7 @@ export default function ComparePage() {
               Comparar territórios
             </h1>
             <p className={`mt-1 text-sm ${theme.muted}`}>
-              Análise lado a lado de indicadores por município ou bairro
+              Análise lado a lado de indicadores por município ou vizinhança
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -845,7 +961,7 @@ export default function ComparePage() {
                     : `${theme.mutedStrong} hover:text-purple-600`
                 }`}
               >
-                Bairro
+                Vizinhança
               </button>
             </div>
             <button
@@ -877,7 +993,7 @@ export default function ComparePage() {
             {compareKind === "bairro" && (
               <div className={`mb-4 grid gap-2 rounded-xl border px-4 py-3 sm:grid-cols-[1fr_240px] sm:items-center ${theme.surfaceSoft}`}>
                 <p className={`text-sm ${theme.muted}`}>
-                  Escolha o município para listar e comparar seus bairros.
+                  Escolha o município para listar e comparar suas vizinhanças.
                 </p>
                 <select
                   value={bairroMunicipioId}

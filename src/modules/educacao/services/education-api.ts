@@ -167,6 +167,7 @@ function normalizeSchoolListItem(item: SchoolListItem): Escola | null {
     ideb: toNumber(item.ideb) ?? undefined,
     inse: undefined,
     geoProps: item as Record<string, unknown>,
+    matriculas: item.matriculas as import("@/core/types/territory").EscolaMatriculas | undefined,
   };
 }
 

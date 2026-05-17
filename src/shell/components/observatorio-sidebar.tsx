@@ -2,11 +2,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SearchableCombobox } from "@/shell/components/searchable-combobox";
-import { BairroMunicipioSelector } from "@/shell/components/bairro-municipio-selector";
-import { ModuleTabSidebar } from "@/shell/components/module-tab-sidebar";
 import type { Bairro, Estado, Municipio } from "@/core/types/territory";
 import type { ObservatoryLayer } from "@/core/types/territory";
-import type { ShellContextType } from "@/core/types/shell";
 
 type SidebarProps = {
   activeLayer: ObservatoryLayer;
@@ -21,15 +18,12 @@ type SidebarProps = {
   onSetEstado: (estadoId: string | null) => void;
   onSetMunicipio: (municipioId: string | null) => void;
   sidebarCollapsed: boolean;
-  shellContext?: ShellContextType;
-  activeIndicatorId?: string | null;
-  onIndicatorChange?: (indicatorId: string | null) => void;
-  isLoadingBairros?: boolean;
+  shellContext?: unknown;
 };
 
 const LAYERS: Array<{ id: ObservatoryLayer; label: string }> = [
   { id: "municipio", label: "Município" },
-  { id: "bairro", label: "Bairro" },
+  { id: "bairro", label: "Vizinhança" },
   { id: "escola", label: "Escola" },
 ];
 
@@ -52,9 +46,6 @@ export function ObservatorioSidebar({
   onSetMunicipio,
   sidebarCollapsed,
   shellContext,
-  activeIndicatorId = null,
-  onIndicatorChange,
-  isLoadingBairros = false,
 }: SidebarProps) {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const [isDragging, setIsDragging] = useState(false);
@@ -111,24 +102,6 @@ export function ObservatorioSidebar({
     [bairros],
   );
 
-  const municipioOptionsForBairro = useMemo(
-    () =>
-      [...municipios]
-        .sort((a, b) =>
-          a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base", numeric: true }),
-        )
-        .map((municipio) => municipio),
-    [municipios],
-  );
-
-  const temBairroOficialNoMunicipio = bairros.length > 0
-    ? bairros.some((b) => b.temBairroOficial === true)
-      ? true
-      : bairros.every((b) => b.temBairroOficial === false)
-      ? false
-      : undefined
-    : undefined;
-
   return (
     <>
       <style>{`
@@ -175,17 +148,6 @@ export function ObservatorioSidebar({
               </p>
             </div>
 
-            {shellContext && onIndicatorChange && (
-              <div className="shrink-0">
-                <ModuleTabSidebar
-                  shellContext={shellContext}
-                  activeIndicatorId={activeIndicatorId}
-                  onIndicatorChange={onIndicatorChange}
-                  collapsed={sidebarCollapsed}
-                />
-              </div>
-            )}
-
             <div className="shrink-0 flex flex-col gap-2 p-1">
               <div className="flex items-center gap-2">
                 <span className="text-cyan-600 dark:text-cyan-500 text-xs">🔍</span>
@@ -220,19 +182,10 @@ export function ObservatorioSidebar({
                 disabled={!estadoId}
               />
 
-              {activeLayer === "bairro" ? (
-                <BairroMunicipioSelector
-                  municipios={municipioOptionsForBairro}
-                  municipioId={municipioId}
-                  onMunicipioChange={onSetMunicipio}
-                  totalBairros={bairros.length}
-                  isLoading={isLoadingBairros}
-                  temBairroOficialNoMunicipio={temBairroOficialNoMunicipio}
-                />
-              ) : (
+              {activeLayer !== "bairro" && (
                 <SearchableCombobox
-                  ariaLabel="Selecionar Bairro"
-                  label="BAIRRO"
+                  ariaLabel="Selecionar Vizinhança"
+                  label="VIZINHANÇA"
                   value={bairroId}
                   options={bairroOptions}
                   onSelect={onSetBairro}

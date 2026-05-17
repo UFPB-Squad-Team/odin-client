@@ -13,6 +13,22 @@ const EXTRACTORS: Record<string, IndicatorValueExtractor> = {
         props.pctPretaParda,
     );
   },
+  pct_branca: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.raca as Record<string, unknown> | undefined)?.pctBranca ??
+        props.pct_branca ??
+        props.pctBranca,
+    );
+  },
+  pct_indigena: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.raca as Record<string, unknown> | undefined)?.pctIndigena ??
+        props.pct_indigena ??
+        props.pctIndigena,
+    );
+  },
   taxa_analfabetismo_15_mais: (props) => {
     const s = socio(props);
     return toNumber(
@@ -47,12 +63,60 @@ const EXTRACTORS: Record<string, IndicatorValueExtractor> = {
         props.pctLixoColetado,
     );
   },
+  pct_agua_inadequada: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.saneamento as Record<string, unknown> | undefined)?.pctAguaInadequada ??
+        props.pct_agua_inadequada ??
+        props.pctAguaInadequada,
+    );
+  },
+  pct_esgoto_inadequado: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.saneamento as Record<string, unknown> | undefined)?.pctEsgotoInadequado ??
+        props.pct_esgoto_inadequado ??
+        props.pctEsgotoInadequado,
+    );
+  },
+  pct_lixo_inadequado: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.saneamento as Record<string, unknown> | undefined)?.pctLixoInadequado ??
+        props.pct_lixo_inadequado ??
+        props.pctLixoInadequado,
+    );
+  },
+  pct_agua_nao_encanada: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.saneamento as Record<string, unknown> | undefined)?.pctAguaNaoEncanada ??
+        props.pct_agua_nao_encanada ??
+        props.pctAguaNaoEncanada,
+    );
+  },
+  pct_dom_sem_banheiro: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.saneamento as Record<string, unknown> | undefined)?.pctDomSemBanheiro ??
+        props.pct_dom_sem_banheiro ??
+        props.pctDomSemBanheiro,
+    );
+  },
   total_populacao: (props) => {
     const s = socio(props);
     return toNumber(
       (s?.populacao as Record<string, unknown> | undefined)?.total ??
         props.total_populacao ??
         props.totalPopulacao,
+    );
+  },
+  total_domicilios: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.populacao as Record<string, unknown> | undefined)?.totalDomicilios ??
+        props.total_domicilios ??
+        props.totalDomicilios,
     );
   },
   pct_criancas_0_9: (props) => {
@@ -73,6 +137,40 @@ const EXTRACTORS: Record<string, IndicatorValueExtractor> = {
         props.pctIdosos60Mais,
     );
   },
+  pct_jovens_15_29: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.estruturaEtaria as Record<string, unknown> | undefined)
+        ?.pctJovens15a29 ??
+        props.pct_jovens_15_29 ??
+        props.pctJovens15a29,
+    );
+  },
+  pct_adultos_30_59: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.estruturaEtaria as Record<string, unknown> | undefined)
+        ?.pctAdultos30a59 ??
+        props.pct_adultos_30_59 ??
+        props.pctAdultos30a59,
+    );
+  },
+  pct_pop_masculina: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.genero as Record<string, unknown> | undefined)?.pctPopMasculina ??
+        props.pct_pop_masculina ??
+        props.pctPopMasculina,
+    );
+  },
+  pct_pop_feminina: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.genero as Record<string, unknown> | undefined)?.pctPopFeminina ??
+        props.pct_pop_feminina ??
+        props.pctPopFeminina,
+    );
+  },
   pct_dom_superlotado: (props) => {
     const s = socio(props);
     return toNumber(
@@ -87,6 +185,38 @@ const EXTRACTORS: Record<string, IndicatorValueExtractor> = {
       (s?.habitacao as Record<string, unknown> | undefined)?.pctDomImprovisado ??
         props.pct_dom_improvisado ??
         props.pctDomImprovisado,
+    );
+  },
+  pct_dom_unipessoal: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.habitacao as Record<string, unknown> | undefined)?.pctDomUnipessoal ??
+        props.pct_dom_unipessoal ??
+        props.pctDomUnipessoal,
+    );
+  },
+  pct_dom_tipo_casa: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.habitacao as Record<string, unknown> | undefined)?.pctDomTipoCasa ??
+        props.pct_dom_tipo_casa ??
+        props.pctDomTipoCasa,
+    );
+  },
+  pct_dom_tipo_apto: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.habitacao as Record<string, unknown> | undefined)?.pctDomTipoApto ??
+        props.pct_dom_tipo_apto ??
+        props.pctDomTipoApto,
+    );
+  },
+  pct_dom_degradado: (props) => {
+    const s = socio(props);
+    return toNumber(
+      (s?.habitacao as Record<string, unknown> | undefined)?.pctDomDegradado ??
+        props.pct_dom_degradado ??
+        props.pctDomDegradado,
     );
   },
   pct_responsavel_feminino: (props) => {

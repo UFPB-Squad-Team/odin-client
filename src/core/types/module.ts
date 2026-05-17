@@ -42,6 +42,45 @@ export interface ModuleLayerStyle {
   selectedColor: string;
 }
 
+// ─── Seções padronizadas para o painel de detalhes unificado ───────────────────
+
+/** Uma linha de dado dentro de uma seção do painel de detalhes. */
+export interface DetailRow {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+/** Um card de métrica de destaque (headline number). */
+export interface DetailMetric {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+/** Uma seção colapsável no painel de detalhes. */
+export interface DetailSection {
+  title: string;
+  rows: DetailRow[];
+  /** Se true, a seção começa expandida. Default: true. */
+  defaultOpen?: boolean;
+  /** Fonte dos dados (ex: "Censo Escolar", "IBGE Censo 2022"). */
+  source?: string;
+}
+
+/**
+ * Contribuição de um módulo para o painel de detalhes unificado.
+ * Cada módulo retorna suas métricas de destaque e seções para a entidade selecionada.
+ */
+export interface ModuleDetailContribution {
+  /** Métricas de destaque (2-4 cards grandes no topo da dimensão). */
+  metrics: DetailMetric[];
+  /** Seções colapsáveis com linhas de dados. */
+  sections: DetailSection[];
+}
+
+// ─── Contrato do módulo ───────────────────────────────────────────────────────
+
 // Contrato que todo módulo deve implementar para ser plugado no Shell.
 // Campos obrigatórios: id, label, description, availableLayers, SidebarPanel.
 // Campos opcionais permitem extensão progressiva sem quebrar o contrato.
@@ -63,6 +102,12 @@ export interface ModuleContract {
   icon?: ComponentType<{ className?: string }>;
   /** Componente React renderizado no painel de detalhes quando uma entidade é selecionada. */
   DetailPanel?: ComponentType<ModuleDetailPanelProps>;
+  /**
+   * Retorna as seções padronizadas para o painel de detalhes unificado.
+   * Preferido sobre DetailPanel para o novo sistema de painel territorial.
+   * Se implementado, o shell usa este método em vez do DetailPanel.
+   */
+  buildDetailSections?: (entity: MapEntity) => ModuleDetailContribution | null;
   /** Retorna os indicadores disponíveis para a camada informada. */
   getIndicators?: (layer: ObservatoryLayer) => ModuleIndicator[];
   /** Retorna o estilo de camada para simbologia dinâmica dado um indicador e valor normalizado [0,1]. */

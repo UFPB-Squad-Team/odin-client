@@ -3,9 +3,10 @@
 
 import type {
   EscolaIndicadores,
+  EscolaMatriculas,
 } from "@/core/types/territory";
 
-export type { EtapaIndicadores, EscolaIndicadores } from "@/core/types/territory";
+export type { EtapaIndicadores, EscolaIndicadores, EscolaMatriculas } from "@/core/types/territory";
 
 export type EducationIndicatorId =
   | "pct_com_internet"
@@ -115,4 +116,5 @@ export type EscolaEntityData = {
   inse?: number | null;
   indicadores?: EscolaIndicadores;
   infraestrutura?: EscolaInfraestrutura;
+  matriculas?: EscolaMatriculas;
 };

@@ -8,6 +8,9 @@ import ComparePanel from "@/shell/components/compare-panel";
 import { MapboxObservatorioMap } from "@/shell/components/mapbox-observatorio-map-v2";
 import { ObservatorioSidebar } from "@/shell/components/observatorio-sidebar";
 import { ShareLinkButton } from "@/shell/components/share-link-button";
+import { MapIndicatorPicker } from "@/shell/components/map-indicator-picker";
+import { RadiusAnalysisToggle, RadiusAnalysisPanel } from "@/shell/components/radius-analysis";
+import { useIndicatorGroups } from "@/shell/hooks/use-indicator-groups";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
 import type { ShellContextType } from "@/core/types/shell";
@@ -152,6 +155,7 @@ export function ObservatorioShell() {
   const [activeIndicatorId, setActiveIndicatorId] = useState<string | null>(
     null,
   );
+
   const [mapViewState, setMapViewState] = useState<MapViewState>(() =>
     initialViewForLayer("bairro"),
   );
@@ -186,6 +190,19 @@ export function ObservatorioShell() {
   function handleEntityClick(entity: import("@/core/types/shell").MapEntity) {
     selectEntity(entity);
   }
+
+  const indicatorGroups = useIndicatorGroups(activeLayer, activeModuleId);
+
+  const [radiusMode, setRadiusMode] = useState(false);
+  const [radiusMeters, setRadiusMeters] = useState(1000);
+  const [radiusResult, setRadiusResult] = useState<import("@/shell/components/radius-analysis").RadiusAnalysisResult | null>(null);
+
+  const handleIndicatorSelect = (moduleId: string, indicatorId: string | null) => {
+    if (moduleId !== activeModuleId) {
+      setActiveModule(moduleId);
+    }
+    setActiveIndicatorId(indicatorId);
+  };
 
   // ShellContext para módulos
   const shellContext: ShellContextType = {
@@ -435,8 +452,8 @@ export function ObservatorioShell() {
     }
 
     previousActiveLayerRef.current = activeLayer;
-    skipZoomLayerSyncRef.current = true;
-    setMapViewState(initialViewForLayer(activeLayer));
+    // Não reseta a posição do mapa ao mudar de camada — mantém onde o usuário está.
+    // O reset só acontece via botão "Centralizar".
   }, [activeLayer]);
 
   useEffect(() => {
@@ -451,6 +468,26 @@ export function ObservatorioShell() {
       setActiveLayer(resolvedLayer);
     }
   }, [activeLayer, mapViewState.zoom, setActiveLayer]);
+
+  // Auto-pan quando município muda via dropdown
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    if (!filters.municipioId) return;
+
+    const municipio = municipios.find((m) => m.id === filters.municipioId);
+    if (!municipio?.geoProps) return;
+
+    const geoProps = municipio.geoProps as Record<string, unknown>;
+    const centroide = geoProps._centroide as [number, number] | undefined;
+    if (centroide) {
+      skipZoomLayerSyncRef.current = true;
+      setMapViewState((prev) => ({
+        longitude: centroide[0],
+        latitude: centroide[1],
+        zoom: Math.max(prev.zoom, 10),
+      }));
+    }
+  }, [filters.municipioId, municipios]);
 
   // Persiste em localStorage
   useEffect(() => {
@@ -649,8 +686,6 @@ export function ObservatorioShell() {
             onSetMunicipio={filters.setMunicipio}
             sidebarCollapsed={sidebarCollapsed}
             shellContext={shellContext}
-            activeIndicatorId={activeIndicatorId}
-            onIndicatorChange={setActiveIndicatorId}
           />
 
           {/* O MAPA AGORA OCUPA 100% SEMPRE */}
@@ -678,7 +713,38 @@ export function ObservatorioShell() {
               bairroId={filters.bairroId}
               viewState={mapViewState}
               visualControls={mapVisualControls}
+              radiusMode={radiusMode}
+              radiusMeters={radiusMeters}
+              onRadiusResult={setRadiusResult}
             />
+
+            {/* Floating indicator picker */}
+            <div className="absolute top-2 right-2 z-[20] sm:top-4 sm:right-4 flex flex-col gap-2 items-end">
+              <MapIndicatorPicker
+                groups={indicatorGroups}
+                activeModuleId={activeModuleId}
+                activeIndicatorId={activeIndicatorId}
+                onSelect={handleIndicatorSelect}
+              />
+              <RadiusAnalysisToggle
+                active={radiusMode}
+                onToggle={() => {
+                  setRadiusMode((v) => !v);
+                  if (radiusMode) setRadiusResult(null);
+                }}
+              />
+              {radiusMode && (
+                <RadiusAnalysisPanel
+                  result={radiusResult}
+                  radiusMeters={radiusMeters}
+                  onRadiusChange={setRadiusMeters}
+                  onClose={() => {
+                    setRadiusMode(false);
+                    setRadiusResult(null);
+                  }}
+                />
+              )}
+            </div>
           </div>
 
           <ObservatorioDetailPanel

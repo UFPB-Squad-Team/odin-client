@@ -38,7 +38,7 @@ export default function ComparePanel() {
         label: b.nome,
         subtitle: b.municipioId?.toUpperCase() ?? undefined,
         kind: "bairro",
-        source: { id: b.id, nome: b.nome, kind: "bairro", subtitle: "Bairro" },
+        source: { id: b.id, nome: b.nome, kind: "bairro", subtitle: "Vizinhança" },
       }));
     }
     return escolas.map((s) => ({

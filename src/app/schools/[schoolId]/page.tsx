@@ -70,10 +70,11 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
     notFound();
   }
 
-  const totalAlunos = school.indicadores?.totalAlunos;
+  const totalAlunos = school.matriculas?.totalAlunos;
   const localizacao = school.localizacao?.coordinates;
   const endereco = school.endereco;
   const infraestrutura = school.infraestrutura;
+  const matriculas = school.matriculas;
 
   const etapas: Array<[string, EtapaIndicadores | undefined]> = [
     ["Educação infantil", school.indicadores?.educacaoInfantil],
@@ -120,6 +121,38 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
               <FieldRow label="Total de alunos" value={formatNumber(totalAlunos)} />
               <FieldRow label="Ano referência" value={school.indicadores?.anoReferencia ?? "—"} />
             </SectionCard>
+
+            {matriculas && (
+              <SectionCard title="Matrículas por etapa">
+                {matriculas.totalAlunos != null && matriculas.totalAlunos > 0 && (
+                  <FieldRow label="Total (censo)" value={formatNumber(matriculas.totalAlunos)} />
+                )}
+                {matriculas.educacaoInfantil != null && matriculas.educacaoInfantil > 0 && (
+                  <FieldRow label="Educação infantil" value={formatNumber(matriculas.educacaoInfantil)} />
+                )}
+                {matriculas.educacaoInfantilCreche != null && matriculas.educacaoInfantilCreche > 0 && (
+                  <FieldRow label="Creche" value={formatNumber(matriculas.educacaoInfantilCreche)} />
+                )}
+                {matriculas.educacaoInfantilPreEscola != null && matriculas.educacaoInfantilPreEscola > 0 && (
+                  <FieldRow label="Pré-escola" value={formatNumber(matriculas.educacaoInfantilPreEscola)} />
+                )}
+                {matriculas.fundamentalTotal != null && matriculas.fundamentalTotal > 0 && (
+                  <FieldRow label="Fundamental (total)" value={formatNumber(matriculas.fundamentalTotal)} />
+                )}
+                {matriculas.fundamentalAnosIniciais != null && matriculas.fundamentalAnosIniciais > 0 && (
+                  <FieldRow label="Fund. anos iniciais" value={formatNumber(matriculas.fundamentalAnosIniciais)} />
+                )}
+                {matriculas.fundamentalAnosFinais != null && matriculas.fundamentalAnosFinais > 0 && (
+                  <FieldRow label="Fund. anos finais" value={formatNumber(matriculas.fundamentalAnosFinais)} />
+                )}
+                {matriculas.ensinoMedio != null && matriculas.ensinoMedio > 0 && (
+                  <FieldRow label="Ensino médio" value={formatNumber(matriculas.ensinoMedio)} />
+                )}
+                {matriculas.eja != null && matriculas.eja > 0 && (
+                  <FieldRow label="EJA" value={formatNumber(matriculas.eja)} />
+                )}
+              </SectionCard>
+            )}
 
             <SectionCard title="Endereço">
               <FieldRow label="Bairro" value={endereco?.bairro ?? "—"} />
