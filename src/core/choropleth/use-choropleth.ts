@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { getModule } from "@/core/registry/module-registry";
 import type { GeoJSONFeatureCollection } from "@/core/types/geospatial";
+import type { ObservatoryLayer } from "@/core/types/territory";
 import { computeChoroplethStats, normalizeValue } from "./normalize";
 import type { ChoroplethColors } from "./types";
 
@@ -31,7 +32,9 @@ function resolveFeatureId(feature: GeoJSONFeature): string {
 interface UseChoroplethArgs {
   collection: GeoJSONFeatureCollection | null;
   activeModuleId: string | null;
+  activeLayer: ObservatoryLayer | null;
   activeIndicatorId: string | null;
+  simplifiedView?: boolean;
 }
 
 interface UseChoroplethResult {
@@ -54,7 +57,9 @@ interface UseChoroplethResult {
 export function useChoropleth({
   collection,
   activeModuleId,
+  activeLayer,
   activeIndicatorId,
+  simplifiedView = false,
 }: UseChoroplethArgs): UseChoroplethResult {
   return useMemo(() => {
     const empty: UseChoroplethResult = {
@@ -68,6 +73,11 @@ export function useChoropleth({
     if (!activeModule?.indicatorValueExtractor || !activeModule?.getMapLayerStyle)
       return empty;
 
+    const indicator = activeLayer
+      ? activeModule.getIndicators?.(activeLayer)?.find((item) => item.id === activeIndicatorId)
+      : undefined;
+    const higherIsBetter = indicator?.higherIsBetter ?? true;
+
     const extractor = activeModule.indicatorValueExtractor(activeIndicatorId);
     if (!extractor) return empty;
 
@@ -75,6 +85,11 @@ export function useChoropleth({
     if (!stats) return empty;
 
     const featureColors: ChoroplethColors = new Map();
+    const simplifiedPalette = {
+      critical: "#ea580c",
+      attention: "#facc15",
+      good: "#0f766e",
+    };
 
     for (const feature of collection.features) {
       const featureId = resolveFeatureId(feature);
@@ -84,10 +99,22 @@ export function useChoropleth({
       if (raw === null || !isFinite(raw)) continue;
 
       const normalized = normalizeValue(raw, stats.min, stats.max);
+      if (simplifiedView) {
+        const performanceValue = higherIsBetter ? normalized : 1 - normalized;
+        const color =
+          performanceValue >= 0.67
+            ? simplifiedPalette.good
+            : performanceValue >= 0.34
+              ? simplifiedPalette.attention
+              : simplifiedPalette.critical;
+        featureColors.set(featureId, color);
+        continue;
+      }
+
       const style = activeModule.getMapLayerStyle(activeIndicatorId, normalized);
       featureColors.set(featureId, style.color);
     }
 
     return { featureColors, stats };
-  }, [collection, activeModuleId, activeIndicatorId]);
+  }, [collection, activeLayer, activeModuleId, activeIndicatorId, simplifiedView]);
 }

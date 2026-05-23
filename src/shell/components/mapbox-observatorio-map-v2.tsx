@@ -10,11 +10,15 @@ import Map, {
 } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
 import { useMapLayers } from "@/core/geospatial/use-map-layers";
+import { getModule } from "@/core/registry/module-registry";
 import { useChoropleth } from "@/core/choropleth/use-choropleth";
+import { normalizeValue } from "@/core/choropleth/normalize";
 import { aggregateFeaturesInRadius } from "@/shell/components/radius-analysis/aggregate-features";
 import { registerMarkerImages } from "@/shell/components/map-markers";
 import { ObservatorioMapTooltip } from "@/shell/components/observatorio-map-tooltip";
+import { MapLegend } from "@/shell/components/map-legend";
 import { LAYER_STYLES, type GeoJSONFeature } from "@/core/types/geospatial";
+import type { ModuleIndicator } from "@/core/types/module";
 import type { Escola, ObservatoryLayer } from "@/core/types/territory";
 import type { MapEntity } from "@/core/types/shell";
 
@@ -75,6 +79,11 @@ type HoverTooltipState = {
   subtitle: string;
   title: string;
   selected: boolean;
+  accent: string;
+  indicatorLabel?: string;
+  summary?: string;
+  detail?: string;
+  value?: string;
 };
 
 type MapStyleId = "demo" | "light" | "dark" | "voyager" | "satellite";
@@ -84,6 +93,7 @@ type MapVisualControls = {
   styleId: MapStyleId;
   fillOpacity: number;
   pointScale: number;
+  simplifiedView: boolean;
 };
 
 type MapCardVisibilityState = {
@@ -274,6 +284,75 @@ function resolveFeatureTitle(
   return String(rawName ?? "Sem nome");
 }
 
+function formatIndicatorValue(value: number, unit?: string) {
+  if (unit === "%") return `${value.toFixed(1)}%`;
+  if (unit === "R$") return `R$ ${value.toLocaleString("pt-BR")}`;
+  if (Number.isInteger(value)) return value.toLocaleString("pt-BR");
+  return value.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+}
+
+function buildHoverInsight(params: {
+  activeIndicatorId: string | null;
+  activeModule: ReturnType<typeof getModule> | null;
+  activeIndicator: ModuleIndicator | null;
+  stats: { min: number; max: number; count: number } | null;
+  featureProps: Record<string, unknown>;
+  featureId: string;
+  layer: ObservatoryLayer;
+}) {
+  const { activeIndicatorId, activeModule, activeIndicator, stats, featureProps, featureId, layer } = params;
+  if (!activeIndicatorId || !activeModule || !activeIndicator || !stats) return null;
+
+  const extractor = activeModule.indicatorValueExtractor?.(activeIndicatorId);
+  if (!extractor) return null;
+
+  const rawValue = extractor(featureProps);
+  if (rawValue === null || !isFinite(rawValue)) return null;
+
+  const normalized = normalizeValue(rawValue, stats.min, stats.max);
+  const performance = activeIndicator.higherIsBetter ? normalized : 1 - normalized;
+  const tone =
+    performance >= 0.67
+      ? "favorável"
+      : performance >= 0.34
+        ? "intermediário"
+        : "de atenção";
+
+  const layerLabel =
+    layer === "municipio"
+      ? "município"
+      : layer === "bairro"
+        ? "vizinhança"
+        : "escola";
+
+  const summary =
+    activeModule.label === "Educação"
+      ? performance >= 0.67
+        ? "Predomínio de indicadores escolares positivos"
+        : performance >= 0.34
+          ? "Quadro escolar em equilíbrio"
+          : "Ponto de atenção nos indicadores escolares"
+      : activeModule.label === "Socioeconômico"
+        ? performance >= 0.67
+          ? "Leitura socioeconômica favorável"
+          : performance >= 0.34
+            ? "Leitura socioeconômica intermediária"
+            : "Ponto de atenção socioeconômica"
+        : performance >= 0.67
+          ? `Leitura favorável na ${layerLabel}`
+          : performance >= 0.34
+            ? `Leitura intermediária na ${layerLabel}`
+            : `Ponto de atenção na ${layerLabel}`;
+
+  return {
+    accent: performance >= 0.67 ? "#06b6d4" : performance >= 0.34 ? "#a78bfa" : "#f59e0b",
+    summary,
+    detail: `${activeIndicator.label} • ${formatIndicatorValue(rawValue, activeIndicator.unit)} • leitura ${tone} no recorte`,
+    value: formatIndicatorValue(rawValue, activeIndicator.unit),
+    featureId,
+  };
+}
+
 function parseIndicadoresFromProps(
   raw: Record<string, unknown>,
 ): import("@/core/types/territory").EscolaIndicadores | undefined {
@@ -362,12 +441,12 @@ export function MapboxObservatorioMap({
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(null);
   const [radiusCenter, setRadiusCenter] = useState<[number, number] | null>(null);
   const mapRef = useRef<MapRef | null>(null);
-  const [markersReady, setMarkersReady] = useState(false);
+  const [, setMarkersReady] = useState(false);
 
   // Register marker images on map load and style changes
   const handleMapLoad = () => {
     const map = mapRef.current?.getMap();
-    if (map) {
+    if (map && (typeof map.isStyleLoaded !== "function" || map.isStyleLoaded())) {
       registerMarkerImages(map);
       setMarkersReady(true);
     }
@@ -378,8 +457,10 @@ export function MapboxObservatorioMap({
     if (map) {
       // Re-register after style change (images are lost)
       setTimeout(() => {
-        registerMarkerImages(map);
-        setMarkersReady(true);
+        if (typeof map.isStyleLoaded !== "function" || map.isStyleLoaded()) {
+          registerMarkerImages(map);
+          setMarkersReady(true);
+        }
       }, 100);
     }
   };
@@ -400,7 +481,19 @@ export function MapboxObservatorioMap({
   const ids = useMemo(() => buildLayerIds(resolvedLayer), [resolvedLayer]);
   const geojsonData = collection ?? EMPTY_COLLECTION;
 
-  const { featureColors, stats } = useChoropleth({ collection, activeModuleId, activeIndicatorId });
+  const { featureColors, stats } = useChoropleth({
+    collection,
+    activeModuleId,
+    activeLayer: resolvedLayer,
+    activeIndicatorId,
+    simplifiedView: visualControls.simplifiedView,
+  });
+
+  const activeModule = useMemo(() => (activeModuleId ? getModule(activeModuleId) : null), [activeModuleId]);
+  const activeIndicator = useMemo(
+    () => activeModule?.getIndicators?.(resolvedLayer)?.find((indicator) => indicator.id === activeIndicatorId) ?? null,
+    [activeIndicatorId, activeModule, resolvedLayer],
+  );
 
   const fillColorExpression = useMemo(() => {
     if (featureColors.size === 0) return layerStyle.color;
@@ -433,6 +526,7 @@ export function MapboxObservatorioMap({
   }, [featureColors, layerStyle.color]);
 
   const hasChoropleth = featureColors.size > 0;
+  const showLegend = Boolean(hasChoropleth && activeIndicator && stats);
 
   const mapStyleUrl = useMemo(() => {
     const style = MAP_STYLE_OPTIONS.find((o) => o.id === visualControls.styleId);
@@ -569,15 +663,29 @@ export function MapboxObservatorioMap({
     const entityId = resolveChoroplethFeatureId(feature);
     const layer = resolveFeatureLayer(feature, resolvedLayer);
     const title = entity?.data.nome ?? resolveFeatureTitle(feature);
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const hoverInsight = buildHoverInsight({
+      activeIndicatorId,
+      activeModule,
+      activeIndicator,
+      stats,
+      featureProps: props,
+      featureId: entityId,
+      layer,
+    });
 
     setHoveredId(entityId || null);
     setHoverTooltip({
       x: event.point.x,
       y: event.point.y,
       layer,
-      subtitle: getLayerSubtitle(layer, title),
+      subtitle: hoverInsight?.summary ?? getLayerSubtitle(layer, title),
       title,
       selected: Boolean(entity && entity.data.id === selectedId),
+      accent: hoverInsight?.accent ?? layerStyle.hoverColor,
+      indicatorLabel: activeIndicator?.label,
+      detail: hoverInsight?.detail,
+      value: hoverInsight?.value,
     });
   };
 
@@ -781,57 +889,78 @@ export function MapboxObservatorioMap({
         </Map>
       </div>
 
-      <div className="absolute left-2 bottom-2 z-20 max-w-[22rem] rounded-xl border border-zinc-300/90 bg-white/90 p-2 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80 sm:bottom-4 sm:left-4 sm:p-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
-            {resolvedLayer} · {collection?.features.length ?? 0} features
-          </p>
-          <button
-            type="button"
-            onClick={() => toggleCard("entities")}
-            className="rounded border border-zinc-300 px-2 py-0.5 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            {collapsedCards.entities ? "Expandir" : "Minimizar"}
-          </button>
-        </div>
-
-        {!collapsedCards.entities ? (
-          <div className="mt-2 max-h-40 space-y-1 overflow-auto sm:max-h-48">
-            {entities.length === 0 ? (
-              <p className="rounded-md border border-dashed border-zinc-300 px-2 py-2 text-[12px] text-zinc-600 dark:border-zinc-700 dark:text-zinc-300 sm:px-3 sm:text-sm">
-                Nenhuma entidade no recorte.
-              </p>
-            ) : (
-              <div className="grid gap-1">
-                {entities.map((entity) => {
-                  const entityId = entity.data.id;
-                  const isSelected = entityId === selectedId;
-                  const isHovered = entityId === hoveredId;
-
-                  return (
-                    <button
-                      key={entityId}
-                      type="button"
-                      onClick={() => onEntityClick(entity)}
-                      onMouseEnter={() => setHoveredId(entityId)}
-                      onMouseLeave={() => setHoveredId(null)}
-                      className={`rounded-md border px-2 py-1 text-left text-[12px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 sm:px-3 sm:py-2 sm:text-sm ${isSelected ? "border-cyan-500 bg-cyan-50 text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200" : isHovered ? "border-zinc-400 bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800" : "border-zinc-300 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"}`}
-                      aria-label={`Selecionar ${entity.data.nome}`}
-                    >
-                      <div className="font-medium">{entity.data.nome}</div>
-                      {entity.kind === "escola" && typeof entity.data.ideb === "number" ? (
-                        <div className="text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
-                          IDEB: {entity.data.ideb.toFixed(1)}
-                        </div>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+      <div className="pointer-events-auto absolute left-2 bottom-2 z-30 flex w-[min(18rem,calc(100vw-1rem))] max-w-[18rem] flex-col gap-2 sm:bottom-4 sm:left-4 sm:w-[min(16rem,calc(100vw-1rem))] sm:max-w-[16rem]">
+        {showLegend && activeIndicator && stats ? (
+          <MapLegend
+            indicatorLabel={activeIndicator.label}
+            indicatorUnit={activeIndicator.unit}
+            colorScale={activeIndicator.colorScale}
+            minValue={stats.min}
+            maxValue={stats.max}
+            higherIsBetter={activeIndicator.higherIsBetter}
+            simplifiedView={visualControls.simplifiedView}
+          />
         ) : null}
+
+        <div className="overflow-hidden rounded-xl border border-zinc-300/90 bg-white/90 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/80">
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-zinc-200/80 bg-white/95 px-2.5 py-2 dark:border-zinc-700/80 dark:bg-zinc-900/95 sm:px-3">
+            <p className="truncate text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+              {resolvedLayer} · {collection?.features.length ?? 0} features
+            </p>
+            <button
+              type="button"
+              onClick={() => toggleCard("entities")}
+              className="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[10px] font-medium text-zinc-600 transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              {collapsedCards.entities ? "Expandir" : "Minimizar"}
+            </button>
+          </div>
+
+          {!collapsedCards.entities ? (
+            <div className="max-h-[min(12.5rem,calc(100vh-20rem))] space-y-1 overflow-y-auto px-2.5 py-2 sm:max-h-[14rem] sm:px-3 odin-entity-scroll">
+              {entities.length === 0 ? (
+                <p className="rounded-md border border-dashed border-zinc-300 px-2 py-2 text-[12px] text-zinc-600 dark:border-zinc-700 dark:text-zinc-300 sm:px-3 sm:text-sm">
+                  Nenhuma entidade no recorte.
+                </p>
+              ) : (
+                <div className="grid gap-1.5">
+                  {entities.map((entity) => {
+                    const entityId = entity.data.id;
+                    const isSelected = entityId === selectedId;
+                    const isHovered = entityId === hoveredId;
+
+                    return (
+                      <button
+                        key={entityId}
+                        type="button"
+                        onClick={() => onEntityClick(entity)}
+                        onMouseEnter={() => setHoveredId(entityId)}
+                        onMouseLeave={() => setHoveredId(null)}
+                        className={`rounded-md border px-2 py-1.5 text-left text-[11.5px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 sm:px-3 sm:py-2 sm:text-sm ${isSelected ? "border-cyan-500 bg-cyan-50 text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200" : isHovered ? "border-zinc-400 bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800" : "border-zinc-300 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"}`}
+                        aria-label={`Selecionar ${entity.data.nome}`}
+                      >
+                        <div className="max-w-full truncate font-medium">{entity.data.nome}</div>
+                        {entity.kind === "escola" && typeof entity.data.ideb === "number" ? (
+                          <div className="text-[10px] text-zinc-600 dark:text-zinc-400 sm:text-[11px]">
+                            IDEB: {entity.data.ideb.toFixed(1)}
+                          </div>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
+
+      <style>{`
+        .odin-entity-scroll::-webkit-scrollbar { width: 4px; }
+        .odin-entity-scroll::-webkit-scrollbar-track { background: transparent; }
+        .odin-entity-scroll::-webkit-scrollbar-thumb { background: rgba(6,182,212,0.35); border-radius: 2px; }
+        .odin-entity-scroll { scrollbar-width: thin; scrollbar-color: rgba(6,182,212,0.35) transparent; }
+      `}</style>
 
       <ObservatorioMapTooltip
         visible={Boolean(hoverTooltip)}
@@ -841,6 +970,10 @@ export function MapboxObservatorioMap({
         subtitle={hoverTooltip?.subtitle ?? ""}
         title={hoverTooltip?.title ?? ""}
         selected={hoverTooltip?.selected}
+        accent={hoverTooltip?.accent}
+        indicatorLabel={hoverTooltip?.indicatorLabel}
+        detail={hoverTooltip?.detail}
+        value={hoverTooltip?.value}
       />
 
       <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-violet-500/10" />

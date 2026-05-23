@@ -12,21 +12,21 @@ type DetailSectionCardProps = {
 
 function Row({ row }: { row: DetailRow }) {
   return (
-    <div className="flex items-center justify-between py-1.5 gap-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 py-1.5 sm:items-center">
       <div className="min-w-0">
         {row.description ? (
           <IndicatorTooltip description={row.description}>
-            <span className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 cursor-help leading-snug">
+            <span className="block text-xs text-muted-foreground underline decoration-dotted underline-offset-2 cursor-help leading-snug break-words">
               {row.label}
             </span>
           </IndicatorTooltip>
         ) : (
-          <span className="text-xs text-muted-foreground leading-snug">
+          <span className="block text-xs text-muted-foreground leading-snug break-words">
             {row.label}
           </span>
         )}
       </div>
-      <span className="text-sm font-semibold tabular-nums shrink-0 text-foreground/90">
+      <span className="justify-self-end text-right text-sm font-semibold tabular-nums shrink-0 text-foreground/90">
         {row.value}
       </span>
     </div>

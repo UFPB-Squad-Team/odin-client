@@ -83,6 +83,16 @@ function renderMarkerToCanvas(config: MarkerConfig): HTMLCanvasElement {
  * Seguro para chamar múltiplas vezes (idempotente).
  */
 export function registerMarkerImages(map: { hasImage: (id: string) => boolean; addImage: (id: string, image: { data: Uint8Array; width: number; height: number }) => void }): void {
+  const mapWithStyle = map as unknown as { isStyleLoaded?: () => boolean };
+
+  if (typeof mapWithStyle.isStyleLoaded === "function" && !mapWithStyle.isStyleLoaded()) {
+    return;
+  }
+
+  if (typeof map.hasImage !== "function" || typeof map.addImage !== "function") {
+    return;
+  }
+
   for (const [type, config] of Object.entries(MARKER_CONFIGS)) {
     const imageId = `marker-${type}`;
     if (map.hasImage(imageId)) continue;
