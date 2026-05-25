@@ -36,6 +36,7 @@ function saveVisibility(visibility: DimensionVisibility) {
   } catch { /* ignore */ }
 }
 
+
 type TerritoryDetailPanelProps = {
   entity: MapEntity;
 };
@@ -122,7 +123,7 @@ export function TerritoryDetailPanel({ entity }: TerritoryDetailPanelProps) {
             <DimensionDivider label={dim.moduleLabel} colorAccent={dim.colorAccent} />
 
             {dim.contribution.metrics.length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {dim.contribution.metrics.map((metric) => (
                   <DetailMetricCard
                     key={metric.label}

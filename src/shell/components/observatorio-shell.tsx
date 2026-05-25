@@ -9,10 +9,16 @@ import { MapboxObservatorioMap } from "@/shell/components/mapbox-observatorio-ma
 import { ObservatorioSidebar } from "@/shell/components/observatorio-sidebar";
 import { ShareLinkButton } from "@/shell/components/share-link-button";
 import { MapIndicatorPicker } from "@/shell/components/map-indicator-picker";
+import {
+  type InterestProfileId,
+  InterestProfileSelector,
+} from "@/shell/components/profile-interest-selector";
 import { RadiusAnalysisToggle, RadiusAnalysisPanel } from "@/shell/components/radius-analysis";
 import { useIndicatorGroups } from "@/shell/hooks/use-indicator-groups";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
+import { getModule } from "@/core/registry/module-registry";
+import { JOAO_PESSOA_IBGE_ID } from "@/core/territory/territory-api";
 import type { ShellContextType } from "@/core/types/shell";
 import type { ObservatoryLayer } from "@/core/types/territory";
 import { resolveLayerByZoom } from "@/core/geospatial/use-map-layers";
@@ -35,12 +41,14 @@ type MapVisualControls = {
   styleId: MapStyleId;
   fillOpacity: number;
   pointScale: number;
+  simplifiedView: boolean;
 };
 
 const DEFAULT_MAP_VISUAL_CONTROLS: MapVisualControls = {
   styleId: "light",
   fillOpacity: 100,
   pointScale: 100,
+  simplifiedView: false,
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -56,7 +64,7 @@ function initialViewForLayer(layer: ObservatoryLayer): MapViewState {
     return { longitude: -34.86, latitude: -7.12, zoom: 9.5 };
   }
 
-  return { longitude: -34.86, latitude: -7.12, zoom: 6.1 };
+  return { longitude: -34.86, latitude: -7.12, zoom: 4.9 };
 }
 
 function isMapStyleId(value: string | null): value is MapStyleId {
@@ -95,6 +103,7 @@ function readMapVisualControls(searchParams: URLSearchParams) {
   const styleId = searchParams.get("style");
   const fillOpacity = parseNumber(searchParams.get("fillOpacity"));
   const pointScale = parseNumber(searchParams.get("pointScale"));
+  const simplifiedView = searchParams.get("simplified");
 
   return {
     styleId: isMapStyleId(styleId)
@@ -110,6 +119,10 @@ function readMapVisualControls(searchParams: URLSearchParams) {
       70,
       160,
     ),
+    simplifiedView:
+      simplifiedView === "1" || simplifiedView === "true"
+        ? true
+        : DEFAULT_MAP_VISUAL_CONTROLS.simplifiedView,
   } satisfies MapVisualControls;
 }
 
@@ -124,6 +137,7 @@ function buildShareableSearchParams(state: {
   mapStyleId: MapStyleId;
   municipioId: string | null;
   pointScale: number;
+  simplifiedView: boolean;
   sidebarCollapsed: boolean;
   zoom: number;
 }) {
@@ -140,6 +154,7 @@ function buildShareableSearchParams(state: {
   params.set("style", state.mapStyleId);
   params.set("fillOpacity", String(state.fillOpacity));
   params.set("pointScale", String(state.pointScale));
+  if (state.simplifiedView) params.set("simplified", "1");
   return params;
 }
 
@@ -155,6 +170,7 @@ export function ObservatorioShell() {
   const [activeIndicatorId, setActiveIndicatorId] = useState<string | null>(
     null,
   );
+  const [activeProfile, setActiveProfile] = useState<InterestProfileId | null>(null);
 
   const [mapViewState, setMapViewState] = useState<MapViewState>(() =>
     initialViewForLayer("bairro"),
@@ -196,6 +212,55 @@ export function ObservatorioShell() {
   const [radiusMode, setRadiusMode] = useState(false);
   const [radiusMeters, setRadiusMeters] = useState(1000);
   const [radiusResult, setRadiusResult] = useState<import("@/shell/components/radius-analysis").RadiusAnalysisResult | null>(null);
+
+  const firstIndicatorFor = (moduleId: string, layer: ObservatoryLayer, preferredIndicatorId?: string) => {
+    const activeModule = getModule(moduleId);
+    const indicators = activeModule?.getIndicators?.(layer) ?? [];
+    if (preferredIndicatorId && indicators.some((indicator) => indicator.id === preferredIndicatorId)) {
+      return preferredIndicatorId;
+    }
+    return indicators[0]?.id ?? null;
+  };
+
+  const applyProfile = (profile: InterestProfileId | "reset") => {
+    skipZoomLayerSyncRef.current = true;
+
+    if (profile === "family") {
+      setActiveProfile("family");
+      filters.setMunicipio(JOAO_PESSOA_IBGE_ID);
+      setActiveModule("educacao");
+      setActiveLayer("bairro");
+      setActiveIndicatorId(firstIndicatorFor("educacao", "bairro", "pct_com_internet_alunos") ?? null);
+      setMapVisualControls((current) => ({ ...current, simplifiedView: true }));
+      setMapViewState(initialViewForLayer("bairro"));
+      setSidebarCollapsed(false);
+      setComparePanelOpen(false);
+      return;
+    }
+
+    if (profile === "researcher") {
+      setActiveProfile("researcher");
+      filters.setMunicipio(JOAO_PESSOA_IBGE_ID);
+      setActiveModule("socioeconomico");
+      setActiveLayer("municipio");
+      setActiveIndicatorId(firstIndicatorFor("socioeconomico", "municipio", "pct_agua_inadequada") ?? null);
+      setMapVisualControls((current) => ({ ...current, simplifiedView: false }));
+      setMapViewState(initialViewForLayer("municipio"));
+      setSidebarCollapsed(false);
+      setComparePanelOpen(false);
+      return;
+    }
+
+    setActiveProfile(null);
+    filters.setMunicipio(JOAO_PESSOA_IBGE_ID);
+    setActiveModule("educacao");
+    setActiveLayer("bairro");
+    setMapViewState(initialViewForLayer("bairro"));
+    setActiveIndicatorId(null);
+    setMapVisualControls((current) => ({ ...current, simplifiedView: false }));
+    setSidebarCollapsed(false);
+    setComparePanelOpen(false);
+  };
 
   const handleIndicatorSelect = (moduleId: string, indicatorId: string | null) => {
     if (moduleId !== activeModuleId) {
@@ -319,7 +384,8 @@ export function ObservatorioShell() {
       searchParams.get("zoom") ||
       searchParams.get("style") ||
       searchParams.get("fillOpacity") ||
-      searchParams.get("pointScale"),
+      searchParams.get("pointScale") ||
+      searchParams.get("simplified")
     );
 
     let storageState: {
@@ -387,6 +453,9 @@ export function ObservatorioShell() {
                 70,
                 160,
               ),
+              simplifiedView:
+                parsed.visualControls?.simplifiedView ??
+                DEFAULT_MAP_VISUAL_CONTROLS.simplifiedView,
             },
           };
         }
@@ -504,6 +573,7 @@ export function ObservatorioShell() {
           layer: activeLayer,
           municipioId: filters.municipioId,
           pointScale: mapVisualControls.pointScale,
+          simplifiedView: mapVisualControls.simplifiedView,
           sidebarCollapsed,
           viewState: mapViewState,
           visualControls: mapVisualControls,
@@ -537,6 +607,7 @@ export function ObservatorioShell() {
       mapStyleId: mapVisualControls.styleId,
       municipioId: filters.municipioId,
       pointScale: mapVisualControls.pointScale,
+      simplifiedView: mapVisualControls.simplifiedView,
       sidebarCollapsed,
       zoom: mapViewState.zoom,
     });
@@ -610,6 +681,7 @@ export function ObservatorioShell() {
       mapStyleId: mapVisualControls.styleId,
       municipioId: filters.municipioId,
       pointScale: mapVisualControls.pointScale,
+      simplifiedView: mapVisualControls.simplifiedView,
       sidebarCollapsed,
       zoom: mapViewState.zoom,
     });
@@ -666,6 +738,14 @@ export function ObservatorioShell() {
               <ThemeToggle />
             </div>
           </div>
+
+          <div className="mt-3">
+            <InterestProfileSelector
+              value={activeProfile}
+              onSelect={applyProfile}
+              onReset={() => applyProfile("reset")}
+            />
+          </div>
         </header>
 
         <div className="relative h-[calc(100vh-65px)] w-full overflow-hidden">
@@ -680,12 +760,12 @@ export function ObservatorioShell() {
             onLayerChange={(layer) => {
               skipZoomLayerSyncRef.current = true;
               setActiveLayer(layer);
+              setMapViewState(initialViewForLayer(layer));
             }}
             onSetBairro={filters.setBairro}
             onSetEstado={filters.setEstado}
             onSetMunicipio={filters.setMunicipio}
             sidebarCollapsed={sidebarCollapsed}
-            shellContext={shellContext}
           />
 
           {/* O MAPA AGORA OCUPA 100% SEMPRE */}
@@ -724,6 +804,14 @@ export function ObservatorioShell() {
                 groups={indicatorGroups}
                 activeModuleId={activeModuleId}
                 activeIndicatorId={activeIndicatorId}
+                simplifiedView={mapVisualControls.simplifiedView}
+                radiusMode={radiusMode}
+                onSimplifiedViewChange={(value) =>
+                  setMapVisualControls((current) => ({
+                    ...current,
+                    simplifiedView: value,
+                  }))
+                }
                 onSelect={handleIndicatorSelect}
               />
               <RadiusAnalysisToggle

@@ -24,28 +24,30 @@ export function IndicatorGroupSection({
   activeIndicatorId,
   isActiveModule,
   onSelect,
-  defaultOpen = false,
 }: IndicatorGroupSectionProps) {
   // Só abre por padrão se este módulo tem o indicador ativo
   const hasActiveIndicator = isActiveModule && activeIndicatorId != null;
   const [open, setOpen] = useState(hasActiveIndicator);
 
   return (
-    <div className="rounded-lg border border-border/40 overflow-hidden">
+    <div className="overflow-hidden rounded-lg border border-border/40">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
+        className={`flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors ${
           hasActiveIndicator
-            ? "bg-muted/60"
-            : "hover:bg-muted/40"
+            ? "bg-muted/55"
+            : "hover:bg-muted/35"
         }`}
       >
         <span
           className="h-2 w-2 rounded-full shrink-0"
           style={{ backgroundColor: colorAccent }}
         />
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground/80 flex-1">
+        <span
+          className="flex-1 text-[11px] font-semibold uppercase tracking-wide"
+          style={{ color: colorAccent }}
+        >
           {moduleLabel}
         </span>
         {hasActiveIndicator && (
@@ -62,7 +64,7 @@ export function IndicatorGroupSection({
       </button>
 
       {open && (
-        <div className="px-1.5 pb-1.5 flex flex-col gap-0.5">
+        <div className="odin-indicator-scroll flex max-h-[24vh] flex-col gap-0.5 overflow-y-auto px-1.5 pb-1.5 pr-2 [scrollbar-gutter:stable]">
           {indicators.map((indicator) => {
             const isActive = isActiveModule && activeIndicatorId === indicator.id;
             return (
@@ -72,10 +74,10 @@ export function IndicatorGroupSection({
                 onClick={() =>
                   onSelect(moduleId, isActive ? null : indicator.id)
                 }
-                className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12px] transition-all ${
+                className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11.5px] transition-all ${
                   isActive
                     ? "text-white font-medium shadow-sm"
-                    : "text-foreground/80 hover:bg-muted/50"
+                    : "text-foreground/90 hover:bg-muted/45"
                 }`}
                 style={
                   isActive
@@ -99,6 +101,13 @@ export function IndicatorGroupSection({
           })}
         </div>
       )}
+
+      <style>{`
+        .odin-indicator-scroll::-webkit-scrollbar { width: 4px; }
+        .odin-indicator-scroll::-webkit-scrollbar-track { background: transparent; }
+        .odin-indicator-scroll::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 2px; }
+        .odin-indicator-scroll { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.35) transparent; }
+      `}</style>
     </div>
   );
 }

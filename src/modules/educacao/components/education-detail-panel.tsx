@@ -77,9 +77,7 @@ function DetailSection({
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-2" />
         )}
       </button>
-      {open && (
-        <div className="px-3 py-1.5 divide-y divide-border/30">{children}</div>
-      )}
+      {open && <div className="px-3 py-1.5 divide-y divide-border/30">{children}</div>}
     </div>
   );
 }
@@ -96,20 +94,22 @@ function IndicatorRow({
   highlight?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between py-1.5 gap-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-1.5">
       <div className="min-w-0">
         {description ? (
           <IndicatorTooltip description={description}>
-            <span className="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 cursor-help leading-snug">
+            <span className="block text-xs text-muted-foreground underline decoration-dotted underline-offset-2 cursor-help leading-snug break-words">
               {label}
             </span>
           </IndicatorTooltip>
         ) : (
-          <span className="text-xs text-muted-foreground leading-snug">{label}</span>
+          <span className="block text-xs text-muted-foreground leading-snug break-words">
+            {label}
+          </span>
         )}
       </div>
       <span
-        className={`text-sm font-semibold tabular-nums shrink-0 ${highlight ? "text-foreground" : "text-foreground/90"}`}
+        className={`justify-self-end text-right text-sm font-semibold tabular-nums shrink-0 ${highlight ? "text-foreground" : "text-foreground/90"}`}
       >
         {value}
       </span>
@@ -167,9 +167,7 @@ function DimensionDivider({ label, dimension }: { label: string; dimension: Dime
 }
 
 function SocioRow({ label, value, description }: { label: string; value: string; description?: string }) {
-  return (
-    <IndicatorRow label={label} value={value} description={description} />
-  );
+  return <IndicatorRow label={label} value={value} description={description} />;
 }
 
 function formatPct(value: unknown) {
@@ -463,7 +461,7 @@ export function EducationDetailPanel({ entity }: ModuleDetailPanelProps) {
       {edu.metrics && edu.metrics.length > 0 && (
         <>
           <DimensionDivider label="Educação" dimension="educacao" />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {edu.metrics.map((m) => (
               <MetricCard key={m.label} label={m.label} value={m.value} description={m.description} dimension="educacao" />
             ))}

@@ -11,5 +11,8 @@ export type MapIndicatorPickerProps = {
   groups: IndicatorGroup[];
   activeModuleId: string | null;
   activeIndicatorId: string | null;
+  simplifiedView: boolean;
+  radiusMode?: boolean;
+  onSimplifiedViewChange: (value: boolean) => void;
   onSelect: (moduleId: string, indicatorId: string | null) => void;
 };

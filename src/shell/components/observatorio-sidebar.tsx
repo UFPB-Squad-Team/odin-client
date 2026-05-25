@@ -18,7 +18,6 @@ type SidebarProps = {
   onSetEstado: (estadoId: string | null) => void;
   onSetMunicipio: (municipioId: string | null) => void;
   sidebarCollapsed: boolean;
-  shellContext?: unknown;
 };
 
 const LAYERS: Array<{ id: ObservatoryLayer; label: string }> = [
@@ -45,7 +44,6 @@ export function ObservatorioSidebar({
   onSetEstado,
   onSetMunicipio,
   sidebarCollapsed,
-  shellContext,
 }: SidebarProps) {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const [isDragging, setIsDragging] = useState(false);
@@ -182,7 +180,7 @@ export function ObservatorioSidebar({
                 disabled={!estadoId}
               />
 
-              {activeLayer !== "bairro" && (
+              {activeLayer === "bairro" && (
                 <SearchableCombobox
                   ariaLabel="Selecionar Vizinhança"
                   label="VIZINHANÇA"
@@ -195,15 +193,15 @@ export function ObservatorioSidebar({
             </div>
 
             <div className="shrink-0 pt-4 border-t border-zinc-200 dark:border-zinc-800/50 pb-6">
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
                 📍 Camada de Análise
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {LAYERS.map((layer) => (
                   <button
                     key={layer.id}
                     onClick={() => onLayerChange(layer.id)}
-                    className={`py-2 text-[10px] font-bold rounded-lg border transition-all ${
+                    className={`min-h-[44px] rounded-xl border px-3 py-2 text-[10px] font-bold leading-tight transition-all ${
                       activeLayer === layer.id
                         ? "bg-cyan-600 border-cyan-500 text-white shadow-[0_0_10px_rgba(8,145,178,0.2)]"
                         : "bg-zinc-100 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-500 hover:border-zinc-400 dark:hover:border-zinc-700"
