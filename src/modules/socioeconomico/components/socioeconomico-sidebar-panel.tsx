@@ -1,5 +1,6 @@
 "use client";
 
+import { IndicatorTooltip } from "@/components/ui/indicator-tooltip";
 import type { ModuleSidebarPanelProps } from "@/core/types/module";
 import type { SocioeconomicoIndicatorId } from "@/modules/socioeconomico/types/socioeconomico";
 
@@ -58,16 +59,17 @@ export function SocioeconomicoSidebarPanel({
           <button
             key={indicator.id}
             onClick={() => onIndicatorChange(isActive ? null : indicator.id)}
-            title={indicator.description}
             aria-pressed={isActive}
             className={[
-              "flex items-start gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+              "flex w-full items-start gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
               isActive
                 ? "bg-violet-600 text-white"
                 : "hover:bg-muted text-foreground",
             ].join(" ")}
           >
-            <span className="flex-1 leading-snug">{indicator.label}</span>
+            <IndicatorTooltip description={indicator.description}>
+              <span className="flex-1 leading-snug text-left">{indicator.label}</span>
+            </IndicatorTooltip>
             {isActive && <span className="shrink-0 text-xs opacity-70 mt-0.5">✓</span>}
           </button>
         );

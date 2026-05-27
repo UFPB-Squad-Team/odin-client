@@ -77,6 +77,7 @@ export function useChoropleth({
       ? activeModule.getIndicators?.(activeLayer)?.find((item) => item.id === activeIndicatorId)
       : undefined;
     const higherIsBetter = indicator?.higherIsBetter ?? true;
+    const comparisonMode = indicator?.comparisonMode ?? "directional";
 
     const extractor = activeModule.indicatorValueExtractor(activeIndicatorId);
     if (!extractor) return empty;
@@ -100,7 +101,12 @@ export function useChoropleth({
 
       const normalized = normalizeValue(raw, stats.min, stats.max);
       if (simplifiedView) {
-        const performanceValue = higherIsBetter ? normalized : 1 - normalized;
+        const performanceValue =
+          comparisonMode === "relative"
+            ? normalized
+            : higherIsBetter
+              ? normalized
+              : 1 - normalized;
         const color =
           performanceValue >= 0.67
             ? simplifiedPalette.good

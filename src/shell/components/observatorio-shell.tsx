@@ -478,7 +478,7 @@ export function ObservatorioShell() {
             estadoId: parsed.estadoId ?? null,
             layer: parsedLayer,
             municipioId: parsed.municipioId ?? null,
-            sidebarCollapsed: Boolean(parsed.sidebarCollapsed),
+            sidebarCollapsed: true,
             viewState: {
               longitude:
                 parsed.viewState?.longitude ??

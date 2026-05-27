@@ -56,7 +56,7 @@ export function readInitialShellState(): InitialShellState {
     bairroId: fromUrl.bairroId ?? fromStorage.bairroId ?? null,
     activeLayer: fromUrl.activeLayer ?? fromStorage.activeLayer ?? "bairro",
     activeModuleId: fromUrl.activeModuleId ?? fromStorage.activeModuleId ?? null,
-    sidebarCollapsed: fromStorage.sidebarCollapsed ?? false,
+    sidebarCollapsed: fromStorage.sidebarCollapsed ?? true,
   };
 }
 

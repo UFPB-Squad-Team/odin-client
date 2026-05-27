@@ -310,9 +310,19 @@ function buildHoverInsight(params: {
   if (rawValue === null || !isFinite(rawValue)) return null;
 
   const normalized = normalizeValue(rawValue, stats.min, stats.max);
-  const performance = activeIndicator.higherIsBetter ? normalized : 1 - normalized;
-  const tone =
-    performance >= 0.67
+  const performance =
+    activeIndicator.comparisonMode === "relative"
+      ? normalized
+      : activeIndicator.higherIsBetter
+        ? normalized
+        : 1 - normalized;
+  const tone = activeIndicator.comparisonMode === "relative"
+    ? performance >= 0.67
+      ? "muito alto"
+      : performance >= 0.34
+        ? "na média"
+        : "muito baixo"
+    : performance >= 0.67
       ? "favorável"
       : performance >= 0.34
         ? "intermediário"
@@ -333,11 +343,17 @@ function buildHoverInsight(params: {
           ? "Quadro escolar em equilíbrio"
           : "Ponto de atenção nos indicadores escolares"
       : activeModule.label === "Socioeconômico"
-        ? performance >= 0.67
-          ? "Leitura socioeconômica favorável"
-          : performance >= 0.34
-            ? "Leitura socioeconômica intermediária"
-            : "Ponto de atenção socioeconômica"
+        ? activeIndicator.comparisonMode === "relative"
+          ? performance >= 0.67
+            ? "Quantidade alta no recorte"
+            : performance >= 0.34
+              ? "Quantidade na média do recorte"
+              : "Quantidade baixa no recorte"
+          : performance >= 0.67
+            ? "Leitura socioeconômica favorável"
+            : performance >= 0.34
+              ? "Leitura socioeconômica intermediária"
+              : "Ponto de atenção socioeconômica"
         : performance >= 0.67
           ? `Leitura favorável na ${layerLabel}`
           : performance >= 0.34
@@ -347,7 +363,7 @@ function buildHoverInsight(params: {
   return {
     accent: performance >= 0.67 ? "#06b6d4" : performance >= 0.34 ? "#a78bfa" : "#f59e0b",
     summary,
-    detail: `${activeIndicator.label} • ${formatIndicatorValue(rawValue, activeIndicator.unit)} • leitura ${tone} no recorte`,
+    detail: `${activeIndicator.label} • ${formatIndicatorValue(rawValue, activeIndicator.unit)} • ${activeIndicator.comparisonMode === "relative" ? "quantidade" : "leitura"} ${tone} no recorte`,
     value: formatIndicatorValue(rawValue, activeIndicator.unit),
     featureId,
   };
@@ -898,6 +914,7 @@ export function MapboxObservatorioMap({
             minValue={stats.min}
             maxValue={stats.max}
             higherIsBetter={activeIndicator.higherIsBetter}
+            comparisonMode={activeIndicator.comparisonMode}
             simplifiedView={visualControls.simplifiedView}
           />
         ) : null}

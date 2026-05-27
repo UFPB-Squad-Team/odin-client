@@ -24,6 +24,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#FFF7ED", "#C2410C"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_branca",
@@ -33,6 +34,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#FFF7ED", "#9A3412"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_indigena",
@@ -42,6 +44,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#ECFDF5", "#065F46"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "taxa_analfabetismo_15_mais",
@@ -121,6 +124,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       description: "Total de residentes no território — IBGE Censo 2022",
       colorScale: ["#F0FDF4", "#166534"],
       higherIsBetter: true,
+      comparisonMode: "relative",
     },
     {
       id: "total_domicilios",
@@ -128,6 +132,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       description: "Total de domicílios no território — IBGE Censo 2022",
       colorScale: ["#F0FDF4", "#166534"],
       higherIsBetter: true,
+      comparisonMode: "relative",
     },
     {
       id: "pct_pop_masculina",
@@ -137,6 +142,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#EFF6FF", "#1E40AF"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_pop_feminina",
@@ -146,6 +152,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#FDF2F8", "#9D174D"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_jovens_15_29",
@@ -155,6 +162,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#ECFDF5", "#047857"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_adultos_30_59",
@@ -164,6 +172,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#EFF6FF", "#1D4ED8"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_dom_unipessoal",
@@ -173,6 +182,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#FFFBEB", "#92400E"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_dom_tipo_casa",
@@ -182,6 +192,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#ECFDF5", "#065F46"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_dom_tipo_apto",
@@ -191,6 +202,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#EFF6FF", "#1E40AF"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_dom_degradado",
@@ -200,6 +212,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#FEF9C3", "#B91C1C"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "renda_per_capita_media",
@@ -219,6 +232,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#FFF7ED", "#C2410C"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_branca",
@@ -228,6 +242,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#FFF7ED", "#9A3412"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "pct_indigena",
@@ -237,6 +252,7 @@ const SOCIOECONOMICO_INDICATORS_BY_LAYER: Record<
       unit: "%",
       colorScale: ["#ECFDF5", "#065F46"],
       higherIsBetter: false,
+      comparisonMode: "relative",
     },
     {
       id: "taxa_analfabetismo_15_mais",

@@ -78,7 +78,7 @@ export function useObservatorioShell() {
   const [selected, setSelected] = useState<ObservatorySelection | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeModuleId, setActiveModuleId] = useState<string | null>("educacao");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   const pendingPathRef = useRef<{
     municipioId?: string;

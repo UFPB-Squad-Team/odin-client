@@ -18,6 +18,8 @@ export interface ModuleIndicator {
   unit?: string;
   colorScale: [string, string]; // [cor para valor mínimo, cor para valor máximo]
   higherIsBetter: boolean; // true = ordem decrescente no ranking, false = crescente
+  /** Define se o indicador é direcional ou apenas quantitativo relativo ao conjunto. */
+  comparisonMode?: "directional" | "relative";
 }
 
 // Props injetadas pelo Shell no painel lateral do módulo ativo
