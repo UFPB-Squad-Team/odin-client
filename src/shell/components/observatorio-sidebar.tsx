@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SearchableCombobox } from "@/shell/components/searchable-combobox";
+import { SmartSearchInput } from "@/shell/components/smart-search";
+import type { SearchResultItem } from "@/shell/services/universal-search";
 import type { Bairro, Estado, Municipio } from "@/core/types/territory";
 import type { ObservatoryLayer } from "@/core/types/territory";
 
@@ -17,6 +19,7 @@ type SidebarProps = {
   onSetBairro: (bairroId: string | null) => void;
   onSetEstado: (estadoId: string | null) => void;
   onSetMunicipio: (municipioId: string | null) => void;
+  onSearchSelect?: (item: SearchResultItem) => void;
   sidebarCollapsed: boolean;
 };
 
@@ -43,6 +46,7 @@ export function ObservatorioSidebar({
   onSetBairro,
   onSetEstado,
   onSetMunicipio,
+  onSearchSelect,
   sidebarCollapsed,
 }: SidebarProps) {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
@@ -153,9 +157,10 @@ export function ObservatorioSidebar({
                   Busca Inteligente
                 </label>
               </div>
-              <input
-                placeholder="Ex.: Av. Epitácio Pessoa"
-                className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-200 outline-none focus:border-cyan-500/50 transition-colors"
+              <SmartSearchInput
+                sgUf={estadoId?.toUpperCase()}
+                municipioId={municipioId}
+                onSelect={(item) => onSearchSelect?.(item)}
               />
               <p className="text-[9px] text-zinc-500 dark:text-zinc-600">
                 Dica: pressione / para focar a busca.

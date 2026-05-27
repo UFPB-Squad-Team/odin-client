@@ -269,6 +269,62 @@ export function ObservatorioShell() {
     setActiveIndicatorId(indicatorId);
   };
 
+  /**
+   * Lógica de navegação ao selecionar resultado da busca universal.
+   * Comportamento varia por tipo de resultado:
+   * - municipio → centraliza + seleciona município + zoom 10
+   * - bairro → centraliza + zoom 13
+   * - escola → centraliza + zoom 15 + abre detalhes
+   * - logradouro/cep → centraliza + ativa análise por raio
+   */
+  const handleSearchSelect = (item: import("@/shell/services/universal-search").SearchResultItem) => {
+    const [lng, lat] = item.coordinates;
+
+    switch (item.kind) {
+      case "municipio":
+        filters.setMunicipio(item.municipioIdIbge);
+        skipZoomLayerSyncRef.current = true;
+        setMapViewState({ longitude: lng, latitude: lat, zoom: 10 });
+        break;
+
+      case "bairro":
+        if (item.municipioIdIbge && item.municipioIdIbge !== filters.municipioId) {
+          filters.setMunicipio(item.municipioIdIbge);
+        }
+        skipZoomLayerSyncRef.current = true;
+        setMapViewState({ longitude: lng, latitude: lat, zoom: 13 });
+        break;
+
+      case "escola":
+        skipZoomLayerSyncRef.current = true;
+        setMapViewState({ longitude: lng, latitude: lat, zoom: 15 });
+        // Abre detalhes da escola
+        selectEntity({
+          kind: "escola",
+          data: {
+            id: item.id,
+            nome: item.label,
+            bairroId: String(item.metadata.bairro ?? ""),
+            municipioId: item.municipioIdIbge,
+            municipioNome: String(item.metadata.municipioNome ?? ""),
+          },
+        });
+        break;
+
+      case "logradouro":
+      case "cep":
+        // Centraliza e ativa análise por raio
+        skipZoomLayerSyncRef.current = true;
+        setMapViewState({ longitude: lng, latitude: lat, zoom: 14 });
+        setRadiusMode(true);
+        // Simula clique no ponto para disparar a análise
+        setTimeout(() => {
+          setRadiusResult(null); // será computado pelo próximo clique ou automaticamente
+        }, 100);
+        break;
+    }
+  };
+
   // ShellContext para módulos
   const shellContext: ShellContextType = {
     activeLayer,
@@ -765,6 +821,7 @@ export function ObservatorioShell() {
             onSetBairro={filters.setBairro}
             onSetEstado={filters.setEstado}
             onSetMunicipio={filters.setMunicipio}
+            onSearchSelect={handleSearchSelect}
             sidebarCollapsed={sidebarCollapsed}
           />
 
