@@ -19,7 +19,7 @@ export type InterestProfileOption = {
 export const INTEREST_PROFILE_OPTIONS: InterestProfileOption[] = [
   {
     id: "family",
-    label: "Morador / Mãe / Pai",
+    label: "Cidadão / Morador",
     description: "Leitura cotidiana do território com foco em escola e bairro.",
     summary: "Ativa educação no bairro com leitura simplificada.",
     changes: ["Camada: Bairro", "Indicador inicial: Internet para alunos", "Layout: Simplificado"],
