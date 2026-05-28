@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fetchSchoolDetail } from "@/modules/educacao/services/education-api";
+import { PendingRouteLink } from "@/components/ui/pending-route-link";
 
 type SchoolPageProps = {
   params: Promise<{ schoolId: string }>;
@@ -101,12 +101,12 @@ export default async function SchoolPage({ params }: SchoolPageProps) {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link
+              <PendingRouteLink
                 href="/observatorio"
                 className="inline-flex items-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
               >
                 Voltar ao mapa
-              </Link>
+              </PendingRouteLink>
             </div>
           </div>
         </header>

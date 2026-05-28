@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { PageContainer } from "@/components/layout/page-container";
+import { PendingRouteLink } from "@/components/ui/pending-route-link";
 
 export function LandingCta() {
   return (
@@ -15,13 +15,13 @@ export function LandingCta() {
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link
+            <PendingRouteLink
               href="/observatorio"
               aria-label="Acessar observatório"
               className="inline-flex rounded-lg bg-cyan-500 px-5 py-3 font-medium text-zinc-950 transition hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70"
             >
               Acessar Observatório
-            </Link>
+            </PendingRouteLink>
             <a
               href="#diferencial"
               aria-label="Abrir seção de visão de produto"

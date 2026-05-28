@@ -3,6 +3,7 @@ import { OdinLogoPlaceholder } from "@/components/features/landing/odin-logo-pla
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PageContainer } from "@/components/layout/page-container";
 import { LandingTourButton } from "@/components/features/landing/landing-tour-button";
+import { PendingRouteLink } from "@/components/ui/pending-route-link";
 
 export function LandingNavbar() {
   return (
@@ -33,14 +34,14 @@ export function LandingNavbar() {
             Governança
           </a>
 
-          <Link
+          <PendingRouteLink
             id="tour-entrar"
             href="/observatorio"
             className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-500 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
           >
             <span className="sm:hidden">Entrar</span>
             <span className="hidden sm:inline">Acessar Observatório</span>
-          </Link>
+          </PendingRouteLink>
           <ThemeToggle />
         </nav>
       </PageContainer>

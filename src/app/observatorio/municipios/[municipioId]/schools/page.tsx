@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, BookOpen, MapPin, School2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { fetchEscolasByMunicipioPage } from "@/modules/educacao/services/education-api";
 import type { Escola } from "@/core/types/territory";
+import { PendingRouteLink } from "@/components/ui/pending-route-link";
 
 function formatMaybeText(value: string | undefined | null) {
   if (!value) return "—";
@@ -30,8 +30,9 @@ function SchoolCard({
   inepId?: string | null;
 }) {
   return (
-    <Link
+    <PendingRouteLink
       href={`/schools/${inepId ?? id}`}
+      loadingVariant="none"
       className="group rounded-2xl border border-zinc-200 bg-white/90 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950/70"
     >
       <div className="flex items-start justify-between gap-4">
@@ -81,7 +82,7 @@ function SchoolCard({
       <p className="mt-4 text-xs font-medium text-cyan-700 transition group-hover:text-cyan-600 dark:text-cyan-300">
         Ver detalhes da escola →
       </p>
-    </Link>
+    </PendingRouteLink>
   );
 }
 
@@ -273,13 +274,13 @@ export default function MunicipalitySchoolsPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Link
+              <PendingRouteLink
                 href="/observatorio"
                 className="inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Voltar ao mapa
-              </Link>
+              </PendingRouteLink>
             </div>
           </div>
         </header>

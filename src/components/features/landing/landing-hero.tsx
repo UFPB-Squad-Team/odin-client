@@ -1,7 +1,7 @@
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { OdinLogoPlaceholder } from "@/components/features/landing/odin-logo-placeholder";
 import { PageContainer } from "@/components/layout/page-container";
+import { PendingRouteLink } from "@/components/ui/pending-route-link";
 
 const InteractiveNetworkBackground = dynamic(
   () =>
@@ -58,13 +58,13 @@ export function LandingHero() {
           </div>
 
           <div className="mt-10 flex flex-wrap gap-4">
-            <Link
+            <PendingRouteLink
               href="/observatorio"
               aria-label="Abrir módulo observatório"
               className="rounded-lg bg-cyan-500 px-6 py-3.5 font-semibold text-zinc-950 transition hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 active:scale-95"
             >
               Acessar Observatório
-            </Link>
+            </PendingRouteLink>
             <a
               href="#diferencial"
               aria-label="Ir para seção de diferencial do produto"
