@@ -74,19 +74,19 @@ export async function listCamadas(
 
     const features = raw
       .map((item) => {
-        const geom = item.geometria as
+        const geom = (item.geometria ?? item.geometry) as
           | { type?: string; coordinates?: unknown }
           | undefined;
         if (!geom?.type) return null;
 
         const rawId = String(
-          item._id ?? item.cd_bairro_ibge ?? item.cd_setor ?? "",
+          item._id ?? item.cd_bairro_ibge ?? item.cd_setor ?? item.id ?? "",
         ).replace(/\.0$/, "");
         if (!rawId) return null;
 
         const nome = String(
           item.bairro ?? item.nm_bairro ?? item.nome_area ?? item.nome ?? rawId,
-        );
+        ).trim() || rawId;
 
         let geometry: GeoJSONFeature["geometry"] | null = null;
         try {

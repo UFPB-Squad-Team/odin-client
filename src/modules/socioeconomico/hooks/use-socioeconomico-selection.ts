@@ -173,12 +173,14 @@ export function buildSocioeconomicoSelection(
 
   const hasRealSocioData = socio != null;
   const hasRealEducacaoData = educacao != null;
+  const isSectorFallback = source === "setor_indicadores" || temBairroOficial === false;
+  const isOfficialNeighborhood = source === "bairro_indicadores" || temBairroOficial === true;
 
   const subtitleQuality =
-    source === "setor_indicadores"
+    isSectorFallback
       ? "Dados de setor censitário (sem delimitação oficial de bairro)"
-      : temBairroOficial === false
-      ? "Dados agregados por setor censitário"
+      : isOfficialNeighborhood
+      ? "Dados oficiais de bairro"
       : "Contexto Socioeconômico — IBGE Censo 2022";
 
   return {
@@ -269,8 +271,14 @@ export function buildSocioeconomicoSelection(
               rows: [
                 {
                   label: "Disponibilidade",
-                  value: source === "setor_indicadores" ? "Setor censitário" : "Em integração",
-                  description: "Dados agregados por setor censitário quando não há bairro oficial delimitado",
+                  value: isSectorFallback
+                    ? "Setor censitário"
+                    : isOfficialNeighborhood
+                    ? "Bairro oficial"
+                    : "Em integração",
+                  description: isSectorFallback
+                    ? "Dados agregados por setor censitário quando não há bairro oficial delimitado"
+                    : "Dados oficiais de bairro quando a delimitação existe",
                 },
               ],
             },

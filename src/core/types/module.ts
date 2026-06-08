@@ -9,6 +9,10 @@ import type {
   ObservatorySelection,
   ShellContextType,
 } from "./shell";
+import type {
+  ThresholdCor,
+  MapaPesosContextuais,
+} from "./comparision";
 
 // Indicador temático de um módulo (ex.: pct_com_internet, taxa_analfabetismo)
 export interface ModuleIndicator {
@@ -18,8 +22,34 @@ export interface ModuleIndicator {
   unit?: string;
   colorScale: [string, string]; // [cor para valor mínimo, cor para valor máximo]
   higherIsBetter: boolean; // true = ordem decrescente no ranking, false = crescente
+  
   /** Define se o indicador é direcional ou apenas quantitativo relativo ao conjunto. */
   comparisonMode?: "directional" | "relative";
+
+  // ─── Novos campos para visão simplificada e segmentação ──────────────────
+
+  /**
+   * Força o indicador a ser tratado como "maior é melhor" na visão simplificada,
+   * independentemente do valor de `higherIsBetter`.
+   * Exemplo: "taxa de reprovação" tem higherIsBetter=false, mas na visão
+   * simplificada queremos mostrar como "maior é melhor" (invertendo a polaridade).
+   */
+  forceHigherIsBetter?: boolean;
+
+  /**
+   * Thresholds fixos para a régua de cores na visão simplificada.
+   * Se definido, substitui a escala dinâmica min-max do choropleth.
+   * Exemplo: [{min: 0, max: 33, cor: "#ea580c", rotulo: "Crítico"}, ...]
+   */
+  thresholdsSimplificado?: ThresholdCor[];
+
+  /**
+   * Mapa de pesos contextuais do indicador.
+   * Permite que o mesmo indicador tenha pesos diferentes dependendo
+   * do contexto de análise (nível de ensino, esfera administrativa, etc.).
+   * Exemplo: "parquinho" tem peso 1.5 para contexto "infantil" e 0.3 para "medio".
+   */
+  contextualPesos?: MapaPesosContextuais;
 }
 
 // Props injetadas pelo Shell no painel lateral do módulo ativo

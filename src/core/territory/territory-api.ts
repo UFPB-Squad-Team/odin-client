@@ -31,7 +31,14 @@ export function normalizeNeighborhoodPayload(
   payload: unknown,
 ): NeighborhoodRawRecord[] {
   if (Array.isArray(payload)) {
-    return payload as NeighborhoodRawRecord[];
+    return payload.map((item) => {
+      const raw = item as Record<string, unknown>;
+      return {
+        ...raw,
+        geometria: (raw.geometria ?? raw.geometry) as NeighborhoodGeometry | undefined,
+        geometry: (raw.geometry ?? raw.geometria) as NeighborhoodGeometry | undefined,
+      };
+    }) as NeighborhoodRawRecord[];
   }
 
   if (!payload || typeof payload !== "object") {
@@ -54,6 +61,7 @@ export function normalizeNeighborhoodPayload(
     ...(feature.properties ?? {}),
     id: feature.id ?? feature.properties?.id,
     geometria: feature.geometry,
+    geometry: feature.geometry,
   })) as NeighborhoodRawRecord[];
 }
 
@@ -122,11 +130,11 @@ export async function listBairros(municipioId: string): Promise<Bairro[]> {
     .map((raw, index) => {
       const idRaw = String(raw._id ?? raw.cd_bairro_ibge ?? raw.cd_setor ?? raw.id ?? "");
       const id = idRaw.replace(/\.0$/, "");
-      const rawNome = String(raw.bairro ?? raw.nm_bairro ?? raw.nome_area ?? raw.nome ?? "");
-      // Se o nome é vazio ou puramente numérico (código de setor), usa nome amigável
-      const nome = rawNome && !/^\d+$/.test(rawNome) ? rawNome : `Área ${index + 1}`;
+      const rawNome = String(raw.bairro ?? raw.nm_bairro ?? raw.nome_area ?? raw.nome ?? "").trim();
+      // Se o nome é vazio ou puramente numérico (código de setor), usa id ou nome amigável
+      const nome = rawNome && rawNome.length > 0 && !/^\d+$/.test(rawNome) ? rawNome : id || `Área ${index + 1}`;
       const municipioIdApi = String(
-        raw.municipioIdIbge ?? raw.municipio_id_ibge ?? "",
+        raw.municipioIdIbge ?? raw.municipio_id_ibge ?? raw.cd_municipio ?? "",
       ).replace(/\.0$/, "");
       const source = raw.source != null ? String(raw.source) : undefined;
       const temBairroOficial =

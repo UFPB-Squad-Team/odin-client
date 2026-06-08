@@ -16,12 +16,14 @@ import {
 import { RadiusAnalysisToggle, RadiusAnalysisPanel } from "@/shell/components/radius-analysis";
 import { useIndicatorGroups } from "@/shell/hooks/use-indicator-groups";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useTheme } from "next-themes";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
 import { getModule } from "@/core/registry/module-registry";
 import { JOAO_PESSOA_IBGE_ID } from "@/core/territory/territory-api";
 import type { ShellContextType } from "@/core/types/shell";
 import type { ObservatoryLayer } from "@/core/types/territory";
 import { resolveLayerByZoom } from "@/core/geospatial/use-map-layers";
+import { startObservatorioTour } from "../components/tour/observatorio-tour";
 
 const STORAGE_KEY = "odin:observatorio:shell:v1";
 
@@ -75,6 +77,10 @@ function isMapStyleId(value: string | null): value is MapStyleId {
     value === "voyager" ||
     value === "satellite"
   );
+}
+
+function isDarkMapStyle(styleId: MapStyleId) {
+  return styleId === "dark" || styleId === "satellite";
 }
 
 function parseNumber(value: string | null) {
@@ -167,6 +173,10 @@ export function ObservatorioShell() {
   const previousActiveLayerRef = useRef<ObservatoryLayer>("bairro");
   const skipZoomLayerSyncRef = useRef(false);
 
+  const handleStartTour = () => {
+    startObservatorioTour();
+  };
+
   const [activeIndicatorId, setActiveIndicatorId] = useState<string | null>(
     null,
   );
@@ -178,6 +188,14 @@ export function ObservatorioShell() {
   const [mapVisualControls, setMapVisualControls] = useState<MapVisualControls>(
     DEFAULT_MAP_VISUAL_CONTROLS,
   );
+  const { resolvedTheme } = useTheme();
+
+  // Sincroniza o estilo do mapa com o tema (claro/escuro) automaticamente.
+  useEffect(() => {
+    if (!resolvedTheme) return;
+    const desired: MapStyleId = resolvedTheme === "dark" ? "dark" : "light";
+    setMapVisualControls((current) => (current.styleId === desired ? current : { ...current, styleId: desired }));
+  }, [resolvedTheme]);
   const [comparePrimarySelection, setComparePrimarySelection] = useState<import("@/core/types/shell").ObservatorySelection | null>(null);
   const [compareSecondarySelection, setCompareSecondarySelection] = useState<import("@/core/types/shell").ObservatorySelection | null>(null);
   const [comparePanelOpen, setComparePanelOpen] = useState(false);
@@ -212,6 +230,7 @@ export function ObservatorioShell() {
   const [radiusMode, setRadiusMode] = useState(false);
   const [radiusMeters, setRadiusMeters] = useState(1000);
   const [radiusResult, setRadiusResult] = useState<import("@/shell/components/radius-analysis").RadiusAnalysisResult | null>(null);
+  const darkMapStyle = isDarkMapStyle(mapVisualControls.styleId);
 
   const firstIndicatorFor = (moduleId: string, layer: ObservatoryLayer, preferredIndicatorId?: string) => {
     const activeModule = getModule(moduleId);
@@ -774,7 +793,7 @@ export function ObservatorioShell() {
                   <h1 className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-xl">
                     ODIN
                   </h1>
-                  <span className="hidden rounded-full border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 sm:inline-flex">
+                  <span id="layer-selector" className="hidden rounded-full border border-zinc-300 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 sm:inline-flex">
                     {activeLayer}
                   </span>
                   <span className="hidden text-[11px] text-zinc-500 dark:text-zinc-400 md:inline-flex">
@@ -784,6 +803,17 @@ export function ObservatorioShell() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleStartTour}
+                className="inline-flex items-center gap-1.5 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-medium text-cyan-700 shadow-sm transition hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-cyan-800/50 dark:bg-cyan-950/50 dark:text-cyan-300 dark:hover:bg-cyan-900/50"
+                aria-label="Iniciar tour guiado"
+                title="Tour guiado pelo observatório"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+                </svg>
+                <span className="hidden sm:inline">Tour</span>
+              </button>
               <ShareLinkButton getUrl={buildShareUrl} />
               <Link
                 href="/"
@@ -791,7 +821,9 @@ export function ObservatorioShell() {
               >
                 Voltar
               </Link>
-              <ThemeToggle />
+              <div className="theme-toggle">
+                <ThemeToggle />
+              </div>
             </div>
           </div>
 
@@ -863,6 +895,7 @@ export function ObservatorioShell() {
                 activeIndicatorId={activeIndicatorId}
                 simplifiedView={mapVisualControls.simplifiedView}
                 radiusMode={radiusMode}
+                darkMapStyle={darkMapStyle}
                 onSimplifiedViewChange={(value) =>
                   setMapVisualControls((current) => ({
                     ...current,
@@ -871,17 +904,21 @@ export function ObservatorioShell() {
                 }
                 onSelect={handleIndicatorSelect}
               />
-              <RadiusAnalysisToggle
-                active={radiusMode}
-                onToggle={() => {
-                  setRadiusMode((v) => !v);
-                  if (radiusMode) setRadiusResult(null);
-                }}
-              />
+              <div id="simplified-view-toggle">
+                <RadiusAnalysisToggle
+                  active={radiusMode}
+                  darkMapStyle={darkMapStyle}
+                  onToggle={() => {
+                    setRadiusMode((v) => !v);
+                    if (radiusMode) setRadiusResult(null);
+                  }}
+                />
+              </div>
               {radiusMode && (
                 <RadiusAnalysisPanel
                   result={radiusResult}
                   radiusMeters={radiusMeters}
+                  darkMapStyle={darkMapStyle}
                   onRadiusChange={setRadiusMeters}
                   onClose={() => {
                     setRadiusMode(false);
@@ -900,9 +937,11 @@ export function ObservatorioShell() {
             shellContext={shellContext}
             onNavigate={handleEntityClick}
           />
-          <ComparePanel />
+          <div className="compare-button">
+            <ComparePanel />
+          </div>
         </div>
-      </main>
+      </main >
     </>
   );
 }

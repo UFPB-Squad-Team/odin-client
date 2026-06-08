@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useState } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import Map, {
   Layer,
   NavigationControl,
@@ -9,6 +9,7 @@ import Map, {
   type MapRef,
 } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
+import { useTheme } from "next-themes";
 import { useMapLayers } from "@/core/geospatial/use-map-layers";
 import { getModule } from "@/core/registry/module-registry";
 import { useChoropleth } from "@/core/choropleth/use-choropleth";
@@ -147,6 +148,10 @@ const EMPTY_COLLECTION = {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function isDarkMapStyle(styleId: MapStyleId) {
+  return styleId === "dark" || styleId === "satellite";
 }
 
 function slugify(value: string) {
@@ -457,7 +462,13 @@ export function MapboxObservatorioMap({
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(null);
   const [radiusCenter, setRadiusCenter] = useState<[number, number] | null>(null);
   const mapRef = useRef<MapRef | null>(null);
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [, setMarkersReady] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Register marker images on map load and style changes
   const handleMapLoad = () => {
@@ -552,6 +563,12 @@ export function MapboxObservatorioMap({
   const fillOpacityFactor = clamp(visualControls.fillOpacity / 100, 0.2, 1);
   const effectiveFillOpacity = clamp(Math.min(layerStyle.opacity, 0.2) * fillOpacityFactor, 0.04, 0.32);
   const pointScaleFactor = clamp(visualControls.pointScale / 100, 0.7, 1.6);
+  const mapIsDark = isDarkMapStyle(visualControls.styleId);
+  const appIsDark = mounted ? resolvedTheme === "dark" : false;
+  const contrastStrokeColor = mapIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.82)";
+  const subtleOutlineColor = mapIsDark ? "rgba(255,255,255,0.34)" : "rgba(15,23,42,0.28)";
+  const radiusFillOpacity = mapIsDark ? (appIsDark ? 0.24 : 0.2) : (appIsDark ? 0.28 : 0.24);
+  const radiusLineOpacity = mapIsDark ? 0.95 : 0.88;
 
   const heatmapData = useMemo<PointFeatureCollection>(() => {
     const features = geojsonData.features ?? [];
@@ -799,6 +816,7 @@ export function MapboxObservatorioMap({
               paint={{
                 "fill-color": fillColorExpression,
                 "fill-opacity": hasChoropleth ? 0.82 : effectiveFillOpacity,
+                "fill-outline-color": subtleOutlineColor,
               }}
             />
             <Layer
@@ -820,14 +838,14 @@ export function MapboxObservatorioMap({
             <Layer
               id={ids.line}
               type="line"
-              paint={{ "line-color": layerStyle.hoverColor, "line-width": 1.25, "line-opacity": 0.85 }}
+              paint={{ "line-color": layerStyle.hoverColor, "line-width": 1.35, "line-opacity": 0.9 }}
               filter={["!=", ["geometry-type"], "Point"]}
             />
             <Layer
               id={ids.hoverFill}
               type="fill"
               filter={hoveredId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], hoveredId]] : ["==", ["id"], "__none__"]}
-              paint={{ "fill-color": layerStyle.hoverColor, "fill-opacity": 0.52 }}
+              paint={{ "fill-color": layerStyle.hoverColor, "fill-opacity": 0.56, "fill-outline-color": contrastStrokeColor }}
             />
             <Layer
               id={ids.hoverPoint}
@@ -845,13 +863,13 @@ export function MapboxObservatorioMap({
               id={ids.hoverLine}
               type="line"
               filter={hoveredId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], hoveredId]] : ["==", ["id"], "__none__"]}
-              paint={{ "line-color": layerStyle.selectedColor, "line-width": 2.5 }}
+              paint={{ "line-color": layerStyle.selectedColor, "line-width": 2.75, "line-opacity": 0.95 }}
             />
             <Layer
               id={ids.selectedFill}
               type="fill"
               filter={selectedId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], selectedId]] : ["==", ["id"], "__none__"]}
-              paint={{ "fill-color": layerStyle.selectedColor, "fill-opacity": 0.65 }}
+              paint={{ "fill-color": layerStyle.selectedColor, "fill-opacity": 0.7, "fill-outline-color": contrastStrokeColor }}
             />
             <Layer
               id={ids.selectedPoint}
@@ -869,7 +887,7 @@ export function MapboxObservatorioMap({
               id={ids.selectedLine}
               type="line"
               filter={selectedId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], selectedId]] : ["==", ["id"], "__none__"]}
-              paint={{ "line-color": "#ffffff", "line-width": 3 }}
+              paint={{ "line-color": contrastStrokeColor, "line-width": 3.2, "line-opacity": 1 }}
             />
           </Source>
 
@@ -893,12 +911,12 @@ export function MapboxObservatorioMap({
               <Layer
                 id="radius-circle-fill"
                 type="fill"
-                paint={{ "fill-color": "#06b6d4", "fill-opacity": 0.12 }}
+                paint={{ "fill-color": "#06b6d4", "fill-opacity": radiusFillOpacity, "fill-outline-color": contrastStrokeColor }}
               />
               <Layer
                 id="radius-circle-line"
                 type="line"
-                paint={{ "line-color": "#06b6d4", "line-width": 2, "line-dasharray": [3, 2] }}
+                paint={{ "line-color": contrastStrokeColor, "line-width": 2.25, "line-opacity": radiusLineOpacity, "line-dasharray": [3, 2] }}
               />
             </Source>
           )}

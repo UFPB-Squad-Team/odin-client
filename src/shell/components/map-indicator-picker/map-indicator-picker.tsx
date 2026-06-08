@@ -11,6 +11,7 @@ export function MapIndicatorPicker({
   activeIndicatorId,
   simplifiedView,
   radiusMode = false,
+  darkMapStyle = false,
   onSimplifiedViewChange,
   onSelect,
 }: MapIndicatorPickerProps) {
@@ -44,6 +45,9 @@ export function MapIndicatorPicker({
       .filter((g) => g.indicators.length > 0);
   }, [groups, search]);
 
+  const titleTextClass = darkMapStyle ? "text-muted-foreground" : "text-zinc-950";
+  const titleIconClass = darkMapStyle ? "text-muted-foreground" : "text-zinc-900";
+
   // Collapsed state: show a compact button
   if (!open) {
     if (groups.length === 0) return null;
@@ -53,13 +57,13 @@ export function MapIndicatorPicker({
         onClick={() => setOpen(true)}
         className={`flex items-center gap-2 rounded-xl border border-border/60 bg-background/90 backdrop-blur-md px-2.5 py-2 shadow-lg transition-all hover:shadow-xl hover:border-border ${radiusMode ? "max-w-[188px]" : "max-w-[220px]"}`}
       >
-        <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+        <Layers id="map-indicator-picker" className={`h-3.5 w-3.5 ${titleIconClass}`} />
         {activeIndicatorLabel ? (
-          <span className="max-w-[110px] truncate text-[11px] font-medium text-foreground">
+          <span className={`max-w-[110px] truncate text-[11px] font-medium ${titleTextClass}`}>
             {activeIndicatorLabel}
           </span>
         ) : (
-          <span className="text-[11px] text-muted-foreground">
+          <span className={`text-[11px] ${titleTextClass}`}>
             Colorir mapa
           </span>
         )}
@@ -82,7 +86,7 @@ export function MapIndicatorPicker({
       <div className="flex items-center justify-between border-b border-border/40 px-2 py-1.5">
         <div className="flex items-center gap-2">
           <Layers className="h-3.5 w-3.5 text-cyan-500" />
-          <span className="text-[10.5px] font-semibold uppercase tracking-wide text-zinc-100 dark:text-zinc-100">
+          <span className={`text-[10.5px] font-semibold uppercase tracking-wide ${darkMapStyle ? "text-zinc-100" : "text-zinc-950"}`}>
             Indicadores
           </span>
         </div>
@@ -156,6 +160,7 @@ export function MapIndicatorPicker({
               indicators={group.indicators}
               activeIndicatorId={activeIndicatorId}
               isActiveModule={activeModuleId === group.moduleId}
+              darkMapStyle={darkMapStyle}
               onSelect={onSelect}
               defaultOpen={activeModuleId === group.moduleId}
             />

@@ -80,6 +80,9 @@ export function useObservatorioShell() {
   const [activeModuleId, setActiveModuleId] = useState<string | null>("educacao");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
+  const [showSetorDisclaimer, setShowSetorDisclaimer] = useState(false);
+  const [activeBairroNome, setActiveBairroNome] = useState<string | undefined>();
+
   const pendingPathRef = useRef<{
     municipioId?: string;
     bairroId?: string;
@@ -216,54 +219,54 @@ export function useObservatorioShell() {
 
       const data: Escola[] = geojson?.features?.length
         ? geojson.features.flatMap((feature) => {
-            const props = feature.properties as Record<string, unknown>;
-            const rawId = String(
-              props.escola_id_inep ?? props.id ?? feature.id ?? "",
-            ).replace(/\.0$/, "");
-            const featureMunicipioId = String(
-              props.municipioIdIbge ?? props.municipio_id_ibge ?? "",
-            ).replace(/\.0$/, "");
+          const props = feature.properties as Record<string, unknown>;
+          const rawId = String(
+            props.escola_id_inep ?? props.id ?? feature.id ?? "",
+          ).replace(/\.0$/, "");
+          const featureMunicipioId = String(
+            props.municipioIdIbge ?? props.municipio_id_ibge ?? "",
+          ).replace(/\.0$/, "");
 
-            if (featureMunicipioId !== municipioId) {
-              return [];
-            }
+          if (featureMunicipioId !== municipioId) {
+            return [];
+          }
 
-            const nome = String(
-              props.escola_nome ?? props.nome ?? props.name ?? rawId,
-            );
-            const bairroNome = String(props.bairro ?? props.bairro_nome ?? "").trim();
-            const bairroMatch = MOCK_BAIRROS.find((bairro) => bairro.nome === bairroNome);
+          const nome = String(
+            props.escola_nome ?? props.nome ?? props.name ?? rawId,
+          );
+          const bairroNome = String(props.bairro ?? props.bairro_nome ?? "").trim();
+          const bairroMatch = MOCK_BAIRROS.find((bairro) => bairro.nome === bairroNome);
 
-            return [
-              {
-                id: rawId,
-                inepId: String(
-                  props.escola_id_inep ?? props.school_id_inep ?? rawId,
-                ).replace(/\.0$/, ""),
-                nome,
-                bairroId: bairroMatch?.id ?? slugify(bairroNome || rawId),
-                bairroNome: bairroNome || undefined,
-                municipioId,
-                municipioNome:
-                  String(props.municipio_nome ?? props.municipio ?? "").trim() || undefined,
-                estadoSigla:
-                  String(props.estado_sigla ?? props.uf ?? estadoId ?? "").trim() || undefined,
-                dependenciaAdministrativa:
-                  String(props.dependencia_adm ?? props.dependencia ?? "").trim() || undefined,
-                dependencia_adm:
-                  String(props.dependencia_adm ?? props.dependencia ?? "").trim() || undefined,
-                tipoLocalizacao:
-                  String(props.tipo_localizacao ?? props.zona ?? props.zonaLocalizacao ?? "").trim() || undefined,
-                tipo_localizacao:
-                  String(props.tipo_localizacao ?? props.zona ?? props.zonaLocalizacao ?? "").trim() || undefined,
-                ideb: toNumber(props.ideb),
-                inse: toNumber(props.inse),
-                geoProps: props,
-                indicadores: props.indicadores as Escola["indicadores"],
-                infraestrutura: props.infraestrutura as Escola["infraestrutura"],
-              } satisfies Escola,
-            ];
-          })
+          return [
+            {
+              id: rawId,
+              inepId: String(
+                props.escola_id_inep ?? props.school_id_inep ?? rawId,
+              ).replace(/\.0$/, ""),
+              nome,
+              bairroId: bairroMatch?.id ?? slugify(bairroNome || rawId),
+              bairroNome: bairroNome || undefined,
+              municipioId,
+              municipioNome:
+                String(props.municipio_nome ?? props.municipio ?? "").trim() || undefined,
+              estadoSigla:
+                String(props.estado_sigla ?? props.uf ?? estadoId ?? "").trim() || undefined,
+              dependenciaAdministrativa:
+                String(props.dependencia_adm ?? props.dependencia ?? "").trim() || undefined,
+              dependencia_adm:
+                String(props.dependencia_adm ?? props.dependencia ?? "").trim() || undefined,
+              tipoLocalizacao:
+                String(props.tipo_localizacao ?? props.zona ?? props.zonaLocalizacao ?? "").trim() || undefined,
+              tipo_localizacao:
+                String(props.tipo_localizacao ?? props.zona ?? props.zonaLocalizacao ?? "").trim() || undefined,
+              ideb: toNumber(props.ideb),
+              inse: toNumber(props.inse),
+              geoProps: props,
+              indicadores: props.indicadores as Escola["indicadores"],
+              infraestrutura: props.infraestrutura as Escola["infraestrutura"],
+            } satisfies Escola,
+          ];
+        })
         : fallback;
 
       const sortedData = [...data].sort((a, b) =>
@@ -284,6 +287,18 @@ export function useObservatorioShell() {
       bootstrapRef.current.bairro = true;
     }
   }, [estadoId, municipioId, bairroId, activeLayer]);
+
+  useEffect(() => {
+    if (activeLayer === "bairro" && selected?.kind === "bairro") {
+      const bairroAtual = bairros.find((b) => b.id === selected.id);
+      const naoOficial = bairroAtual?.temBairroOficial === false;
+      setShowSetorDisclaimer(naoOficial);
+      setActiveBairroNome(naoOficial ? bairroAtual?.nome : undefined);
+    } else {
+      setShowSetorDisclaimer(false);
+      setActiveBairroNome(undefined);
+    }
+  }, [activeLayer, selected, bairros]);
 
   const mapEntities: MapEntity[] = useMemo(() => {
     if (activeLayer === "municipio") return municipios.map((data) => ({ kind: "municipio" as const, data }));
@@ -401,5 +416,8 @@ export function useObservatorioShell() {
     setActiveModule,
     sidebarCollapsed,
     setSidebarCollapsed,
+    showSetorDisclaimer,
+    activeBairroNome,
+    setMunicipio: filters.setMunicipio,
   };
 }

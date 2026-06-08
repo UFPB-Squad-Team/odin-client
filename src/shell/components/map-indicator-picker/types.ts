@@ -13,6 +13,7 @@ export type MapIndicatorPickerProps = {
   activeIndicatorId: string | null;
   simplifiedView: boolean;
   radiusMode?: boolean;
+  darkMapStyle?: boolean;
   onSimplifiedViewChange: (value: boolean) => void;
   onSelect: (moduleId: string, indicatorId: string | null) => void;
 };

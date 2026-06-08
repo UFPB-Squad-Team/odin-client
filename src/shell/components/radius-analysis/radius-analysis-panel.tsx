@@ -7,6 +7,7 @@ import { RADIUS_OPTIONS } from "./types";
 type RadiusAnalysisPanelProps = {
   result: RadiusAnalysisResult | null;
   radiusMeters: number;
+  darkMapStyle?: boolean;
   onRadiusChange: (radius: number) => void;
   onClose: () => void;
 };
@@ -28,21 +29,26 @@ function formatNum(value: number | null): string {
 export function RadiusAnalysisPanel({
   result,
   radiusMeters,
+  darkMapStyle = false,
   onRadiusChange,
   onClose,
 }: RadiusAnalysisPanelProps) {
+  const titleClass = darkMapStyle ? "text-cyan-400" : "text-zinc-950";
+  const bodyClass = darkMapStyle ? "text-zinc-100/90" : "text-zinc-700";
+  const mutedClass = darkMapStyle ? "text-zinc-300/85" : "text-muted-foreground";
+
   if (!result) {
     return (
       <div className="rounded-xl border border-cyan-500/30 bg-background/95 backdrop-blur-md p-4 shadow-xl w-[260px]">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-cyan-600 dark:text-cyan-400">
+          <span className={`text-[11px] font-semibold uppercase tracking-wide ${titleClass}`}>
             Análise por raio
           </span>
           <button type="button" onClick={onClose} className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted">
             <X className="h-3 w-3 text-muted-foreground" />
           </button>
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className={`text-[11px] ${bodyClass}`}>
           Clique em qualquer ponto do mapa para analisar a área ao redor.
         </p>
         <div className="mt-3 flex gap-1.5">
@@ -53,8 +59,12 @@ export function RadiusAnalysisPanel({
               onClick={() => onRadiusChange(opt.value)}
               className={`flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition ${
                 radiusMeters === opt.value
-                  ? "bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/40"
-                  : "bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent"
+                  ? darkMapStyle
+                    ? "bg-cyan-500/20 text-cyan-200 border border-cyan-500/40"
+                    : "bg-cyan-500/20 text-cyan-700 border border-cyan-500/40"
+                  : darkMapStyle
+                    ? "bg-muted/30 text-zinc-200 hover:bg-muted/50 border border-transparent"
+                    : "bg-muted/40 text-muted-foreground hover:bg-muted/60 border border-transparent"
               }`}
             >
               {opt.label}
@@ -69,10 +79,10 @@ export function RadiusAnalysisPanel({
     <div className="rounded-xl border border-cyan-500/30 bg-background/95 backdrop-blur-md shadow-xl w-[280px] overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40">
         <div>
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-cyan-600 dark:text-cyan-400">
+          <span className={`text-[11px] font-semibold uppercase tracking-wide ${titleClass}`}>
             Análise por raio
           </span>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
+          <p className={`text-[10px] mt-0.5 ${mutedClass}`}>
             {result.featuresIncluded} áreas · raio de {radiusMeters >= 1000 ? `${radiusMeters / 1000}km` : `${radiusMeters}m`}
           </p>
         </div>
@@ -90,8 +100,12 @@ export function RadiusAnalysisPanel({
             onClick={() => onRadiusChange(opt.value)}
             className={`flex-1 rounded-md px-2 py-1 text-[10px] font-medium transition ${
               radiusMeters === opt.value
-                ? "bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/40"
-                : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
+                ? darkMapStyle
+                  ? "bg-cyan-500/20 text-cyan-200 border border-cyan-500/40"
+                  : "bg-cyan-500/20 text-cyan-700 border border-cyan-500/40"
+                : darkMapStyle
+                  ? "bg-muted/30 text-zinc-200 hover:bg-muted/50 border border-transparent"
+                  : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
             }`}
           >
             {opt.label}
@@ -104,7 +118,7 @@ export function RadiusAnalysisPanel({
         {/* Educação */}
         {Object.keys(result.educacao).length > 0 && (
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-400 mb-1.5">
+            <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${titleClass}`}>
               Educação
             </p>
             <div className="flex flex-col gap-1">
@@ -133,7 +147,7 @@ export function RadiusAnalysisPanel({
         {/* Socioeconômico */}
         {Object.keys(result.socioeconomico).length > 0 && (
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 mb-1.5">
+            <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${darkMapStyle ? "text-violet-300" : "text-violet-600"}`}>
               Socioeconômico
             </p>
             <div className="flex flex-col gap-1">
@@ -157,7 +171,7 @@ export function RadiusAnalysisPanel({
         )}
 
         {result.featuresIncluded === 0 && (
-          <p className="text-[11px] text-muted-foreground text-center py-2">
+          <p className={`text-[11px] text-center py-2 ${mutedClass}`}>
             Nenhuma área encontrada neste raio. Tente aumentar o raio.
           </p>
         )}
@@ -169,8 +183,8 @@ export function RadiusAnalysisPanel({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between text-[11px]">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-semibold tabular-nums text-foreground">{value}</span>
+      <span className="text-muted-foreground dark:text-zinc-300">{label}</span>
+      <span className="font-semibold tabular-nums text-foreground dark:text-zinc-100">{value}</span>
     </div>
   );
 }

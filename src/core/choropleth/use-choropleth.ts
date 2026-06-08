@@ -6,6 +6,7 @@ import type { GeoJSONFeatureCollection } from "@/core/types/geospatial";
 import type { ObservatoryLayer } from "@/core/types/territory";
 import { computeChoroplethStats, normalizeValue } from "./normalize";
 import type { ChoroplethColors } from "./types";
+import type { ThresholdCor } from "@/core/types/comparision";
 
 type GeoJSONFeature = GeoJSONFeatureCollection["features"][number];
 
@@ -42,18 +43,32 @@ interface UseChoroplethResult {
   featureColors: ChoroplethColors;
   /** Estatísticas do indicador ativo (min, max, count). */
   stats: { min: number; max: number; count: number } | null;
+  /** Thresholds usados na visão simplificada (para renderizar a régua). */
+  activeThresholds: ThresholdCor[] | null;
 }
 
 /**
- * Calcula as cores do choropleth para o indicador ativo do módulo ativo.
- *
- * Fluxo:
- * 1. Obtém o módulo ativo via registry
- * 2. Usa `indicatorValueExtractor` do módulo para extrair o valor de cada feature
- * 3. Normaliza min/max no conjunto
- * 4. Chama `getMapLayerStyle(indicatorId, normalizedValue)` para obter a cor
- * 5. Retorna Map<featureId, cor>
+ * Determina a cor com base em thresholds fixos (visão simplificada).
  */
+function resolveThresholdColor(
+  value: number,
+  thresholds: ThresholdCor[],
+  higherIsBetter: boolean,
+  forceHigherIsBetter: boolean,
+): string | null {
+  const effectiveValue = (!higherIsBetter && forceHigherIsBetter)
+    ? 100 - value 
+    : value;
+
+  for (const threshold of thresholds) {
+    if (effectiveValue >= threshold.min && effectiveValue < threshold.max) {
+      return threshold.cor;
+    }
+  }
+
+  return thresholds[thresholds.length - 1]?.cor ?? "#6b7280";
+}
+
 export function useChoropleth({
   collection,
   activeModuleId,
@@ -65,6 +80,7 @@ export function useChoropleth({
     const empty: UseChoroplethResult = {
       featureColors: new Map(),
       stats: null,
+      activeThresholds: null,
     };
 
     if (!collection || !activeModuleId || !activeIndicatorId) return empty;
@@ -77,7 +93,8 @@ export function useChoropleth({
       ? activeModule.getIndicators?.(activeLayer)?.find((item) => item.id === activeIndicatorId)
       : undefined;
     const higherIsBetter = indicator?.higherIsBetter ?? true;
-    const comparisonMode = indicator?.comparisonMode ?? "directional";
+    const forceHigherIsBetter = indicator?.forceHigherIsBetter ?? false;
+    const thresholdsSimplificado = indicator?.thresholdsSimplificado ?? null;
 
     const extractor = activeModule.indicatorValueExtractor(activeIndicatorId);
     if (!extractor) return empty;
@@ -86,11 +103,6 @@ export function useChoropleth({
     if (!stats) return empty;
 
     const featureColors: ChoroplethColors = new Map();
-    const simplifiedPalette = {
-      critical: "#ea580c",
-      attention: "#facc15",
-      good: "#0f766e",
-    };
 
     for (const feature of collection.features) {
       const featureId = resolveFeatureId(feature);
@@ -100,19 +112,45 @@ export function useChoropleth({
       if (raw === null || !isFinite(raw)) continue;
 
       const normalized = normalizeValue(raw, stats.min, stats.max);
+
+      if (simplifiedView && thresholdsSimplificado) {
+        
+        const percentual = normalized * 100;
+        
+        const color = resolveThresholdColor(
+          percentual,
+          thresholdsSimplificado,
+          higherIsBetter,
+          forceHigherIsBetter,
+        );
+        
+        if (color) {
+          featureColors.set(featureId, color);
+        }
+        continue;
+      }
+
       if (simplifiedView) {
+        const simplifiedPalette = {
+          critical: "#ea580c",
+          attention: "#facc15",
+          good: "#0f766e",
+        };
+
         const performanceValue =
-          comparisonMode === "relative"
+          indicator?.comparisonMode === "relative"
             ? normalized
             : higherIsBetter
               ? normalized
               : 1 - normalized;
+
         const color =
           performanceValue >= 0.67
             ? simplifiedPalette.good
             : performanceValue >= 0.34
               ? simplifiedPalette.attention
               : simplifiedPalette.critical;
+
         featureColors.set(featureId, color);
         continue;
       }
@@ -121,6 +159,14 @@ export function useChoropleth({
       featureColors.set(featureId, style.color);
     }
 
-    return { featureColors, stats };
+    return {
+      featureColors,
+      stats,
+      activeThresholds: simplifiedView ? (thresholdsSimplificado ?? [
+        { min: 0, max: 34, cor: "#ea580c", rotulo: "Crítico" },
+        { min: 34, max: 67, cor: "#facc15", rotulo: "Atenção" },
+        { min: 67, max: 101, cor: "#0f766e", rotulo: "Bom" },
+      ]) : null,
+    };
   }, [collection, activeLayer, activeModuleId, activeIndicatorId, simplifiedView]);
 }

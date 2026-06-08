@@ -12,6 +12,7 @@ type IndicatorGroupSectionProps = {
   indicators: ModuleIndicator[];
   activeIndicatorId: string | null;
   isActiveModule: boolean;
+  darkMapStyle?: boolean;
   onSelect: (moduleId: string, indicatorId: string | null) => void;
   defaultOpen?: boolean;
 };
@@ -23,6 +24,7 @@ export function IndicatorGroupSection({
   indicators,
   activeIndicatorId,
   isActiveModule,
+  darkMapStyle = false,
   onSelect,
 }: IndicatorGroupSectionProps) {
   // Só abre por padrão se este módulo tem o indicador ativo
@@ -45,7 +47,7 @@ export function IndicatorGroupSection({
           style={{ backgroundColor: colorAccent }}
         />
         <span
-          className="flex-1 text-[11px] font-semibold uppercase tracking-wide"
+          className={`flex-1 text-[11px] font-semibold uppercase tracking-wide ${darkMapStyle ? "text-zinc-100" : "text-zinc-950"}`}
           style={{ color: colorAccent }}
         >
           {moduleLabel}
@@ -77,7 +79,9 @@ export function IndicatorGroupSection({
                 className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11.5px] transition-all ${
                   isActive
                     ? "text-white font-medium shadow-sm"
-                    : "text-foreground/90 hover:bg-muted/45"
+                    : darkMapStyle
+                      ? "text-zinc-100/90 hover:bg-muted/45"
+                      : "text-zinc-950 hover:bg-muted/45"
                 }`}
                 style={
                   isActive
