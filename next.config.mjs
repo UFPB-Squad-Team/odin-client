@@ -11,14 +11,14 @@ const nextConfig = {
 
   // Configuração para desenvolvimento local
 
-  // A variável NEXT_PUBLIC_API_URL será usada no frontend
+  // A variável NEXT_PUBLIC_API_BASE_URL será usada no frontend
 
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   },
 
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
     
     return [
       {
