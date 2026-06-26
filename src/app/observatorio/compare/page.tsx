@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -337,11 +337,10 @@ function MunicipioSelector({
             <button
               type="button"
               onClick={onClear}
-              className={`mt-0.5 rounded border px-2 py-0.5 text-[10px] transition ${
-                isDark
+              className={`mt-0.5 rounded border px-2 py-0.5 text-[10px] transition ${isDark
                   ? "border-zinc-700 text-zinc-500 hover:text-zinc-300"
                   : "border-zinc-300 text-zinc-600 hover:text-zinc-900"
-              }`}
+                }`}
             >
               Trocar
             </button>
@@ -357,9 +356,8 @@ function MunicipioSelector({
           />
           {filtered.length > 0 && (
             <ul
-              className={`select-enter absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-xl border py-1 shadow-xl ${
-                isDark ? "border-zinc-700 bg-zinc-900" : "border-zinc-200 bg-white"
-              }`}
+              className={`select-enter absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-xl border py-1 shadow-xl ${isDark ? "border-zinc-700 bg-zinc-900" : "border-zinc-200 bg-white"
+                }`}
             >
               {filtered.map((m) => (
                 <li key={m.id}>
@@ -388,10 +386,10 @@ function MunicipioSelector({
 }
 
 // ============================================================
-// PÁGINA PRINCIPAL: ComparePage
+// COMPONENTE PRINCIPAL: ComparePageContent
 // ============================================================
 
-export default function ComparePage() {
+function ComparePageContent() {
   const ctx = useShellContext();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -950,25 +948,22 @@ export default function ComparePage() {
                     <span className={isDark ? "text-zinc-500" : "text-zinc-600"}>Comparando:</span>
                     <span className="text-cyan-400 font-medium">{selectedA.nome}</span>
                     {segModuleForRender && (
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        isDark ? "bg-cyan-500/10 text-cyan-400" : "bg-cyan-50 text-cyan-700"
-                      }`}>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${isDark ? "bg-cyan-500/10 text-cyan-400" : "bg-cyan-50 text-cyan-700"
+                        }`}>
                         {segModuleForRender.segments[segmentA]?.label || segmentA}
                       </span>
                     )}
                     <span className={isDark ? "text-zinc-600" : "text-zinc-400"}>vs</span>
                     <span className="text-purple-400 font-medium">{selectedB.nome}</span>
                     {segModuleForRender && (
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        isDark ? "bg-purple-500/10 text-purple-400" : "bg-purple-50 text-purple-700"
-                      }`}>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${isDark ? "bg-purple-500/10 text-purple-400" : "bg-purple-50 text-purple-700"
+                        }`}>
                         {segModuleForRender.segments[segmentB]?.label || segmentB}
                       </span>
                     )}
                     {segmentA !== segmentB && (
-                      <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${
-                        isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-700"
-                      }`}>
+                      <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-700"
+                        }`}>
                         Segmentos diferentes
                       </span>
                     )}
@@ -976,9 +971,8 @@ export default function ComparePage() {
                 </div>
 
                 {winner && winner !== "tie" && (
-                  <div className={`rounded-xl border px-4 py-3 ${
-                    winner === "a" ? "border-cyan-500/30 bg-cyan-950/20" : "border-purple-500/30 bg-purple-950/20"
-                  }`}>
+                  <div className={`rounded-xl border px-4 py-3 ${winner === "a" ? "border-cyan-500/30 bg-cyan-950/20" : "border-purple-500/30 bg-purple-950/20"
+                    }`}>
                     <p className="text-xs text-zinc-400">
                       <span className={`font-semibold ${winner === "a" ? "text-cyan-400" : "text-purple-400"}`}>
                         {winner === "a" ? selectedA.nome : selectedB.nome}
@@ -1149,5 +1143,27 @@ export default function ComparePage() {
         )}
       </div>
     </main>
+  );
+}
+
+// ============================================================
+// COMPONENTE PRINCIPAL (com Suspense)
+// ============================================================
+
+export default function ComparePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <svg className="h-8 w-8 animate-spin text-cyan-500" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          <span className="text-sm text-zinc-500">Carregando...</span>
+        </div>
+      </div>
+    }>
+      <ComparePageContent />
+    </Suspense>
   );
 }
