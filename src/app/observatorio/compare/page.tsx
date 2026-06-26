@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -574,8 +574,11 @@ function CompareBar({
   );
 }
 
+// ============================================================
+// COMPONENTE PRINCIPAL (com conteúdo)
+// ============================================================
 
-export default function ComparePage() {
+function ComparePageContent() {
   const ctx = useShellContext();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -600,37 +603,37 @@ export default function ComparePage() {
 
   const theme = isDark
     ? {
-        page: "bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.14),_transparent_35%),linear-gradient(180deg,_#09090b,_#0f172a)] text-zinc-100",
-        surface: "border-zinc-800 bg-zinc-900/50",
-        surfaceStrong: "border-zinc-800 bg-zinc-950/70",
-        surfaceSoft: "border-zinc-800 bg-zinc-900/40",
-        border: "border-zinc-800",
-        borderSoft: "border-zinc-700",
-        text: "text-zinc-100",
-        textSoft: "text-zinc-300",
-        muted: "text-zinc-400",
-        mutedStrong: "text-zinc-500",
-        input: "border-zinc-700 bg-zinc-950 text-zinc-100 placeholder-zinc-600",
-        button: "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800",
-        buttonSoft: "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
-        empty: "border-zinc-800 text-zinc-600",
-      }
+      page: "bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.14),_transparent_35%),linear-gradient(180deg,_#09090b,_#0f172a)] text-zinc-100",
+      surface: "border-zinc-800 bg-zinc-900/50",
+      surfaceStrong: "border-zinc-800 bg-zinc-950/70",
+      surfaceSoft: "border-zinc-800 bg-zinc-900/40",
+      border: "border-zinc-800",
+      borderSoft: "border-zinc-700",
+      text: "text-zinc-100",
+      textSoft: "text-zinc-300",
+      muted: "text-zinc-400",
+      mutedStrong: "text-zinc-500",
+      input: "border-zinc-700 bg-zinc-950 text-zinc-100 placeholder-zinc-600",
+      button: "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800",
+      buttonSoft: "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200",
+      empty: "border-zinc-800 text-zinc-600",
+    }
     : {
-        page: "bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.10),_transparent_35%),linear-gradient(180deg,_#fafafa,_#eef4f9)] text-zinc-900",
-        surface: "border-zinc-200 bg-white/90 shadow-sm shadow-cyan-500/5",
-        surfaceStrong: "border-zinc-200 bg-white/95 shadow-sm shadow-cyan-500/5",
-        surfaceSoft: "border-zinc-200 bg-zinc-50/80",
-        border: "border-zinc-200",
-        borderSoft: "border-zinc-300",
-        text: "text-zinc-900",
-        textSoft: "text-zinc-700",
-        muted: "text-zinc-500",
-        mutedStrong: "text-zinc-600",
-        input: "border-zinc-300 bg-white text-zinc-900 placeholder-zinc-400",
-        button: "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50",
-        buttonSoft: "border-zinc-300 text-zinc-600 hover:border-zinc-500 hover:text-zinc-900",
-        empty: "border-zinc-300 text-zinc-500",
-      };
+      page: "bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.10),_transparent_35%),linear-gradient(180deg,_#fafafa,_#eef4f9)] text-zinc-900",
+      surface: "border-zinc-200 bg-white/90 shadow-sm shadow-cyan-500/5",
+      surfaceStrong: "border-zinc-200 bg-white/95 shadow-sm shadow-cyan-500/5",
+      surfaceSoft: "border-zinc-200 bg-zinc-50/80",
+      border: "border-zinc-200",
+      borderSoft: "border-zinc-300",
+      text: "text-zinc-900",
+      textSoft: "text-zinc-700",
+      muted: "text-zinc-500",
+      mutedStrong: "text-zinc-600",
+      input: "border-zinc-300 bg-white text-zinc-900 placeholder-zinc-400",
+      button: "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50",
+      buttonSoft: "border-zinc-300 text-zinc-600 hover:border-zinc-500 hover:text-zinc-900",
+      empty: "border-zinc-300 text-zinc-500",
+    };
 
   const activeModuleId = ctx.activeModuleId ?? null;
 
@@ -741,17 +744,17 @@ export default function ComparePage() {
     if (!selectedA) return null;
     const data = (compareKind === "bairro"
       ? ({
-          id: selectedA.id,
-          nome: selectedA.nome,
-          municipioId: selectedA.municipioId ?? "",
-          geoProps: selectedA.geoProps,
-        } satisfies Bairro)
+        id: selectedA.id,
+        nome: selectedA.nome,
+        municipioId: selectedA.municipioId ?? "",
+        geoProps: selectedA.geoProps,
+      } satisfies Bairro)
       : ({
-          id: selectedA.id,
-          nome: selectedA.nome,
-          estadoId: selectedA.estadoId ?? "",
-          geoProps: selectedA.geoProps,
-        } satisfies Municipio));
+        id: selectedA.id,
+        nome: selectedA.nome,
+        estadoId: selectedA.estadoId ?? "",
+        geoProps: selectedA.geoProps,
+      } satisfies Municipio));
     const entity: MapEntity = { kind: compareKind, data } as MapEntity;
     const mod = activeModuleId ? getModule(activeModuleId) : undefined;
     if (mod?.buildSelection) {
@@ -769,17 +772,17 @@ export default function ComparePage() {
     if (!selectedB) return null;
     const data = (compareKind === "bairro"
       ? ({
-          id: selectedB.id,
-          nome: selectedB.nome,
-          municipioId: selectedB.municipioId ?? "",
-          geoProps: selectedB.geoProps,
-        } satisfies Bairro)
+        id: selectedB.id,
+        nome: selectedB.nome,
+        municipioId: selectedB.municipioId ?? "",
+        geoProps: selectedB.geoProps,
+      } satisfies Bairro)
       : ({
-          id: selectedB.id,
-          nome: selectedB.nome,
-          estadoId: selectedB.estadoId ?? "",
-          geoProps: selectedB.geoProps,
-        } satisfies Municipio));
+        id: selectedB.id,
+        nome: selectedB.nome,
+        estadoId: selectedB.estadoId ?? "",
+        geoProps: selectedB.geoProps,
+      } satisfies Municipio));
     const entity: MapEntity = { kind: compareKind, data } as MapEntity;
     const mod = activeModuleId ? getModule(activeModuleId) : undefined;
     if (mod?.buildSelection) {
@@ -944,22 +947,20 @@ export default function ComparePage() {
               <button
                 type="button"
                 onClick={() => setCompareKind("municipio")}
-                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${
-                  compareKind === "municipio"
+                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "municipio"
                     ? "bg-cyan-600 text-white"
                     : `${theme.mutedStrong} hover:text-cyan-600`
-                }`}
+                  }`}
               >
                 Município
               </button>
               <button
                 type="button"
                 onClick={() => setCompareKind("bairro")}
-                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${
-                  compareKind === "bairro"
+                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "bairro"
                     ? "bg-purple-600 text-white"
                     : `${theme.mutedStrong} hover:text-purple-600`
-                }`}
+                  }`}
               >
                 Vizinhança
               </button>
@@ -1066,11 +1067,10 @@ export default function ComparePage() {
 
                 {winner && winner !== "tie" && (
                   <div
-                    className={`rounded-xl border px-4 py-3 ${
-                      winner === "a"
+                    className={`rounded-xl border px-4 py-3 ${winner === "a"
                         ? "border-cyan-500/30 bg-cyan-950/20"
                         : "border-purple-500/30 bg-purple-950/20"
-                    }`}
+                      }`}
                   >
                     <p className="text-xs text-zinc-400">
                       <span
@@ -1148,14 +1148,10 @@ export default function ComparePage() {
                                   ) : (
                                     <div className="flex flex-col items-end gap-1">
                                       <span
-                                        className={`text-sm font-semibold tabular-nums ${
-                                          aWins ? "text-cyan-400" : aVal === "—" ? theme.mutedStrong : theme.textSoft
-                                        }`}
+                                        className={`text-sm font-semibold tabular-nums ${aWins ? "text-cyan-400" : aVal === "—" ? theme.mutedStrong : theme.textSoft
+                                          }`}
                                       >
                                         {aVal}
-                                        {aWins && (
-                                          <span className="ml-1 text-[10px] text-cyan-500"></span>
-                                        )}
                                       </span>
                                       {isCompetitive && m.a > 0 && m.b > 0 && (
                                         <CompareBar a={m.a} b={m.b} higherIsBetter={m.higherIsBetter} isDark={isDark} />
@@ -1170,14 +1166,10 @@ export default function ComparePage() {
                                   ) : (
                                     <div className="flex flex-col items-end gap-1">
                                       <span
-                                        className={`text-sm font-semibold tabular-nums ${
-                                          bWins ? "text-purple-400" : bVal === "—" ? theme.mutedStrong : theme.textSoft
-                                        }`}
+                                        className={`text-sm font-semibold tabular-nums ${bWins ? "text-purple-400" : bVal === "—" ? theme.mutedStrong : theme.textSoft
+                                          }`}
                                       >
                                         {bVal}
-                                        {bWins && (
-                                          <span className="ml-1 text-[10px] text-purple-500"></span>
-                                        )}
                                       </span>
                                     </div>
                                   )}
@@ -1273,6 +1265,10 @@ export default function ComparePage() {
     </main>
   );
 }
+
+// ============================================================
+// COMPONENTE PRINCIPAL (com Suspense)
+// ============================================================
 
 function ScoreCard({
   groups,
@@ -1379,11 +1375,10 @@ function MunicipioSelector({
             <button
               type="button"
               onClick={onClear}
-              className={`mt-0.5 rounded border px-2 py-0.5 text-[10px] transition ${
-                isDark
+              className={`mt-0.5 rounded border px-2 py-0.5 text-[10px] transition ${isDark
                   ? "border-zinc-700 text-zinc-500 hover:text-zinc-300"
                   : "border-zinc-300 text-zinc-600 hover:text-zinc-900"
-              }`}
+                }`}
             >
               Trocar
             </button>
@@ -1400,9 +1395,8 @@ function MunicipioSelector({
           />
           {filtered.length > 0 && (
             <ul
-              className={`select-enter absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-xl border py-1 shadow-xl ${
-                isDark ? "border-zinc-700 bg-zinc-900" : "border-zinc-200 bg-white"
-              }`}
+              className={`select-enter absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-xl border py-1 shadow-xl ${isDark ? "border-zinc-700 bg-zinc-900" : "border-zinc-200 bg-white"
+                }`}
             >
               {filtered.map((m) => (
                 <li key={m.id}>
@@ -1421,5 +1415,27 @@ function MunicipioSelector({
         </div>
       )}
     </div>
+  );
+}
+
+// ============================================================
+// EXPORT PRINCIPAL COM SUSPENSE
+// ============================================================
+
+export default function ComparePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="flex flex-col items-center gap-3">
+          <svg className="h-8 w-8 animate-spin text-cyan-500" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          <span className="text-sm text-zinc-400">Carregando comparador...</span>
+        </div>
+      </div>
+    }>
+      <ComparePageContent />
+    </Suspense>
   );
 }
