@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "vercel-build": "npm run build",
+    "postinstall": "echo 'Dependências instaladas com sucesso!'"
   },
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.2.8",
