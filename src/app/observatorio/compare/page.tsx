@@ -20,7 +20,7 @@ import {
   getSegmentationForEntity,
   getAllSegmentationModules,
 } from "@/core/segmentation";
-import "@/core/segmentation/modules/educacao"; // Garante registro do módulo de educação
+import "@/core/segmentation/modules/educacao";
 import type { MapEntity, ObservatorySelection } from "@/core/types/shell";
 import type { Bairro, Municipio } from "@/core/types/territory";
 import type { SegmentId } from "@/core/segmentation/types";
@@ -31,26 +31,26 @@ import { SegmentationModuleSelector } from "@/components/ui/segmentation-module-
 // ============================================================
 
 function fmt(v: unknown, decimals = 1): string {
-  if (v === null || v === undefined || v === "") return "—";
+  if (v === null || v === undefined || v === "") return "\u2014";
   const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
-  if (n === 0) return "—";
+  if (n === 0) return "\u2014";
   return Number.isInteger(n) ? String(n) : n.toFixed(decimals);
 }
 
 function fmtPct(v: unknown): string {
   const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
-  if (n === 0) return "—";
+  if (n === 0) return "\u2014";
   return `${n.toFixed(1)}%`;
 }
 
 function fmtInt(v: unknown): string {
   const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
-  if (n === 0) return "—";
+  if (n === 0) return "\u2014";
   return new Intl.NumberFormat("pt-BR").format(Math.round(n));
 }
 
 function formatMetricValue(v: number, format: "int" | "pct" | "decimal"): string {
-  if (v === 0) return "—";
+  if (v === 0) return "\u2014";
   if (format === "int") return fmtInt(v);
   if (format === "pct") return fmtPct(v);
   return fmt(v);
@@ -80,17 +80,12 @@ function RadarChart({
   const count = allMetrics.length;
   const angle = (i: number) => (Math.PI * 2 * i) / count - Math.PI / 2;
 
-  const maxPerMetric = allMetrics.map((m) => {
-    const valA = m.a * (m.pesoA ?? 1);
-    const valB = m.b * (m.pesoB ?? 1);
-    return Math.max(valA, valB, 0.0001);
-  });
+  const maxPerMetric = allMetrics.map((m) => Math.max(m.a, m.b, 0.0001));
 
-  function pointsFor(values: number[], pesos: number[]) {
+  function pointsFor(values: number[]) {
     return values
       .map((v, i) => {
-        const weighted = v * (pesos[i] ?? 1);
-        const pct = weighted / (maxPerMetric[i] ?? 1);
+        const pct = v / (maxPerMetric[i] ?? 1);
         const r = Math.sqrt(Math.max(0, pct)) * radius;
         const x = center + Math.cos(angle(i)) * r;
         const y = center + Math.sin(angle(i)) * r;
@@ -101,8 +96,6 @@ function RadarChart({
 
   const valuesA = allMetrics.map((m) => m.a);
   const valuesB = allMetrics.map((m) => m.b);
-  const pesosA = allMetrics.map((m) => m.pesoA ?? 1);
-  const pesosB = allMetrics.map((m) => m.pesoB ?? 1);
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -135,14 +128,14 @@ function RadarChart({
           />
         ))}
         <polygon
-          points={pointsFor(valuesA, pesosA)}
+          points={pointsFor(valuesA)}
           fill={isDark ? "rgba(6,182,212,0.15)" : "rgba(6,182,212,0.10)"}
           stroke="#06b6d4"
           strokeWidth={2}
           strokeLinejoin="round"
         />
         <polygon
-          points={pointsFor(valuesB, pesosB)}
+          points={pointsFor(valuesB)}
           fill={isDark ? "rgba(168,85,247,0.15)" : "rgba(168,85,247,0.10)"}
           stroke="#a855f7"
           strokeWidth={2}
@@ -158,7 +151,7 @@ function RadarChart({
                 ? "start"
                 : "end";
           const shortLabel =
-            m.label.length > 14 ? m.label.slice(0, 13) + "…" : m.label;
+            m.label.length > 14 ? m.label.slice(0, 13) + "\u2026" : m.label;
           return (
             <text
               key={m.key}
@@ -201,37 +194,30 @@ function CompareBar({
   b,
   higherIsBetter,
   isDark,
-  pesoA = 1,
-  pesoB = 1,
 }: {
   a: number;
   b: number;
   higherIsBetter: boolean;
   isDark: boolean;
-  pesoA?: number;
-  pesoB?: number;
 }) {
-  const weightedA = a * pesoA;
-  const weightedB = b * pesoB;
-
-  if (weightedA === 0 && weightedB === 0) return null;
-  const total = weightedA + weightedB;
+  if (a === 0 && b === 0) return null;
+  const total = a + b;
   if (total === 0) return null;
 
-  const pctA = (weightedA / total) * 100;
-  const pctB = (weightedB / total) * 100;
-  const aWins = higherIsBetter ? weightedA >= weightedB : weightedA <= weightedB;
-  const bWins = higherIsBetter ? weightedB > weightedA : weightedB < weightedA;
+  const pctA = (a / total) * 100;
+  const pctB = (b / total) * 100;
+  const aWins = higherIsBetter ? a >= b : a <= b;
+  const bWins = higherIsBetter ? b > a : b < a;
 
   return (
     <div className="flex h-1.5 w-full overflow-hidden rounded-full">
       <div
         style={{ width: `${pctA}%` }}
-        className={`transition-all ${aWins && weightedA !== weightedB ? "bg-cyan-400" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
+        className={`transition-all ${aWins && a !== b ? "bg-cyan-400" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
       />
       <div
         style={{ width: `${pctB}%` }}
-        className={`transition-all ${bWins && weightedA !== weightedB ? "bg-purple-500" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
+        className={`transition-all ${bWins && a !== b ? "bg-purple-500" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
       />
     </div>
   );
@@ -259,16 +245,14 @@ function ScoreCard({
   groups.forEach((g) =>
     g.metrics.forEach((m) => {
       if (m.competitive === false) return;
-      const valA = m.a * (m.pesoA ?? 1);
-      const valB = m.b * (m.pesoB ?? 1);
-      if (valA === 0 && valB === 0) return;
+      if (m.a === 0 && m.b === 0) return;
       if (m.higherIsBetter) {
-        if (valA > valB) scoreA++;
-        else if (valB > valA) scoreB++;
+        if (m.a > m.b) scoreA++;
+        else if (m.b > m.a) scoreB++;
         else ties++;
       } else {
-        if (valA < valB) scoreA++;
-        else if (valB < valA) scoreB++;
+        if (m.a < m.b) scoreA++;
+        else if (m.b < m.a) scoreB++;
         else ties++;
       }
     })
@@ -368,7 +352,7 @@ function MunicipioSelector({
           <input
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder={`Buscar ${label.toLowerCase().replace(/ a$/, "").replace(/ b$/, "")}…`}
+            placeholder={`Buscar ${label.toLowerCase().replace(/ a$/, "").replace(/ b$/, "")}\u2026`}
             className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none ring-0 transition focus:border-zinc-600 focus:ring-1 ${input} ${ring}`}
           />
           {filtered.length > 0 && (
@@ -429,8 +413,8 @@ export default function ComparePage() {
   const firstModuleId = allSegModules[0]?.id ?? "educacao";
   const [activeSegModuleId, setActiveSegModuleId] = useState<string>(firstModuleId);
   const segModule = useMemo(() => getSegmentationModule(activeSegModuleId), [activeSegModuleId]);
-  const [segmentA, setSegmentA] = useState<SegmentId>("fundamental");
-  const [segmentB, setSegmentB] = useState<SegmentId>("fundamental");
+  const [segmentA, setSegmentA] = useState<SegmentId>("todas");
+  const [segmentB, setSegmentB] = useState<SegmentId>("todas");
 
   const bairroCacheRef = useRef<Record<string, Bairro[]>>({});
   const isDark = mounted ? resolvedTheme !== "light" : true;
@@ -570,8 +554,7 @@ export default function ComparePage() {
     [compareItems, secondaryId],
   );
 
-  // Segmentação via registry — extrai segmentos disponíveis dos geoProps reais
-  // O registry já faz fallback para todos os segmentos quando não detecta dados específicos
+  // Segmentação via registry
   const segResultA = useMemo(() => {
     if (!selectedA || !segModule) return null;
     const geoProps = selectedA.geoProps ?? {};
@@ -627,7 +610,7 @@ export default function ComparePage() {
     if (mod?.buildSelection) {
       try { return mod.buildSelection(entity); } catch { /* fallback */ }
     }
-    return { id: selectedA.id, nome: selectedA.nome, kind: compareKind, subtitle: compareKind === "bairro" ? "Vizinhança" : "Município" };
+    return { id: selectedA.id, nome: selectedA.nome, kind: compareKind, subtitle: compareKind === "bairro" ? "Vizinhan\u00e7a" : "Munic\u00edpio" };
   }, [selectedA, activeModuleId, compareKind]);
 
   const selectionB = useMemo<ObservatorySelection | null>(() => {
@@ -640,10 +623,10 @@ export default function ComparePage() {
     if (mod?.buildSelection) {
       try { return mod.buildSelection(entity); } catch { }
     }
-    return { id: selectedB.id, nome: selectedB.nome, kind: compareKind, subtitle: compareKind === "bairro" ? "Vizinhança" : "Município" };
+    return { id: selectedB.id, nome: selectedB.nome, kind: compareKind, subtitle: compareKind === "bairro" ? "Vizinhan\u00e7a" : "Munic\u00edpio" };
   }, [selectedB, activeModuleId, compareKind]);
 
-  // Extrai métricas usando o utilitário centralizado
+  // Extrai métricas
   const groups = useMemo(
     () => extractComparableMetrics(selectedA, selectedB, compareKind, segmentA, segmentB),
     [selectedA, selectedB, compareKind, segmentA, segmentB],
@@ -651,11 +634,9 @@ export default function ComparePage() {
 
   // Separa grupos em: módulo ativo (educação) vs socioeconômico
   const moduleGroupLabels = useMemo(() => {
-    // Para o módulo "educacao", os grupos são "Rede escolar" e "Infraestrutura escolar"
     if (activeSegModuleId === "educacao") {
       return ["Rede escolar", "Infraestrutura escolar"];
     }
-    // Para futuros módulos, definir aqui os labels dos grupos que pertencem a eles
     return [];
   }, [activeSegModuleId]);
 
@@ -751,8 +732,8 @@ export default function ComparePage() {
     setSecondaryId("");
     setSearchA("");
     setSearchB("");
-    setSegmentA("fundamental");
-    setSegmentB("fundamental");
+    setSegmentA("todas");
+    setSegmentB("todas");
     didPreselect.current = false;
     router.replace("/observatorio/compare", { scroll: false });
   }, [router]);
@@ -764,15 +745,13 @@ export default function ComparePage() {
     groups.forEach((g) =>
       g.metrics.forEach((m) => {
         if (m.competitive === false) return;
-        const valA = m.a * (m.pesoA ?? 1);
-        const valB = m.b * (m.pesoB ?? 1);
-        if (valA === 0 && valB === 0) return;
+        if (m.a === 0 && m.b === 0) return;
         if (m.higherIsBetter) {
-          if (valA > valB) scoreA++;
-          else if (valB > valA) scoreB++;
+          if (m.a > m.b) scoreA++;
+          else if (m.b > m.a) scoreB++;
         } else {
-          if (valA < valB) scoreA++;
-          else if (valB < valA) scoreB++;
+          if (m.a < m.b) scoreA++;
+          else if (m.b < m.a) scoreB++;
         }
       }),
     );
@@ -805,13 +784,13 @@ export default function ComparePage() {
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-500">
-              ODIN · Observatório
+              ODIN &middot; Observat&oacute;rio
             </p>
             <h1 className={`mt-1 text-2xl font-bold ${theme.text}`} style={{ letterSpacing: "-0.02em" }}>
-              Comparar territórios
+              Comparar territ&oacute;rios
             </h1>
             <p className={`mt-1 text-sm ${theme.muted}`}>
-              Análise lado a lado de indicadores por município ou vizinhança com segmentação inteligente
+              An&aacute;lise lado a lado de indicadores por munic&iacute;pio ou vizinhan&ccedil;a com segmenta&ccedil;&atilde;o inteligente
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -822,21 +801,21 @@ export default function ComparePage() {
                 onClick={() => setCompareKind("municipio")}
                 className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "municipio" ? "bg-cyan-600 text-white" : `${theme.mutedStrong} hover:text-cyan-600`}`}
               >
-                Município
+                Munic&iacute;pio
               </button>
               <button
                 type="button"
                 onClick={() => setCompareKind("bairro")}
                 className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "bairro" ? "bg-purple-600 text-white" : `${theme.mutedStrong} hover:text-purple-600`}`}
               >
-                Vizinhança
+                Vizinhan&ccedil;a
               </button>
             </div>
             <button type="button" onClick={clear} className={`rounded-md border px-3 py-1.5 text-xs transition ${theme.buttonSoft}`}>
               Limpar
             </button>
             <Link href="/observatorio" className={`rounded-md border px-3 py-1.5 text-xs transition ${theme.button}`}>
-              ← Voltar ao mapa
+              &larr; Voltar ao mapa
             </Link>
           </div>
         </div>
@@ -847,7 +826,7 @@ export default function ComparePage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
-            <span className={`text-sm ${theme.muted}`}>Carregando dados de comparação…</span>
+            <span className={`text-sm ${theme.muted}`}>Carregando dados de compara&ccedil;&atilde;o&hellip;</span>
           </div>
         ) : (
           <>
@@ -867,7 +846,7 @@ export default function ComparePage() {
             {compareKind === "bairro" && (
               <div className={`mb-4 grid gap-2 rounded-xl border px-4 py-3 sm:grid-cols-[1fr_240px] sm:items-center ${theme.surfaceSoft}`}>
                 <p className={`text-sm ${theme.muted}`}>
-                  Escolha o município para listar e comparar suas vizinhanças.
+                  Escolha o munic&iacute;pio para listar e comparar suas vizinhan&ccedil;as.
                 </p>
                 <select
                   value={bairroMunicipioId}
@@ -889,7 +868,7 @@ export default function ComparePage() {
 
             {compareKind === "bairro" && compareItems.length === 0 && !isLoadingBairroItems && (
               <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${theme.empty}`}>
-                Nenhum bairro disponível para o município selecionado.
+                Nenhum bairro dispon&iacute;vel para o munic&iacute;pio selecionado.
               </div>
             )}
 
@@ -897,7 +876,7 @@ export default function ComparePage() {
             <div className="mb-8 grid grid-cols-[1fr_56px_1fr] items-start gap-0">
               <div className="space-y-3">
                 <MunicipioSelector
-                  label={compareKind === "bairro" ? "Bairro A" : "Município A"}
+                  label={compareKind === "bairro" ? "Bairro A" : "Municipio A"}
                   color="cyan"
                   selected={selectedA}
                   search={searchA}
@@ -937,7 +916,7 @@ export default function ComparePage() {
 
               <div className="space-y-3">
                 <MunicipioSelector
-                  label={compareKind === "bairro" ? "Bairro B" : "Município B"}
+                  label={compareKind === "bairro" ? "Bairro B" : "Municipio B"}
                   color="purple"
                   selected={selectedB}
                   search={searchB}
@@ -971,19 +950,19 @@ export default function ComparePage() {
                     <span className={isDark ? "text-zinc-500" : "text-zinc-600"}>Comparando:</span>
                     <span className="text-cyan-400 font-medium">{selectedA.nome}</span>
                     {segModuleForRender && (
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
                         isDark ? "bg-cyan-500/10 text-cyan-400" : "bg-cyan-50 text-cyan-700"
                       }`}>
-                        {segModuleForRender.segments[segmentA]?.icon} {segModuleForRender.segments[segmentA]?.label || segmentA}
+                        {segModuleForRender.segments[segmentA]?.label || segmentA}
                       </span>
                     )}
                     <span className={isDark ? "text-zinc-600" : "text-zinc-400"}>vs</span>
                     <span className="text-purple-400 font-medium">{selectedB.nome}</span>
                     {segModuleForRender && (
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
                         isDark ? "bg-purple-500/10 text-purple-400" : "bg-purple-50 text-purple-700"
                       }`}>
-                        {segModuleForRender.segments[segmentB]?.icon} {segModuleForRender.segments[segmentB]?.label || segmentB}
+                        {segModuleForRender.segments[segmentB]?.label || segmentB}
                       </span>
                     )}
                     {segmentA !== segmentB && (
@@ -1004,7 +983,7 @@ export default function ComparePage() {
                       <span className={`font-semibold ${winner === "a" ? "text-cyan-400" : "text-purple-400"}`}>
                         {winner === "a" ? selectedA.nome : selectedB.nome}
                       </span>{" "}
-                      se destaca na maioria dos indicadores disponíveis.
+                      se destaca na maioria dos indicadores dispon&iacute;veis.
                     </p>
                   </div>
                 )}
@@ -1012,7 +991,7 @@ export default function ComparePage() {
                 {!hasAnyData && (
                   <div className={`rounded-xl border px-4 py-6 text-center ${theme.surfaceSoft}`}>
                     <p className={`text-sm ${theme.muted}`}>
-                      Dados agregados ainda não disponíveis para este recorte. Os indicadores são preenchidos conforme o Censo Escolar.
+                      Dados agregados ainda n&atilde;o dispon&iacute;veis para este recorte. Os indicadores s&atilde;o preenchidos conforme o Censo Escolar.
                     </p>
                   </div>
                 )}
@@ -1038,12 +1017,9 @@ export default function ComparePage() {
                             const aVal = formatMetricValue(m.a, m.format);
                             const bVal = formatMetricValue(m.b, m.format);
                             const isCompetitive = m.competitive !== false;
-                            const valA = m.a * (m.pesoA ?? 1);
-                            const valB = m.b * (m.pesoB ?? 1);
-                            const aWins = isCompetitive && valA > 0 && valB > 0 && (m.higherIsBetter ? valA > valB : valA < valB);
-                            const bWins = isCompetitive && valA > 0 && valB > 0 && (m.higherIsBetter ? valB > valA : valB < valA);
+                            const aWins = isCompetitive && m.a > 0 && m.b > 0 && (m.higherIsBetter ? m.a > m.b : m.a < m.b);
+                            const bWins = isCompetitive && m.a > 0 && m.b > 0 && (m.higherIsBetter ? m.b > m.a : m.b < m.a);
                             const noData = m.a === 0 && m.b === 0;
-                            const hasPeso = (m.pesoA ?? 1) !== 1 || (m.pesoB ?? 1) !== 1;
 
                             return (
                               <div key={m.key} className={`metric-row grid grid-cols-[1fr_1fr_1fr] items-center gap-4 border-t px-4 py-3 transition-colors ${theme.border}`}>
@@ -1054,23 +1030,18 @@ export default function ComparePage() {
                                       menor melhor
                                     </span>
                                   )}
-                                  {hasPeso && (
-                                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-500">
-                                      peso {m.pesoA?.toFixed(1)}/{m.pesoB?.toFixed(1)}
-                                    </span>
-                                  )}
                                 </div>
 
                                 <div className="text-right">
                                   {noData ? (
-                                    <span className={theme.mutedStrong}>—</span>
+                                    <span className={theme.mutedStrong}>{`\u2014`}</span>
                                   ) : (
                                     <div className="flex flex-col items-end gap-1">
-                                      <span className={`text-sm font-semibold tabular-nums ${aWins ? "text-cyan-400" : aVal === "—" ? theme.mutedStrong : theme.textSoft}`}>
+                                      <span className={`text-sm font-semibold tabular-nums ${aWins ? "text-cyan-400" : aVal === "\u2014" ? theme.mutedStrong : theme.textSoft}`}>
                                         {aVal}
                                       </span>
                                       {isCompetitive && m.a > 0 && m.b > 0 && (
-                                        <CompareBar a={m.a} b={m.b} higherIsBetter={m.higherIsBetter} isDark={isDark} pesoA={m.pesoA} pesoB={m.pesoB} />
+                                        <CompareBar a={m.a} b={m.b} higherIsBetter={m.higherIsBetter} isDark={isDark} />
                                       )}
                                     </div>
                                   )}
@@ -1078,10 +1049,10 @@ export default function ComparePage() {
 
                                 <div className="text-right">
                                   {noData ? (
-                                    <span className={theme.mutedStrong}>—</span>
+                                    <span className={theme.mutedStrong}>{`\u2014`}</span>
                                   ) : (
                                     <div className="flex flex-col items-end gap-1">
-                                      <span className={`text-sm font-semibold tabular-nums ${bWins ? "text-purple-400" : bVal === "—" ? theme.mutedStrong : theme.textSoft}`}>
+                                      <span className={`text-sm font-semibold tabular-nums ${bWins ? "text-purple-400" : bVal === "\u2014" ? theme.mutedStrong : theme.textSoft}`}>
                                         {bVal}
                                       </span>
                                     </div>
@@ -1101,7 +1072,7 @@ export default function ComparePage() {
                     {moduleGroups.length > 0 && (
                       <div className={`rounded-xl border p-4 ${theme.surface}`}>
                         <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
-                          {segModuleForRender?.icon ?? "📊"} {segModuleForRender?.label ?? "Módulo"}
+                          {segModuleForRender?.label ?? "Módulo"}
                         </p>
                         {hasModuleData ? (
                           <RadarChart groups={moduleGroups} nameA={selectedA.nome} nameB={selectedB.nome} isDark={isDark} />
@@ -1116,7 +1087,7 @@ export default function ComparePage() {
                     {/* Radar socioeconômico */}
                     <div className={`rounded-xl border p-4 ${theme.surface}`}>
                       <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
-                        📈 Socioeconômico
+                        Socioecon&ocirc;mico
                       </p>
                       {hasSocioData ? (
                         <RadarChart groups={socioGroups} nameA={selectedA.nome} nameB={selectedB.nome} isDark={isDark} />
@@ -1141,7 +1112,7 @@ export default function ComparePage() {
                     <div className="space-y-2">
                       {selectedA && (
                         <div className={`rounded-xl border p-3 ${theme.surface} ${winner === "a" ? "winner-glow-a" : ""}`}>
-                          <p className={`text-[10px] ${theme.muted}`}>{compareKind === "bairro" ? "Bairro A" : "Município A"}</p>
+                          <p className={`text-[10px] ${theme.muted}`}>{compareKind === "bairro" ? "Bairro A" : "Municipio A"}</p>
                           <p className={`mt-0.5 text-sm font-medium ${theme.text}`}>{selectedA.nome}</p>
                           {selectionA?.metrics?.map((m) => (
                             <div key={m.label} className="mt-1 flex justify-between text-xs">
@@ -1153,7 +1124,7 @@ export default function ComparePage() {
                       )}
                       {selectedB && (
                         <div className={`rounded-xl border p-3 ${theme.surface} ${winner === "b" ? "winner-glow-b" : ""}`}>
-                          <p className={`text-[10px] ${theme.muted}`}>{compareKind === "bairro" ? "Bairro B" : "Município B"}</p>
+                          <p className={`text-[10px] ${theme.muted}`}>{compareKind === "bairro" ? "Bairro B" : "Municipio B"}</p>
                           <p className={`mt-0.5 text-sm font-medium ${theme.text}`}>{selectedB.nome}</p>
                           {selectionB?.metrics?.map((m) => (
                             <div key={m.label} className="mt-1 flex justify-between text-xs">
@@ -1170,7 +1141,7 @@ export default function ComparePage() {
             ) : (
               <div className={`rounded-xl border border-dashed py-16 text-center ${theme.empty}`}>
                 <p className={`text-sm ${theme.mutedStrong}`}>
-                  Selecione dois {compareKind === "bairro" ? "bairros" : "municípios"} para iniciar a comparação
+                  Selecione dois {compareKind === "bairro" ? "bairros" : "munic\u00edpios"} para iniciar a compara\u00e7\u00e3o
                 </p>
               </div>
             )}

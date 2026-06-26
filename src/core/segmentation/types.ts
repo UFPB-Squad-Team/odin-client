@@ -19,10 +19,6 @@ export interface SegmentConfig {
   id: SegmentId;
   label: string;
   description: string;
-  /** Emoji/ícone representativo */
-  icon: string;
-  /** Pesos contextuais para indicadores neste segmento */
-  weightAdjustments: Record<string, number>;
   /** Quais chaves de métrica este segmento usa */
   availableMetrics: string[];
 }
@@ -37,8 +33,6 @@ export interface SegmentationModule {
   label: string;
   /** Descrição */
   description: string;
-  /** Emoji/ícone */
-  icon: string;
   /** Todos os segmentos disponíveis neste módulo */
   segments: Record<SegmentId, SegmentConfig>;
   /** Segmento padrão quando nenhum é selecionado */

@@ -19,7 +19,7 @@ type SegmentationSelectorProps = {
 };
 
 /**
- * Seletor de segmentação universal e estiloso.
+ * Seletor de segmentação universal.
  * Funciona para qualquer módulo (educação, saúde, etc.)
  * Suporta visualização pill horizontal ou dropdown.
  */
@@ -46,10 +46,9 @@ export function SegmentationSelector({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [isOpen]);
 
-  // Se não há segmentos ou só 1, mostra label estático com ícone
+  // Se não há segmentos ou só 1, mostra label estático
   if (availableSegments.length <= 1) {
     const seg = module.segments[selectedSegment];
-    const icon = seg?.icon || module.icon;
     const label = seg?.label || module.label;
 
     return (
@@ -62,7 +61,6 @@ export function SegmentationSelector({
             ? "bg-zinc-800/70 text-zinc-300"
             : "bg-zinc-100 text-zinc-700"
         }`}>
-          <span className="text-sm">{icon}</span>
           <span>{label}</span>
         </div>
       </div>
@@ -99,7 +97,6 @@ export function SegmentationSelector({
                     : "bg-zinc-100/80 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-800"
                 }`}
               >
-                <span className="text-sm leading-none">{seg.icon}</span>
                 <span>{seg.label}</span>
               </button>
             );
@@ -123,7 +120,6 @@ export function SegmentationSelector({
             : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
         }`}
       >
-        <span className="text-sm">{selectedConfig?.icon || module.icon}</span>
         <span className="font-medium">{selectedConfig?.label || module.label}</span>
         <svg
           className={`h-3 w-3 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
@@ -157,7 +153,7 @@ export function SegmentationSelector({
           {/* Header */}
           <div className={`px-3 py-2 border-b ${isDark ? "border-zinc-800" : "border-zinc-100"}`}>
             <p className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
-              {module.icon} {module.label}
+              {module.label}
             </p>
           </div>
 
@@ -186,12 +182,11 @@ export function SegmentationSelector({
                       : "text-zinc-700 hover:bg-zinc-50"
                   }`}
                 >
-                  <span className="text-base mt-0.5">{seg.icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className={`text-xs font-medium ${isActive ? (isDark ? "text-cyan-300" : "text-cyan-700") : ""}`}>
                       {seg.label}
                       {isActive && (
-                        <span className="ml-1.5 text-[9px] opacity-60">• ativo</span>
+                        <span className="ml-1.5 text-[9px] opacity-60">&bull; ativo</span>
                       )}
                     </div>
                     <div className={`text-[10px] mt-0.5 leading-tight ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>

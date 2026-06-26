@@ -37,7 +37,7 @@ function extractAvailableSegments(geoProps: Record<string, unknown>): string[] {
 
   // 3. Fallback: se não detectou dados específicos, oferece TODOS os segmentos
   // Isso garante que o seletor de nível de ensino sempre apareça na comparação
-  return ["infantil", "fundamental", "medio", "superior", "todas"];
+  return ["infantil", "fundamental", "medio", "todas"];
 }
 
 /**
@@ -47,87 +47,43 @@ export const EDUCACAO_SEGMENTATION: SegmentationModule = {
   id: "educacao",
   label: "Educação",
   description: "Segmentação por nível de ensino",
-  icon: "📚",
-  defaultSegment: "fundamental",
+  defaultSegment: "todas",
   segments: {
     infantil: {
       id: "infantil",
       label: "Educação Infantil",
       description: "Creches e pré-escolas",
-      icon: "🧒",
       availableMetrics: [
         "totalEscolas", "totalAlunos", "pctComInternet",
         "pctComBiblioteca", "pctComLabInformatica", "pctSemAcessibilidade"
       ],
-      weightAdjustments: {
-        pctComInternet: 0.6,
-        pctComBiblioteca: 0.8,
-        pctComLabInformatica: 0.3,
-        totalEscolas: 1.2,
-        totalAlunos: 1.2,
-      },
     },
     fundamental: {
       id: "fundamental",
       label: "Ensino Fundamental",
       description: "Anos iniciais e finais",
-      icon: "📖",
       availableMetrics: [
         "totalEscolas", "totalAlunos", "pctComInternet",
         "pctComBiblioteca", "pctComLabInformatica", "pctSemAcessibilidade"
       ],
-      weightAdjustments: {
-        pctComInternet: 1.0,
-        pctComBiblioteca: 1.2,
-        pctComLabInformatica: 1.0,
-        totalEscolas: 1.0,
-        totalAlunos: 1.0,
-      },
     },
     medio: {
       id: "medio",
       label: "Ensino Médio",
       description: "Ensino médio regular e técnico",
-      icon: "🎓",
       availableMetrics: [
         "totalEscolas", "totalAlunos", "pctComInternet",
         "pctComBiblioteca", "pctComLabInformatica", "pctSemAcessibilidade"
       ],
-      weightAdjustments: {
-        pctComInternet: 1.5,
-        pctComBiblioteca: 1.3,
-        pctComLabInformatica: 1.5,
-        totalEscolas: 0.8,
-        totalAlunos: 0.8,
-      },
-    },
-    superior: {
-      id: "superior",
-      label: "Ensino Superior",
-      description: "Universidades e faculdades",
-      icon: "🏛️",
-      availableMetrics: [
-        "totalEscolas", "totalAlunos", "pctComInternet",
-        "pctComBiblioteca", "pctComLabInformatica"
-      ],
-      weightAdjustments: {
-        pctComInternet: 2.0,
-        pctComBiblioteca: 1.5,
-        pctComLabInformatica: 2.0,
-        totalEscolas: 0.5,
-        totalAlunos: 0.5,
-      },
     },
     todas: {
       id: "todas",
       label: "Todas as etapas",
       description: "Visão geral de todos os níveis",
-      icon: "📚",
       availableMetrics: [
         "totalEscolas", "totalAlunos", "pctComInternet",
         "pctComBiblioteca", "pctComLabInformatica", "pctSemAcessibilidade"
       ],
-      weightAdjustments: {},
     },
   },
   extractAvailableSegments,

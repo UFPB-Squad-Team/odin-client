@@ -4,7 +4,7 @@
  * e sejam descobertos pelo sistema de comparação.
  */
 
-import type { SegmentationModule, SegmentId, SegmentationResult } from "./types";
+import type { SegmentationModule, SegmentationResult } from "./types";
 
 const _modules = new Map<string, SegmentationModule>();
 
@@ -53,36 +53,3 @@ export function getSegmentationForEntity(
   };
 }
 
-/**
- * Obtém o peso de uma métrica em um segmento específico de um módulo.
- */
-export function getSegmentWeight(
-  moduleId: string,
-  segmentId: SegmentId,
-  metricKey: string
-): number {
-  const mod = _modules.get(moduleId);
-  if (!mod) return 1.0;
-
-  const seg = mod.segments[segmentId];
-  if (!seg) return 1.0;
-
-  return seg.weightAdjustments[metricKey] ?? 1.0;
-}
-
-/**
- * Verifica se uma métrica está disponível para um segmento específico.
- */
-export function isMetricAvailableForSegment(
-  moduleId: string,
-  segmentId: SegmentId,
-  metricKey: string
-): boolean {
-  const mod = _modules.get(moduleId);
-  if (!mod) return true;
-
-  const seg = mod.segments[segmentId];
-  if (!seg) return true;
-
-  return seg.availableMetrics.includes(metricKey);
-}

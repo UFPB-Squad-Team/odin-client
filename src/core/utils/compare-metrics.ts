@@ -1,6 +1,5 @@
 // src/core/utils/compare-metrics.ts
 import type { EnsinoLevel } from "@/core/types/comparision";
-import { EDUCATION_LEVELS } from "@/core/types/education";
 
 // Tipos exportados para uso externo
 export type CompareEntityKind = "municipio" | "bairro";
@@ -21,8 +20,6 @@ export interface MetricItem {
   format: "int" | "pct" | "decimal";
   higherIsBetter: boolean;
   competitive?: boolean;
-  pesoA?: number;
-  pesoB?: number;
 }
 
 export interface MetricGroup {
@@ -40,47 +37,58 @@ function parseNum(v: unknown): number {
 }
 
 /**
- * Obtém os pesos contextuais para um nível de ensino a partir da configuração centralizada.
- * Usa EDUCATION_LEVELS como fonte única da verdade.
- */
-function getPesoParaNivel(level: EnsinoLevel, metricKey: string): number {
-  const config = EDUCATION_LEVELS[level];
-  if (!config) return 1.0;
-  return config.weightAdjustments?.[metricKey] ?? 1.0;
-}
-
-/**
  * Extrai métricas específicas de um nível de ensino a partir dos geoProps.
- * Busca primeiro em educacao.niveis[level], depois em educacao.*, depois em geoProps.*
+ * Busca primeiro em educacao.niveis[level] (dados reais por nível quando disponíveis),
+ * depois usa os dados agregados totais (educacao.* ou geoProps.*).
+ * 
+ * NOTA: Quando não há dados específicos por nível nos geoProps, usamos os dados
+ * totais do município/bairro. A filtragem real por nível de ensino só seria possível
+ * carregando as escolas individuais e aplicando a segmentação por matrícula/indicador.
  */
 function extractLevelMetrics(
   geoProps: Record<string, unknown>,
   level: EnsinoLevel
 ): Record<string, number> {
-  // Para "todas", busca métricas agregadas diretamente
-  if (level === "todas") {
-    const educacao = (geoProps.educacao ?? {}) as Record<string, unknown>;
-    return {
-      totalEscolas: parseNum(educacao.totalEscolas ?? geoProps.total_escolas),
-      totalAlunos: parseNum(educacao.totalMatriculas ?? geoProps.total_alunos),
-      pctComInternet: parseNum(educacao.pctComInternet ?? geoProps.pct_com_internet),
-      pctComBiblioteca: parseNum(educacao.pctComBiblioteca ?? geoProps.pct_com_biblioteca),
-      pctComLabInformatica: parseNum(educacao.pctComLabInformatica ?? geoProps.pct_com_lab_informatica),
-      pctSemAcessibilidade: parseNum(educacao.pctSemAcessibilidade ?? geoProps.pct_sem_acessibilidade)
-    };
+  const educacao = (geoProps.educacao ?? {}) as Record<string, unknown>;
+
+  // Valores agregados totais (fallback principal)
+  const totalEscolas = parseNum(educacao.totalEscolas ?? geoProps.total_escolas);
+  const totalAlunos = parseNum(educacao.totalMatriculas ?? geoProps.total_alunos);
+  const pctComInternet = parseNum(educacao.pctComInternet ?? geoProps.pct_com_internet);
+  const pctComBiblioteca = parseNum(educacao.pctComBiblioteca ?? geoProps.pct_com_biblioteca);
+  const pctComLabInformatica = parseNum(educacao.pctComLabInformatica ?? geoProps.pct_com_lab_informatica);
+  const pctSemAcessibilidade = parseNum(educacao.pctSemAcessibilidade ?? geoProps.pct_sem_acessibilidade);
+
+  // Tenta buscar dados específicos do nível em educacao.niveis[level]
+  if (level !== "todas") {
+    const nivelData = (educacao.niveis ?? {}) as Record<string, unknown>;
+    const nivelMetrics = (nivelData[level] ?? {}) as Record<string, unknown>;
+
+    const hasLevelData = nivelMetrics && Object.keys(nivelMetrics).some(k => {
+      const v = nivelMetrics[k];
+      return typeof v === "number" && v > 0;
+    });
+
+    if (hasLevelData) {
+      return {
+        totalEscolas: parseNum(nivelMetrics.totalEscolas ?? totalEscolas),
+        totalAlunos: parseNum(nivelMetrics.totalMatriculas ?? totalAlunos),
+        pctComInternet: parseNum(nivelMetrics.pctComInternet ?? pctComInternet),
+        pctComBiblioteca: parseNum(nivelMetrics.pctComBiblioteca ?? pctComBiblioteca),
+        pctComLabInformatica: parseNum(nivelMetrics.pctComLabInformatica ?? pctComLabInformatica),
+        pctSemAcessibilidade: parseNum(nivelMetrics.pctSemAcessibilidade ?? pctSemAcessibilidade),
+      };
+    }
   }
 
-  const educacao = (geoProps.educacao ?? {}) as Record<string, unknown>;
-  const nivelData = (educacao.niveis ?? {}) as Record<string, unknown>;
-  const nivelMetrics = (nivelData[level] ?? {}) as Record<string, unknown>;
-
+  // Sem dados específicos do nível, retorna os dados agregados totais
   return {
-    totalEscolas: parseNum(nivelMetrics.totalEscolas ?? educacao.totalEscolas ?? geoProps.total_escolas),
-    totalAlunos: parseNum(nivelMetrics.totalMatriculas ?? educacao.totalMatriculas ?? geoProps.total_alunos),
-    pctComInternet: parseNum(nivelMetrics.pctComInternet ?? educacao.pctComInternet ?? geoProps.pct_com_internet),
-    pctComBiblioteca: parseNum(nivelMetrics.pctComBiblioteca ?? educacao.pctComBiblioteca ?? geoProps.pct_com_biblioteca),
-    pctComLabInformatica: parseNum(nivelMetrics.pctComLabInformatica ?? educacao.pctComLabInformatica ?? geoProps.pct_com_lab_informatica),
-    pctSemAcessibilidade: parseNum(nivelMetrics.pctSemAcessibilidade ?? educacao.pctSemAcessibilidade ?? geoProps.pct_sem_acessibilidade)
+    totalEscolas,
+    totalAlunos,
+    pctComInternet,
+    pctComBiblioteca,
+    pctComLabInformatica,
+    pctSemAcessibilidade,
   };
 }
 
@@ -115,12 +123,9 @@ export function extractComparableMetrics(
   const saRaca = (sa.raca ?? {}) as Record<string, unknown>;
   const sbRaca = (sb.raca ?? {}) as Record<string, unknown>;
 
-  // Extrai métricas específicas do nível de ensino (pesos centralizados)
+  // Extrai métricas específicas do nível de ensino
   const metricsA = extractLevelMetrics(pa, levelA);
   const metricsB = extractLevelMetrics(pb, levelB);
-
-  const pesoA = (key: string) => getPesoParaNivel(levelA, key);
-  const pesoB = (key: string) => getPesoParaNivel(levelB, key);
 
   const groups: MetricGroup[] = [
     {
@@ -133,8 +138,6 @@ export function extractComparableMetrics(
           b: metricsB.totalEscolas,
           format: "int",
           higherIsBetter: true,
-          pesoA: pesoA("totalEscolas"),
-          pesoB: pesoB("totalEscolas")
         },
         {
           key: "totalAlunos",
@@ -143,8 +146,6 @@ export function extractComparableMetrics(
           b: metricsB.totalAlunos,
           format: "int",
           higherIsBetter: true,
-          pesoA: pesoA("totalAlunos"),
-          pesoB: pesoB("totalAlunos")
         }
       ]
     },
@@ -158,8 +159,6 @@ export function extractComparableMetrics(
           b: metricsB.pctComInternet,
           format: "pct",
           higherIsBetter: true,
-          pesoA: pesoA("pctComInternet"),
-          pesoB: pesoB("pctComInternet")
         },
         {
           key: "biblioteca",
@@ -168,8 +167,6 @@ export function extractComparableMetrics(
           b: metricsB.pctComBiblioteca,
           format: "pct",
           higherIsBetter: true,
-          pesoA: pesoA("pctComBiblioteca"),
-          pesoB: pesoB("pctComBiblioteca")
         },
         {
           key: "lab",
@@ -178,8 +175,6 @@ export function extractComparableMetrics(
           b: metricsB.pctComLabInformatica,
           format: "pct",
           higherIsBetter: true,
-          pesoA: pesoA("pctComLabInformatica"),
-          pesoB: pesoB("pctComLabInformatica")
         },
         {
           key: "comAcessibilidade",
@@ -188,8 +183,6 @@ export function extractComparableMetrics(
           b: Math.max(0, 100 - metricsB.pctSemAcessibilidade),
           format: "pct",
           higherIsBetter: true,
-          pesoA: 1.0,
-          pesoB: 1.0
         }
       ]
     },
@@ -204,8 +197,6 @@ export function extractComparableMetrics(
           format: "int",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctCriancas0a9",
@@ -215,8 +206,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctJovens15a29",
@@ -226,8 +215,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctAdultos30a59",
@@ -237,8 +224,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctIdosos60Mais",
@@ -248,8 +233,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctPopMasculina",
@@ -259,8 +242,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctPopFeminina",
@@ -270,8 +251,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctPretaParda",
@@ -281,8 +260,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctBranca",
@@ -292,8 +269,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "pctIndigena",
@@ -303,8 +278,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         }
       ]
     },
@@ -318,8 +291,6 @@ export function extractComparableMetrics(
           b: parseNum(sbSaneamento.pctAguaRedeGeral),
           format: "pct",
           higherIsBetter: true,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "esgotoRedeGeral",
@@ -328,8 +299,6 @@ export function extractComparableMetrics(
           b: parseNum(sbSaneamento.pctEsgotoRedeGeral),
           format: "pct",
           higherIsBetter: true,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "lixoColetado",
@@ -338,8 +307,6 @@ export function extractComparableMetrics(
           b: parseNum(sbSaneamento.pctLixoColetado),
           format: "pct",
           higherIsBetter: true,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "aguaNaoEncanada",
@@ -348,8 +315,6 @@ export function extractComparableMetrics(
           b: parseNum(sbSaneamento.pctAguaNaoEncanada),
           format: "pct",
           higherIsBetter: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "domSemBanheiro",
@@ -358,8 +323,6 @@ export function extractComparableMetrics(
           b: parseNum(sbSaneamento.pctDomSemBanheiro),
           format: "pct",
           higherIsBetter: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "aguaInadequada",
@@ -368,8 +331,6 @@ export function extractComparableMetrics(
           b: parseNum(sbSaneamento.pctAguaInadequada),
           format: "pct",
           higherIsBetter: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "esgotoInadequado",
@@ -378,8 +339,6 @@ export function extractComparableMetrics(
           b: parseNum(sbSaneamento.pctEsgotoInadequado),
           format: "pct",
           higherIsBetter: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "lixoInadequado",
@@ -388,8 +347,6 @@ export function extractComparableMetrics(
           b: parseNum(sbSaneamento.pctLixoInadequado),
           format: "pct",
           higherIsBetter: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         }
       ]
     },
@@ -403,8 +360,6 @@ export function extractComparableMetrics(
           b: Math.max(0, 100 - parseNum(sbEducacaoPop.taxaAnalfabetismo15Mais)),
           format: "pct",
           higherIsBetter: true,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "razaoDependencia",
@@ -413,8 +368,6 @@ export function extractComparableMetrics(
           b: parseNum(sbEstruturaEtaria.razaoDependencia),
           format: "pct",
           higherIsBetter: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "domNaoSuperlotado",
@@ -423,8 +376,6 @@ export function extractComparableMetrics(
           b: Math.max(0, 100 - parseNum(sbHabitacao.pctDomSuperlotado)),
           format: "pct",
           higherIsBetter: true,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "domUnipessoal",
@@ -434,8 +385,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: false,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "domTipoCasa",
@@ -445,8 +394,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "domTipoApto",
@@ -456,8 +403,6 @@ export function extractComparableMetrics(
           format: "pct",
           higherIsBetter: true,
           competitive: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         },
         {
           key: "domDegradado",
@@ -466,8 +411,6 @@ export function extractComparableMetrics(
           b: parseNum(sbHabitacao.pctDomDegradado),
           format: "pct",
           higherIsBetter: false,
-          pesoA: 1.0,
-          pesoB: 1.0
         }
       ]
     }

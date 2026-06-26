@@ -11,7 +11,6 @@ export type EducationLevelConfig = {
     label: string;
     description: string;
     availableMetrics: string[];
-    weightAdjustments: Record<string, number>;
 };
 
 export const EDUCATION_LEVELS: Record<EducationLevel, EducationLevelConfig> = {
@@ -27,13 +26,6 @@ export const EDUCATION_LEVELS: Record<EducationLevel, EducationLevelConfig> = {
             "pctComLabInformatica",
             "pctSemAcessibilidade"
         ],
-        weightAdjustments: {
-            "pctComInternet": 0.6,
-            "pctComBiblioteca": 0.8,
-            "pctComLabInformatica": 0.3,
-            "totalEscolas": 1.2,
-            "totalAlunos": 1.2
-        }
     },
     fundamental: {
         id: "fundamental",
@@ -47,13 +39,6 @@ export const EDUCATION_LEVELS: Record<EducationLevel, EducationLevelConfig> = {
             "pctComLabInformatica",
             "pctSemAcessibilidade"
         ],
-        weightAdjustments: {
-            "pctComInternet": 1.0,
-            "pctComBiblioteca": 1.2,
-            "pctComLabInformatica": 1.0,
-            "totalEscolas": 1.0,
-            "totalAlunos": 1.0
-        }
     },
     medio: {
         id: "medio",
@@ -67,13 +52,6 @@ export const EDUCATION_LEVELS: Record<EducationLevel, EducationLevelConfig> = {
             "pctComLabInformatica",
             "pctSemAcessibilidade"
         ],
-        weightAdjustments: {
-            "pctComInternet": 1.5,
-            "pctComBiblioteca": 1.3,
-            "pctComLabInformatica": 1.5,
-            "totalEscolas": 0.8,
-            "totalAlunos": 0.8
-        }
     },
     superior: {
         id: "superior",
@@ -86,13 +64,6 @@ export const EDUCATION_LEVELS: Record<EducationLevel, EducationLevelConfig> = {
             "pctComBiblioteca",
             "pctComLabInformatica"
         ],
-        weightAdjustments: {
-            "pctComInternet": 2.0,
-            "pctComBiblioteca": 1.5,
-            "pctComLabInformatica": 2.0,
-            "totalEscolas": 0.5,
-            "totalAlunos": 0.5
-        }
     },
     todas: {
         id: "todas",
@@ -106,6 +77,5 @@ export const EDUCATION_LEVELS: Record<EducationLevel, EducationLevelConfig> = {
             "pctComLabInformatica",
             "pctSemAcessibilidade"
         ],
-        weightAdjustments: {}
     }
 };

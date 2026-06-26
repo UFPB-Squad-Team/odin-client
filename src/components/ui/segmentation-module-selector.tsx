@@ -85,7 +85,6 @@ export function SegmentationModuleSelector({
               : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"
           }`}
         >
-          <span className="text-base">{selectedModule.icon}</span>
           <div className="flex-1 text-left">
             <div className="font-medium">{selectedModule.label}</div>
             <div className={`text-[10px] ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
@@ -136,7 +135,6 @@ export function SegmentationModuleSelector({
                           : "text-zinc-700 hover:bg-zinc-50"
                       }`}
                     >
-                      <span className="text-base">{mod.icon}</span>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium">{mod.label}</div>
                         <div className={`text-[10px] truncate ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
