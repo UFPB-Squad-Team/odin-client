@@ -30,7 +30,7 @@ const nextConfig = {
 
   images: {
     domains: [
-      'odin-backend.onrender.com',
+      'odin-backend-xdfx.onrender.com',
       'localhost',
     ],
     remotePatterns: [
