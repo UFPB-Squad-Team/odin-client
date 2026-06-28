@@ -146,6 +146,24 @@
   box-shadow: 0 0 0 3px var(--tour-accent), 0 0 0 10px rgba(34, 211, 238, 0.25) !important;
 }
 
+/* Mimir - animação dos pontinhos pulsando */
+@keyframes mimir-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+.mimir-dot {
+  animation: mimir-bounce 1.4s infinite ease-in-out both;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
