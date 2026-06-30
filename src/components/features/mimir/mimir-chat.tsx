@@ -1,31 +1,669 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { sendMessage } from "@/core/mimir-service";
-import { PageContainer } from "@/components/layout/page-container";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { sendMessage, COLECOES_DISPONIVEIS } from "@/core/mimir-service";
+import type { MimirResponse } from "@/core/mimir-service";
 import Link from "next/link";
+import {
+  Send,
+  Sparkles,
+  Plus,
+  Copy,
+  RefreshCw,
+  User,
+  Check,
+  Filter,
+  ChevronDown,
+} from "lucide-react";
 
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
+/* ─── Design tokens ODIN ─────────────────────────────── */
+const t = {
+  canvas: "#f4f4f5",
+  surface: "#ffffff",
+  textPrimary: "#18181b",
+  textSecondary: "#3f3f46",
+  textMuted: "#a1a1aa",
+  border: "#d4d4d8",
+  brandDark: "#1C3F3A",
+  brandCyan: "#06b6d4",
+  brandCyanLight: "#22d3ee",
 };
 
-export function MimirChat() {
+/* ─── Mimir typing dots ─────────────────────────────── */
+function MimirDots() {
+  return (
+    <div style={{ display: "flex", gap: 4, alignItems: "center", padding: "4px 0" }}>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: t.brandCyan,
+            display: "inline-block",
+            animation: "mimirBounce 1.4s infinite ease-in-out both",
+            animationDelay: `${i * 0.16}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ─── Mimir circular icon ──────────────────────────── */
+function MimirIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" width={size} height={size} aria-hidden="true">
+      <circle cx="24" cy="24" r="20" stroke={t.brandCyan} strokeWidth="2" />
+      <circle cx="24" cy="24" r="10" stroke={t.brandCyan} strokeWidth="1.5" opacity="0.6" />
+      <circle cx="24" cy="24" r="4" fill={t.brandCyan} />
+    </svg>
+  );
+}
+
+/* ─── Types ─────────────────────────────────────────── */
+type Role = "user" | "mimir";
+interface Message {
+  id: number;
+  role: Role;
+  content: string;
+  time: string;
+  colecoes?: string[];
+}
+
+/* ─── Sidebar ───────────────────────────────────────── */
+function Sidebar({ onNewChat }: { onNewChat: () => void }) {
+  return (
+    <div
+      style={{
+        width: 220,
+        background: t.surface,
+        borderRight: `1px solid ${t.border}`,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        flexShrink: 0,
+      }}
+    >
+      {/* Logo + Brand */}
+      <div style={{ padding: "20px 16px 16px", borderBottom: `1px solid ${t.border}` }}>
+        <Link
+          href="/"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 16,
+            textDecoration: "none",
+          }}
+        >
+          <MimirIcon size={32} />
+          <span style={{ fontSize: 18, fontWeight: 800, color: t.textPrimary, letterSpacing: "-0.02em" }}>
+            ODIN
+          </span>
+        </Link>
+
+        <button
+          onClick={onNewChat}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            background: t.brandDark,
+            color: "#fff",
+            border: "none",
+            borderRadius: 10,
+            padding: "10px 14px",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "opacity 150ms ease",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.9"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+        >
+          <Plus size={14} />
+          Nova conversa
+        </button>
+      </div>
+
+      {/* Navigation — apenas Chat no momento */}
+      <div style={{ padding: "12px 10px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 10px",
+            borderRadius: 10,
+            background: t.canvas,
+          }}
+        >
+          <MimirIcon size={18} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: t.textPrimary }}>Chat</span>
+        </div>
+      </div>
+
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
+
+      {/* Link para o observatório */}
+      <div style={{ padding: "12px 16px", borderTop: `1px solid ${t.border}` }}>
+        <Link
+          href="/"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 0",
+            fontSize: 12,
+            color: t.textSecondary,
+            textDecoration: "none",
+            transition: "color 150ms ease",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = t.brandCyan; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = t.textSecondary; }}
+        >
+          ← Explorar dados no observatório
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Message bubble ────────────────────────────────── */
+function MessageBubble({ msg }: { msg: Message }) {
+  const isUser = msg.role === "user";
+  const [hovered, setHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: isUser ? "row-reverse" : "row",
+        gap: 10,
+        alignItems: "flex-start",
+        maxWidth: "100%",
+        padding: "4px 0",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Avatar */}
+      {!isUser && (
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: t.canvas,
+            border: `2px solid ${t.brandCyanLight}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <MimirIcon size={18} />
+        </div>
+      )}
+      {isUser && (
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: t.brandDark,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <User size={15} color="#fff" strokeWidth={1.5} />
+        </div>
+      )}
+
+      <div style={{ maxWidth: "76%", minWidth: 0 }}>
+        {/* Name + time */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6,
+            flexDirection: isUser ? "row-reverse" : "row",
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 600, color: isUser ? t.textSecondary : t.textPrimary }}>
+            {isUser ? "Você" : "Mimir"}
+          </span>
+          {msg.colecoes && msg.colecoes.length > 0 && (
+            <span
+              style={{
+                fontSize: 10,
+                color: t.textMuted,
+                background: t.canvas,
+                padding: "2px 8px",
+                borderRadius: 999,
+              }}
+            >
+              {msg.colecoes.join(", ")}
+            </span>
+          )}
+          <span style={{ fontSize: 11, color: t.textMuted }}>{msg.time}</span>
+        </div>
+
+        {/* Bubble */}
+        <div
+          style={{
+            background: isUser ? t.brandDark : t.surface,
+            color: isUser ? "#fff" : t.textPrimary,
+            borderRadius: isUser ? "16px 4px 16px 16px" : "4px 16px 16px 16px",
+            padding: "14px 18px",
+            fontSize: 14,
+            lineHeight: 1.65,
+            boxShadow: isUser ? "none" : "0 1px 4px rgba(0,0,0,0.06)",
+            border: isUser ? "none" : `1px solid ${t.border}`,
+            wordBreak: "break-word",
+          }}
+        >
+          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{msg.content}</p>
+        </div>
+
+        {/* Action row — Copiar e Regenerar apenas */}
+        {!isUser && hovered && (
+          <div
+            style={{
+              display: "flex",
+              gap: 4,
+              marginTop: 6,
+              opacity: hovered ? 1 : 0,
+              transition: "opacity 150ms ease",
+            }}
+          >
+            <button
+              title="Copiar"
+              onClick={handleCopy}
+              style={{
+                background: "transparent",
+                border: `1px solid ${t.border}`,
+                borderRadius: 8,
+                padding: "4px 10px",
+                cursor: "pointer",
+                color: copied ? "#16a34a" : t.textMuted,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 11,
+                transition: "all 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.color = t.textPrimary;
+                (e.currentTarget as HTMLButtonElement).style.background = t.canvas;
+              }}
+              onMouseLeave={(e) => {
+                if (!copied) {
+                  (e.currentTarget as HTMLButtonElement).style.color = t.textMuted;
+                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                }
+              }}
+            >
+              {copied ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
+              {copied ? "Copiado" : "Copiar"}
+            </button>
+            <button
+              title="Regenerar"
+              style={{
+                background: "transparent",
+                border: `1px solid ${t.border}`,
+                borderRadius: 8,
+                padding: "4px 10px",
+                cursor: "pointer",
+                color: t.textMuted,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 11,
+                transition: "all 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.color = t.textPrimary;
+                (e.currentTarget as HTMLButtonElement).style.background = t.canvas;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.color = t.textMuted;
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              }}
+            >
+              <RefreshCw size={12} strokeWidth={1.5} />
+              Regenerar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Collection filter dropdown ────────────────────── */
+function CollectionFilter({
+  selected,
+  onToggle,
+}: {
+  selected: string[];
+  onToggle: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "7px 14px",
+          borderRadius: 999,
+          border: `1px solid ${selected.length > 0 ? t.brandCyan : t.border}`,
+          background: selected.length > 0 ? "rgba(6,182,212,0.06)" : t.surface,
+          color: selected.length > 0 ? t.brandCyan : t.textSecondary,
+          fontSize: 12,
+          fontWeight: 500,
+          cursor: "pointer",
+          transition: "all 150ms ease",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+      >
+        <Filter size={12} strokeWidth={1.5} />
+        {selected.length === 0 ? "Todas as bases" : `${selected.length} selecionada(s)`}
+        <ChevronDown
+          size={12}
+          strokeWidth={1.5}
+          style={{
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 200ms ease",
+          }}
+        />
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 9 }} onClick={() => setOpen(false)} />
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 6px)",
+              left: 0,
+              zIndex: 10,
+              background: t.surface,
+              border: `1px solid ${t.border}`,
+              borderRadius: 12,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+              padding: "8px",
+              minWidth: 210,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: t.textMuted,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                padding: "4px 8px 8px",
+              }}
+            >
+              Filtrar por base
+            </div>
+            {COLECOES_DISPONIVEIS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onToggle(c.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: selected.includes(c.id) ? "rgba(6,182,212,0.08)" : "transparent",
+                  color: selected.includes(c.id) ? t.brandCyan : t.textSecondary,
+                  fontSize: 13,
+                  fontWeight: selected.includes(c.id) ? 600 : 400,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 100ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!selected.includes(c.id)) {
+                    (e.currentTarget as HTMLButtonElement).style.background = t.canvas;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!selected.includes(c.id)) {
+                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                  }
+                }}
+              >
+                <span>{c.icon}</span>
+                <span style={{ flex: 1 }}>{c.label}</span>
+                {selected.includes(c.id) && <Check size={12} strokeWidth={3} color={t.brandCyan} />}
+              </button>
+            ))}
+            {selected.length > 0 && (
+              <button
+                onClick={() => {
+                  COLECOES_DISPONIVEIS.forEach((c) => {
+                    if (selected.includes(c.id)) onToggle(c.id);
+                  });
+                  setOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  marginTop: 6,
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: `1px solid ${t.border}`,
+                  background: "transparent",
+                  color: t.textMuted,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  textAlign: "center",
+                }}
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ─── Input bar ─────────────────────────────────────── */
+function InputBar({
+  onSend,
+  selectedColecoes,
+  onToggleColecao,
+  externalValue,
+  onExternalValueChange,
+}: {
+  onSend: (text: string) => void;
+  selectedColecoes: string[];
+  onToggleColecao: (id: string) => void;
+  externalValue: string;
+  onExternalValueChange: (val: string) => void;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleSend = () => {
+    if (!externalValue.trim()) return;
+    onSend(externalValue.trim());
+    onExternalValueChange("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+  };
+
+  const suggestions = [
+    "Liste os bairros de João Pessoa",
+    "Escolas com melhor IDEB",
+    "População por município PB",
+    "Taxa de analfabetismo",
+  ];
+
+  return (
+    <div style={{ padding: "16px 24px 20px", background: t.canvas, borderTop: `1px solid ${t.border}` }}>
+      {/* Filters + suggestion chips */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 12,
+          overflowX: "auto",
+          paddingBottom: 2,
+          alignItems: "center",
+        }}
+      >
+        <CollectionFilter selected={selectedColecoes} onToggle={onToggleColecao} />
+        {suggestions.map((s) => (
+          <button
+            key={s}
+            onClick={() => {
+              onExternalValueChange(s);
+              textareaRef.current?.focus();
+            }}
+            style={{
+              background: "rgba(255,255,255,0.7)",
+              border: `1px solid ${t.border}`,
+              borderRadius: 999,
+              padding: "7px 14px",
+              fontSize: 12,
+              fontWeight: 500,
+              color: t.textSecondary,
+              cursor: "pointer",
+              transition: "all 150ms ease",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = t.surface;
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#d1d5db";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.7)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = t.border;
+            }}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Input row */}
+      <div
+        style={{
+          background: t.surface,
+          borderRadius: 16,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+          border: `1px solid ${t.border}`,
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 10,
+          padding: "10px 10px 10px 18px",
+        }}
+      >
+        <textarea
+          ref={textareaRef}
+          value={externalValue}
+          onChange={(e) => {
+            onExternalValueChange(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder="Pergunte sobre os dados do ODIN..."
+          rows={1}
+          style={{
+            flex: 1,
+            resize: "none",
+            border: "none",
+            outline: "none",
+            background: "transparent",
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: t.textPrimary,
+            fontFamily: "Inter, system-ui, sans-serif",
+            maxHeight: 120,
+            overflowY: "auto",
+          }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!externalValue.trim()}
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: "50%",
+            background: externalValue.trim() ? t.brandDark : t.canvas,
+            border: externalValue.trim() ? "none" : `1px solid ${t.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: externalValue.trim() ? "pointer" : "default",
+            transition: "all 200ms ease",
+            flexShrink: 0,
+          }}
+        >
+          <Send size={15} color={externalValue.trim() ? "#fff" : t.textMuted} strokeWidth={2} />
+        </button>
+      </div>
+
+      <div style={{ textAlign: "center", marginTop: 10 }}>
+        <span style={{ fontSize: 11, color: t.textMuted }}>
+          Mimir pode cometer erros. Sempre valide dados críticos nas fontes oficiais.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Chat area ─────────────────────────────────────── */
+function ChatArea() {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: "welcome",
-      role: "assistant",
+      id: 1,
+      role: "mimir",
+      time: "",
       content:
-        "Sou Mimir, o guardião do poço da sabedoria. Posso ajudar com informações sobre os dados do ODIN, análises territoriais, ou qualquer dúvida sobre o projeto. O que desejas saber?",
+        "Olá! Sou a **Mimir**, sua assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
     },
   ]);
-  const [input, setInput] = useState("");
+  const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const nextId = useRef(2);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -33,264 +671,206 @@ export function MimirChat() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages, isLoading, scrollToBottom]);
 
-  // Ajusta altura do textarea automaticamente
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
-      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 200)}px`;
-    }
-  }, [input]);
+  const toggleColecao = (id: string) => {
+    setSelectedColecoes((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
+  const handleSend = async (text: string) => {
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
+    const userMsg: Message = {
+      id: nextId.current++,
       role: "user",
-      content: trimmed,
+      time,
+      content: text,
+      colecoes: selectedColecoes.length > 0 ? selectedColecoes : undefined,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
-    setError(null);
 
     try {
-      const response = await sendMessage(trimmed);
+      const data: MimirResponse = await sendMessage(text, selectedColecoes);
 
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: response,
+      const mimirMsg: Message = {
+        id: nextId.current++,
+        role: "mimir",
+        time,
+        content: data.resposta,
+        colecoes: data.colecoes_consultadas,
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, mimirMsg]);
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Erro ao comunicar com Mimir";
-      setError(errorMsg);
       console.error("Mimir chat error:", err);
+
+      const errorMessage: Message = {
+        id: nextId.current++,
+        role: "mimir",
+        time,
+        content: `❌ **Erro:** ${errorMsg}\n\nTente novamente ou verifique se o servidor está rodando.`,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
+  const handleNewChat = () => {
+    setMessages([
+      {
+        id: 1,
+        role: "mimir",
+        time: "",
+        content:
+          "Olá! Sou a **Mimir**, sua assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
+      },
+    ]);
+    setSelectedColecoes([]);
+    setInputValue("");
+    nextId.current = 2;
   };
 
   return (
-    <div className="flex h-dvh flex-col bg-zinc-50 dark:bg-zinc-950">
-      <header className="flex items-center justify-between border-b border-zinc-200/70 bg-white/80 px-4 py-3 backdrop-blur dark:border-zinc-800/70 dark:bg-zinc-950/80 sm:px-6">
-        <Link
-          href="/"
-          className="flex items-center gap-2.5 transition hover:opacity-80"
-        >
-          <svg
-            viewBox="0 0 48 48"
-            fill="none"
-            className="size-8"
-            aria-hidden="true"
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: t.canvas }}>
+      {/* Header */}
+      <div
+        style={{
+          height: 60,
+          background: t.surface,
+          borderBottom: `1px solid ${t.border}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 24px",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: t.canvas,
+              border: `2px solid ${t.brandCyanLight}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
-            <circle
-              cx="24"
-              cy="24"
-              r="20"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-cyan-400 dark:text-cyan-500"
-            />
-            <circle
-              cx="24"
-              cy="24"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="text-cyan-400/60 dark:text-cyan-500/60"
-            />
-            <circle
-              cx="24"
-              cy="24"
-              r="4"
-              className="fill-cyan-400 dark:fill-cyan-500"
-            />
-          </svg>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <MimirIcon size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: t.textPrimary, display: "flex", alignItems: "center", gap: 6 }}>
               Mimir
-            </span>
-            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              Guardião do Poço da Sabedoria
-            </span>
-          </div>
-        </Link>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/"
-            className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            Voltar
-          </Link>
-          <ThemeToggle />
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
-        <PageContainer className="mx-auto max-w-3xl">
-          <div className="space-y-4">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed sm:max-w-[75%] sm:text-base ${
-                    msg.role === "user"
-                      ? "bg-cyan-500 text-zinc-950"
-                      : "border border-zinc-200 bg-white text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-                  }`}
-                >
-                  {msg.role === "assistant" && (
-                    <div className="mb-1.5 flex items-center gap-1.5">
-                      <svg
-                        viewBox="0 0 48 48"
-                        fill="none"
-                        className="size-4"
-                        aria-hidden="true"
-                      >
-                        <circle
-                          cx="24"
-                          cy="24"
-                          r="20"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          className="text-cyan-400 dark:text-cyan-500"
-                        />
-                        <circle
-                          cx="24"
-                          cy="24"
-                          r="4"
-                          className="fill-cyan-400 dark:fill-cyan-500"
-                        />
-                      </svg>
-                      <span className="text-[11px] font-medium text-cyan-500 dark:text-cyan-400">
-                        Mimir
-                      </span>
-                    </div>
-                  )}
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                </div>
-              </div>
-            ))}
-
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="max-w-[85%] rounded-2xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-700 dark:bg-zinc-900 sm:max-w-[75%]">
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <svg
-                      viewBox="0 0 48 48"
-                      fill="none"
-                      className="size-4"
-                      aria-hidden="true"
-                    >
-                      <circle
-                        cx="24"
-                        cy="24"
-                        r="20"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        className="text-cyan-400 dark:text-cyan-500"
-                      />
-                      <circle
-                        cx="24"
-                        cy="24"
-                        r="4"
-                        className="fill-cyan-400 dark:fill-cyan-500"
-                      />
-                    </svg>
-                    <span className="text-[11px] font-medium text-cyan-500 dark:text-cyan-400">
-                      Mimir
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="mimir-dot size-1.5 animate-bounce rounded-full bg-zinc-400 dark:bg-zinc-500 [animation-delay:0ms]"></span>
-                    <span className="mimir-dot size-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:150ms] dark:bg-zinc-500"></span>
-                    <span className="mimir-dot size-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:300ms] dark:bg-zinc-500"></span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {error && !isLoading && (
-              <div className="flex justify-center">
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
-                  <span className="font-medium">Erro:</span>{" "}
-                  {error}
-                  <button
-                    onClick={() => setError(null)}
-                    className="ml-2 font-medium underline hover:no-underline"
-                  >
-                    Fechar
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-        </PageContainer>
-      </div>
-
-      <div className="border-t border-zinc-200/70 bg-white/80 backdrop-blur dark:border-zinc-800/70 dark:bg-zinc-950/80">
-        <PageContainer className="mx-auto max-w-3xl px-4 py-4 sm:px-6">
-          <form onSubmit={handleSubmit} className="flex items-end gap-3">
-            <div className="relative flex-1">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Digite sua mensagem..."
-                rows={1}
-                disabled={isLoading}
-                className="w-full resize-none rounded-xl border border-zinc-300 bg-white px-4 py-3 pr-12 text-sm placeholder-zinc-400 transition focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:placeholder-zinc-500 dark:focus:border-cyan-500 dark:focus:ring-cyan-500/20"
-              />
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
             </div>
-            <button
-              type="submit"
-              disabled={!input.trim() || isLoading}
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-cyan-500 text-zinc-950 transition hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 disabled:opacity-40 disabled:hover:bg-cyan-500"
-              aria-label="Enviar mensagem"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="size-5"
-              >
-                <path d="M22 2L11 13" />
-                <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-              </svg>
-            </button>
-          </form>
-          <p className="mt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-            As respostas são geradas por IA e podem conter imprecisões. Não há
-            armazenamento de histórico.
-          </p>
-        </PageContainer>
+            <div style={{ fontSize: 11, color: t.textMuted }}>IA de dados do Nordeste</div>
+          </div>
+        </div>
       </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px 24px 16px" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} msg={msg} />
+          ))}
+
+          {isLoading && (
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: t.canvas,
+                  border: `2px solid ${t.brandCyanLight}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <MimirIcon size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: t.textPrimary, marginBottom: 6 }}>Mimir</div>
+                <div
+                  style={{
+                    background: t.surface,
+                    border: `1px solid ${t.border}`,
+                    borderRadius: "4px 16px 16px 16px",
+                    padding: "12px 16px",
+                    display: "inline-block",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                  }}
+                >
+                  <MimirDots />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* Input bar */}
+      <InputBar
+        onSend={handleSend}
+        selectedColecoes={selectedColecoes}
+        onToggleColecao={toggleColecao}
+        externalValue={inputValue}
+        onExternalValueChange={setInputValue}
+      />
     </div>
+  );
+}
+
+/* ─── Root ──────────────────────────────────────────── */
+export function MimirChat() {
+  const [chatKey, setChatKey] = useState(0);
+
+  const handleNewChat = () => {
+    setChatKey((k) => k + 1);
+  };
+
+  return (
+    <>
+      <style>{`
+        @keyframes mimirBounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+          40% { transform: translateY(-5px); opacity: 1; }
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        textarea::placeholder { color: #a1a1aa; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 99px; }
+        strong { font-weight: 600; }
+      `}</style>
+      <div
+        key={chatKey}
+        style={{
+          fontFamily: "Inter, system-ui, sans-serif",
+          display: "flex",
+          height: "100vh",
+          overflow: "hidden",
+          background: t.canvas,
+        }}
+      >
+        <Sidebar onNewChat={handleNewChat} />
+        <ChatArea />
+      </div>
+    </>
   );
 }

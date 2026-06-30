@@ -8,19 +8,36 @@ if (!MIMIR_API_URL) {
 
 export interface MimirRequest {
   mensagem: string;
+  colecoes?: string[];
 }
 
 export interface MimirResponse {
   resposta: string;
+  colecoes_consultadas: string[];
 }
 
-export async function sendMessage(message: string): Promise<string> {
+export const COLECOES_DISPONIVEIS = [
+  { id: "escolas", label: "Escolas", icon: "🏫" },
+  { id: "municipios", label: "Municípios", icon: "🏙️" },
+  { id: "bairros", label: "Bairros", icon: "🏘️" },
+  { id: "setores", label: "Setores", icon: "📊" },
+] as const;
+
+export async function sendMessage(
+  message: string,
+  colecoes?: string[]
+): Promise<MimirResponse> {
+  const body: MimirRequest = { mensagem: message };
+  if (colecoes && colecoes.length > 0) {
+    body.colecoes = colecoes;
+  }
+
   const res = await fetch(MIMIR_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ mensagem: message } satisfies MimirRequest),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -28,5 +45,5 @@ export async function sendMessage(message: string): Promise<string> {
   }
 
   const data: MimirResponse = await res.json();
-  return data.resposta;
+  return data;
 }
