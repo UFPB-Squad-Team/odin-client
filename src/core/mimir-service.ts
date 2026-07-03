@@ -14,6 +14,10 @@ export interface MimirRequest {
 export interface MimirResponse {
   resposta: string;
   colecoes_consultadas: string[];
+  component: "text" | "table";
+  payload: Record<string, unknown>[];
+  colunas: string[];
+  rotulos: string[];
 }
 
 export const COLECOES_DISPONIVEIS = [

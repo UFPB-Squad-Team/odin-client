@@ -6,7 +6,6 @@ import type { MimirResponse } from "@/core/mimir-service";
 import Link from "next/link";
 import {
   Send,
-  Sparkles,
   Plus,
   Copy,
   RefreshCw,
@@ -14,6 +13,7 @@ import {
   Check,
   Filter,
   ChevronDown,
+  Table2,
 } from "lucide-react";
 
 /* ─── Design tokens ODIN ─────────────────────────────── */
@@ -70,6 +70,146 @@ interface Message {
   content: string;
   time: string;
   colecoes?: string[];
+  component?: "text" | "table";
+  payload?: Record<string, unknown>[];
+  colunas?: string[];
+  rotulos?: string[];
+}
+
+/* ─── Data Table component ──────────────────────────── */
+function DataTable({
+  payload,
+  colunas,
+  rotulos,
+}: {
+  payload: Record<string, unknown>[];
+  colunas: string[];
+  rotulos: string[];
+}) {
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const sorted = [...payload].sort((a, b) => {
+    if (!sortCol) return 0;
+    const va = a[sortCol];
+    const vb = b[sortCol];
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === "number" && typeof vb === "number") {
+      return sortDir === "asc" ? va - vb : vb - va;
+    }
+    return sortDir === "asc"
+      ? String(va).localeCompare(String(vb))
+      : String(vb).localeCompare(String(va));
+  });
+
+  const handleSort = (col: string) => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  };
+
+  const formatVal = (val: unknown): string => {
+    if (val == null || val === "-" || val === "não informado") return "-";
+    if (typeof val === "number") {
+      if (Number.isInteger(val)) return val.toLocaleString("pt-BR");
+      return val.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+    }
+    return String(val);
+  };
+
+  return (
+    <div style={{ overflowX: "auto", marginTop: 8, borderRadius: 12, border: `1px solid ${t.border}` }}>
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: 12,
+          fontFamily: "Inter, system-ui, sans-serif",
+        }}
+      >
+        <thead>
+          <tr style={{ background: t.canvas }}>
+            {rotulos.map((rotulo, i) => (
+              <th
+                key={colunas[i] || i}
+                onClick={() => handleSort(colunas[i])}
+                style={{
+                  padding: "10px 12px",
+                  textAlign: "left",
+                  fontWeight: 700,
+                  color: t.textSecondary,
+                  borderBottom: `2px solid ${t.border}`,
+                  whiteSpace: "nowrap",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {rotulo}
+                {sortCol === colunas[i] && (
+                  <span style={{ marginLeft: 4, color: t.brandCyan }}>
+                    {sortDir === "asc" ? "▲" : "▼"}
+                  </span>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, rowIdx) => (
+            <tr
+              key={rowIdx}
+              style={{
+                background: rowIdx % 2 === 0 ? t.surface : t.canvas,
+                transition: "background 100ms ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLTableRowElement).style.background = "#e8f4f8";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLTableRowElement).style.background =
+                  rowIdx % 2 === 0 ? t.surface : t.canvas;
+              }}
+            >
+              {colunas.map((col) => (
+                <td
+                  key={col}
+                  style={{
+                    padding: "8px 12px",
+                    borderBottom: `1px solid ${t.border}`,
+                    color: t.textPrimary,
+                    whiteSpace: "nowrap",
+                    maxWidth: 200,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {formatVal(row[col])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div
+        style={{
+          padding: "8px 12px",
+          fontSize: 10,
+          color: t.textMuted,
+          borderTop: `1px solid ${t.border}`,
+          background: t.surface,
+        }}
+      >
+        {payload.length} registro(s) — Clique nos cabeçalhos para ordenar
+      </div>
+    </div>
+  );
 }
 
 /* ─── Sidebar ───────────────────────────────────────── */
@@ -187,6 +327,8 @@ function MessageBubble({ msg }: { msg: Message }) {
     });
   };
 
+  const isTable = msg.component === "table" && msg.payload && msg.payload.length > 0;
+
   return (
     <div
       style={{
@@ -205,6 +347,7 @@ function MessageBubble({ msg }: { msg: Message }) {
         <div
           style={{
             width: 32,
+            minWidth: 32,
             height: 32,
             borderRadius: "50%",
             background: t.canvas,
@@ -212,7 +355,6 @@ function MessageBubble({ msg }: { msg: Message }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            flexShrink: 0,
           }}
         >
           <MimirIcon size={18} />
@@ -222,13 +364,13 @@ function MessageBubble({ msg }: { msg: Message }) {
         <div
           style={{
             width: 32,
+            minWidth: 32,
             height: 32,
             borderRadius: "50%",
             background: t.brandDark,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            flexShrink: 0,
           }}
         >
           <User size={15} color="#fff" strokeWidth={1.5} />
@@ -262,25 +404,67 @@ function MessageBubble({ msg }: { msg: Message }) {
               {msg.colecoes.join(", ")}
             </span>
           )}
+          {isTable && (
+            <span
+              style={{
+                fontSize: 10,
+                color: t.brandCyan,
+                background: "rgba(6,182,212,0.08)",
+                padding: "2px 8px",
+                borderRadius: 999,
+                display: "flex",
+                alignItems: "center",
+                gap: 3,
+              }}
+            >
+              <Table2 size={10} strokeWidth={1.5} />
+              Tabela
+            </span>
+          )}
           <span style={{ fontSize: 11, color: t.textMuted }}>{msg.time}</span>
         </div>
 
-        {/* Bubble */}
-        <div
-          style={{
-            background: isUser ? t.brandDark : t.surface,
-            color: isUser ? "#fff" : t.textPrimary,
-            borderRadius: isUser ? "16px 4px 16px 16px" : "4px 16px 16px 16px",
-            padding: "14px 18px",
-            fontSize: 14,
-            lineHeight: 1.65,
-            boxShadow: isUser ? "none" : "0 1px 4px rgba(0,0,0,0.06)",
-            border: isUser ? "none" : `1px solid ${t.border}`,
-            wordBreak: "break-word",
-          }}
-        >
-          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{msg.content}</p>
-        </div>
+        {/* Table content */}
+        {isTable && msg.payload && msg.colunas && msg.rotulos && (
+          <div
+            style={{
+              background: t.surface,
+              borderRadius: "4px 16px 16px 16px",
+              padding: "6px",
+              border: `1px solid ${t.border}`,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+            }}
+          >
+            <DataTable
+              payload={msg.payload}
+              colunas={msg.colunas}
+              rotulos={msg.rotulos}
+            />
+          </div>
+        )}
+
+        {/* Text bubble */}
+        {msg.content && (
+          <div
+            style={{
+              background: isTable ? "transparent" : isUser ? t.brandDark : t.surface,
+              color: isUser && !isTable ? "#fff" : t.textPrimary,
+              borderRadius: isUser
+                ? "16px 4px 16px 16px"
+                : isTable
+                ? 0
+                : "4px 16px 16px 16px",
+              padding: isTable ? "8px 0 0 0" : "14px 18px",
+              fontSize: 14,
+              lineHeight: 1.65,
+              boxShadow: isUser || isTable ? "none" : "0 1px 4px rgba(0,0,0,0.06)",
+              border: isUser ? "none" : isTable ? "none" : `1px solid ${t.border}`,
+              wordBreak: "break-word",
+            }}
+          >
+            <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{msg.content}</p>
+          </div>
+        )}
 
         {/* Action row — Copiar e Regenerar apenas */}
         {!isUser && hovered && (
@@ -385,7 +569,6 @@ function CollectionFilter({
           cursor: "pointer",
           transition: "all 150ms ease",
           whiteSpace: "nowrap",
-          flexShrink: 0,
         }}
       >
         <Filter size={12} strokeWidth={1.5} />
@@ -535,44 +718,56 @@ function InputBar({
           display: "flex",
           gap: 8,
           marginBottom: 12,
-          overflowX: "auto",
-          paddingBottom: 2,
-          alignItems: "center",
+          alignItems: "flex-start",
         }}
       >
-        <CollectionFilter selected={selectedColecoes} onToggle={onToggleColecao} />
-        {suggestions.map((s) => (
-          <button
-            key={s}
-            onClick={() => {
-              onExternalValueChange(s);
-              textareaRef.current?.focus();
-            }}
-            style={{
-              background: "rgba(255,255,255,0.7)",
-              border: `1px solid ${t.border}`,
-              borderRadius: 999,
-              padding: "7px 14px",
-              fontSize: 12,
-              fontWeight: 500,
-              color: t.textSecondary,
-              cursor: "pointer",
-              transition: "all 150ms ease",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = t.surface;
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#d1d5db";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.7)";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = t.border;
-            }}
-          >
-            {s}
-          </button>
-        ))}
+        <span style={{ flexShrink: 0 }}>
+          <CollectionFilter selected={selectedColecoes} onToggle={onToggleColecao} />
+        </span>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            overflowX: "auto",
+            paddingBottom: 2,
+            alignItems: "center",
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              onClick={() => {
+                onExternalValueChange(s);
+                textareaRef.current?.focus();
+              }}
+              style={{
+                background: "rgba(255,255,255,0.7)",
+                border: `1px solid ${t.border}`,
+                borderRadius: 999,
+                padding: "7px 14px",
+                fontSize: 12,
+                fontWeight: 500,
+                color: t.textSecondary,
+                cursor: "pointer",
+                transition: "all 150ms ease",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = t.surface;
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#d1d5db";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.7)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = t.border;
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Input row */}
@@ -649,14 +844,14 @@ function InputBar({
 }
 
 /* ─── Chat area ─────────────────────────────────────── */
-function ChatArea() {
+function ChatArea({ onNewChatRef }: { onNewChatRef?: React.MutableRefObject<(() => void) | undefined> }) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
       role: "mimir",
       time: "",
       content:
-        "Olá! Sou a **Mimir**, sua assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
+        "Olá! Sou o **Mimir**, seu assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
     },
   ]);
   const [inputValue, setInputValue] = useState("");
@@ -703,6 +898,10 @@ function ChatArea() {
         time,
         content: data.resposta,
         colecoes: data.colecoes_consultadas,
+        component: data.component || "text",
+        payload: data.payload || [],
+        colunas: data.colunas || [],
+        rotulos: data.rotulos || [],
       };
 
       setMessages((prev) => [...prev, mimirMsg]);
@@ -723,20 +922,31 @@ function ChatArea() {
     }
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = useCallback(() => {
     setMessages([
       {
         id: 1,
         role: "mimir",
         time: "",
         content:
-          "Olá! Sou a **Mimir**, sua assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
+          "Olá! Sou o **Mimir**, seu assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
       },
     ]);
     setSelectedColecoes([]);
     setInputValue("");
     nextId.current = 2;
-  };
+  }, []);
+
+  useEffect(() => {
+    if (onNewChatRef) {
+      onNewChatRef.current = handleNewChat;
+    }
+    return () => {
+      if (onNewChatRef) {
+        onNewChatRef.current = undefined;
+      }
+    };
+  }, [onNewChatRef, handleNewChat]);
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: t.canvas }}>
@@ -838,11 +1048,11 @@ function ChatArea() {
 
 /* ─── Root ──────────────────────────────────────────── */
 export function MimirChat() {
-  const [chatKey, setChatKey] = useState(0);
+  const sidebarNewChatRef = useRef<() => void>();
 
-  const handleNewChat = () => {
-    setChatKey((k) => k + 1);
-  };
+  const handleNewChatFromSidebar = useCallback(() => {
+    sidebarNewChatRef.current?.();
+  }, []);
 
   return (
     <>
@@ -857,9 +1067,13 @@ export function MimirChat() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 99px; }
         strong { font-weight: 600; }
+        
+        /* DataTable hover */
+        table tbody tr:hover td {
+          background: #e8f4f8 !important;
+        }
       `}</style>
       <div
-        key={chatKey}
         style={{
           fontFamily: "Inter, system-ui, sans-serif",
           display: "flex",
@@ -868,8 +1082,8 @@ export function MimirChat() {
           background: t.canvas,
         }}
       >
-        <Sidebar onNewChat={handleNewChat} />
-        <ChatArea />
+        <Sidebar onNewChat={handleNewChatFromSidebar} />
+        <ChatArea onNewChatRef={sidebarNewChatRef} />
       </div>
     </>
   );
