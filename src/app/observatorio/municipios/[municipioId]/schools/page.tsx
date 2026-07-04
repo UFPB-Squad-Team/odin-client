@@ -1,11 +1,36 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, BookOpen, MapPin, School2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  MapPin,
+  School2,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+  Search,
+  X,
+  SlidersHorizontal,
+  Building2,
+  MapPinned,
+} from "lucide-react";
 import { fetchEscolasByMunicipioPage } from "@/modules/educacao/services/education-api";
+import type { SchoolsPageFilters } from "@/modules/educacao/services/education-api";
 import type { Escola } from "@/core/types/territory";
 import { PendingRouteLink } from "@/components/ui/pending-route-link";
+
+const DEPENDENCIA_OPTIONS = [
+  { value: "Federal", label: "Federal" },
+  { value: "Estadual", label: "Estadual" },
+  { value: "Municipal", label: "Municipal" },
+];
+
+const LOCALIZACAO_OPTIONS = [
+  { value: "Urbana", label: "Urbana" },
+  { value: "Rural", label: "Rural" },
+];
 
 function formatMaybeText(value: string | undefined | null) {
   if (!value) return "—";
@@ -190,6 +215,30 @@ function PaginationBar({
   );
 }
 
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+        active
+          ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:border-cyan-500/60 dark:text-cyan-300"
+          : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function MunicipalitySchoolsPage() {
   const params = useParams();
   const municipioId = String(params.municipioId ?? "");
@@ -204,13 +253,39 @@ export default function MunicipalitySchoolsPage() {
   const [pageFailed, setPageFailed] = useState(false);
   const [failedPages, setFailedPages] = useState<Set<number>>(new Set());
 
+  // Filtros
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedDependencia, setSelectedDependencia] = useState<string[]>([]);
+  const [selectedLocalizacao, setSelectedLocalizacao] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hasActiveFilters =
+    searchTerm.length > 0 ||
+    selectedDependencia.length > 0 ||
+    selectedLocalizacao.length > 0;
+
   const loadPage = useCallback(
     async (page: number) => {
       if (!municipioId) return;
       setLoading(true);
       setPageFailed(false);
 
-      const result = await fetchEscolasByMunicipioPage(municipioId, page);
+      const filters: SchoolsPageFilters = {};
+      if (searchTerm) {
+        filters.search = searchTerm;
+        filters.fuzzy_search = true;
+      }
+      if (selectedDependencia.length > 0) {
+        filters.dependencia_adm = selectedDependencia;
+      }
+      if (selectedLocalizacao.length > 0) {
+        filters.tipo_localizacao = selectedLocalizacao;
+      }
+
+      const result = await fetchEscolasByMunicipioPage(municipioId, page, filters);
 
       if (result.failed) {
         setPageFailed(true);
@@ -232,7 +307,7 @@ export default function MunicipalitySchoolsPage() {
 
       setLoading(false);
     },
-    [municipioId],
+    [municipioId, searchTerm, selectedDependencia, selectedLocalizacao],
   );
 
   useEffect(() => {
@@ -242,6 +317,51 @@ export default function MunicipalitySchoolsPage() {
   const handlePage = (page: number) => {
     window.scrollTo({ top: 0, behavior: "smooth" });
     loadPage(page);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearchTerm(value.trim());
+    }, 400);
+  };
+
+  const handleSearchClear = () => {
+    setSearchInput("");
+    setSearchTerm("");
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchTerm(searchInput.trim());
+  };
+
+  const toggleDependencia = (value: string) => {
+    setSelectedDependencia((prev) =>
+      prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value],
+    );
+  };
+
+  const toggleLocalizacao = (value: string) => {
+    setSelectedLocalizacao((prev) =>
+      prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value],
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSearchInput("");
+    setSearchTerm("");
+    setSelectedDependencia([]);
+    setSelectedLocalizacao([]);
   };
 
   return (
@@ -285,6 +405,107 @@ export default function MunicipalitySchoolsPage() {
           </div>
         </header>
 
+        {/* Barra de busca e filtros */}
+        <section className="rounded-3xl border border-zinc-200/70 bg-white/85 p-4 shadow-lg shadow-cyan-500/5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/75 sm:p-5">
+          <div className="flex flex-col gap-4">
+            {/* Input de busca fuzzy */}
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Buscar escola por nome..."
+                className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-8 text-sm text-zinc-900 placeholder-zinc-400 transition focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-cyan-500"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={handleSearchClear}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </form>
+
+            {/* Botão toggle filtros */}
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowFilters((prev) => !prev)}
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+                  showFilters || hasActiveFilters
+                    ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:border-cyan-500/60 dark:text-cyan-300"
+                    : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                }`}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filtros
+                {hasActiveFilters && (
+                  <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-cyan-500 px-1 text-[10px] font-bold text-white">
+                    {(selectedDependencia.length > 0 ? 1 : 0) +
+                      (selectedLocalizacao.length > 0 ? 1 : 0) +
+                      (searchTerm ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                >
+                  <X className="h-3 w-3" />
+                  Limpar filtros
+                </button>
+              )}
+            </div>
+
+            {/* Painel de filtros */}
+            {showFilters && (
+              <div className="flex flex-col gap-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+                {/* Dependência administrativa */}
+                <div>
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
+                    <Building2 className="h-3.5 w-3.5" />
+                    Dependência administrativa
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {DEPENDENCIA_OPTIONS.map((opt) => (
+                      <FilterChip
+                        key={opt.value}
+                        label={opt.label}
+                        active={selectedDependencia.includes(opt.value)}
+                        onClick={() => toggleDependencia(opt.value)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tipo de localização */}
+                <div>
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
+                    <MapPinned className="h-3.5 w-3.5" />
+                    Tipo de localização
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {LOCALIZACAO_OPTIONS.map((opt) => (
+                      <FilterChip
+                        key={opt.value}
+                        label={opt.label}
+                        active={selectedLocalizacao.includes(opt.value)}
+                        onClick={() => toggleLocalizacao(opt.value)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
         {loading ? (
           <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -323,7 +544,9 @@ export default function MunicipalitySchoolsPage() {
           </section>
         ) : schools.length === 0 ? (
           <section className="rounded-2xl border border-dashed border-zinc-300 bg-white/80 p-6 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950/70 dark:text-zinc-300">
-            Nenhuma escola retornada para este município.
+            {hasActiveFilters
+              ? "Nenhuma escola encontrada com os filtros aplicados. Tente alterar os critérios de busca."
+              : "Nenhuma escola retornada para este município."}
           </section>
         ) : (
           <>

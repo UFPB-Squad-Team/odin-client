@@ -171,12 +171,38 @@ function normalizeSchoolListItem(item: SchoolListItem): Escola | null {
   };
 }
 
+export type SchoolsPageFilters = {
+  search?: string;
+  fuzzy_search?: boolean;
+  dependencia_adm?: string[];
+  tipo_localizacao?: string[];
+};
+
 async function fetchSchoolsPageRaw(
   municipioId: string,
   page: number,
+  filters?: SchoolsPageFilters,
 ): Promise<{ payload: SchoolsPageResponse | null; failed: boolean }> {
   try {
-    const url = `${API_BASE_URL}/schools?page=${page}&page_size=${PAGE_SIZE}&municipio_id=${municipioId}`;
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("page_size", String(PAGE_SIZE));
+    params.set("municipio_id", municipioId);
+
+    if (filters?.search) {
+      params.set("search", filters.search);
+    }
+    if (filters?.fuzzy_search) {
+      params.set("fuzzy_search", "true");
+    }
+    if (filters?.dependencia_adm?.length) {
+      filters.dependencia_adm.forEach((v) => params.append("dependencia_adm", v));
+    }
+    if (filters?.tipo_localizacao?.length) {
+      filters.tipo_localizacao.forEach((v) => params.append("tipo_localizacao", v));
+    }
+
+    const url = `${API_BASE_URL}/schools?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -195,6 +221,7 @@ async function fetchSchoolsPageRaw(
 export async function fetchEscolasByMunicipioPage(
   municipioId: string,
   page: number,
+  filters?: SchoolsPageFilters,
 ): Promise<SchoolsPage> {
   const empty: SchoolsPage = {
     schools: [],
@@ -207,7 +234,7 @@ export async function fetchEscolasByMunicipioPage(
 
   if (!API_BASE_URL) return empty;
 
-  const { payload, failed } = await fetchSchoolsPageRaw(municipioId, page);
+  const { payload, failed } = await fetchSchoolsPageRaw(municipioId, page, filters);
 
   if (failed || !payload) {
     return {
