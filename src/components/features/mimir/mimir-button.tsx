@@ -125,7 +125,7 @@ export function MimirButton() {
       </svg>
 
       <span
-        className={`absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-sm transition-all duration-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 ${
+        className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 max-w-[200px] text-center rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-sm transition-all duration-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 ${
           hovered
             ? "translate-y-0 opacity-100"
             : "translate-y-1 opacity-0 pointer-events-none"
