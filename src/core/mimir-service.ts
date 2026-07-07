@@ -9,6 +9,7 @@ if (!MIMIR_API_URL) {
 export interface MimirRequest {
   mensagem: string;
   colecoes?: string[];
+  ignorar_cache?: boolean;
 }
 
 export interface MimirResponse {
@@ -18,6 +19,10 @@ export interface MimirResponse {
   payload: Record<string, unknown>[];
   colunas: string[];
   rotulos: string[];
+  /** Fonte da resposta: 'rag' | 'cache' | 'fallback' */
+  fonte: string;
+  /** Nível de confiança: 'alta' | 'media' | 'baixa' */
+  confianca: string;
 }
 
 export const COLECOES_DISPONIVEIS = [
@@ -29,11 +34,15 @@ export const COLECOES_DISPONIVEIS = [
 
 export async function sendMessage(
   message: string,
-  colecoes?: string[]
+  colecoes?: string[],
+  ignorarCache: boolean = false
 ): Promise<MimirResponse> {
   const body: MimirRequest = { mensagem: message };
   if (colecoes && colecoes.length > 0) {
     body.colecoes = colecoes;
+  }
+  if (ignorarCache) {
+    body.ignorar_cache = true;
   }
 
   const res = await fetch(MIMIR_API_URL, {
@@ -45,7 +54,15 @@ export async function sendMessage(
   });
 
   if (!res.ok) {
-    throw new Error(`Mimir API error: ${res.status} ${res.statusText}`);
+    // Tenta extrair mensagem de erro do corpo
+    let detail = `Erro ${res.status}`;
+    try {
+      const errBody = await res.json();
+      if (errBody.detail) detail = errBody.detail;
+    } catch {
+      // ignora
+    }
+    throw new Error(detail);
   }
 
   const data: MimirResponse = await res.json();

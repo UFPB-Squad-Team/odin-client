@@ -18,6 +18,9 @@ import {
   Trash2,
   MessageSquare,
   AlertTriangle,
+  Zap,
+  Database,
+  WifiOff,
 } from "lucide-react";
 
 /* ─── Design tokens ODIN ─────────────────────────────── */
@@ -33,6 +36,10 @@ const lightTheme = {
   brandCyanLight: "#22d3ee",
   danger: "#dc2626",
   dangerBg: "rgba(220,38,38,0.1)",
+  success: "#16a34a",
+  successBg: "rgba(22,163,74,0.1)",
+  warning: "#f59e0b",
+  warningBg: "rgba(245,158,11,0.1)",
 };
 
 const darkTheme = {
@@ -47,6 +54,10 @@ const darkTheme = {
   brandCyanLight: "#22d3ee",
   danger: "#ef4444",
   dangerBg: "rgba(239,68,68,0.15)",
+  success: "#22c55e",
+  successBg: "rgba(34,197,94,0.15)",
+  warning: "#f59e0b",
+  warningBg: "rgba(245,158,11,0.15)",
 };
 
 /* ─── Types ─────────────────────────────────────────── */
@@ -61,6 +72,14 @@ interface Message {
   payload?: Record<string, unknown>[];
   colunas?: string[];
   rotulos?: string[];
+  /** @deprecated kept for backwards compat, use fonte */
+  fonte?: string;
+  /** @deprecated kept for backwards compat, use confianca */
+  confianca?: string;
+  /** Fonte da resposta vinda do backend */
+  fonte_backend?: string;
+  /** Nível de confiança vindo do backend */
+  confianca_backend?: string;
 }
 
 interface ChatSession {
@@ -213,6 +232,108 @@ function MimirIcon({ size = 24 }: { size?: number }) {
       <circle cx="24" cy="24" r="10" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
       <circle cx="24" cy="24" r="4" fill="currentColor" />
     </svg>
+  );
+}
+
+/* ─── Confidence badge ──────────────────────────────── */
+function ConfidenceBadge({
+  confianca,
+  colors,
+}: {
+  confianca: string;
+  colors: typeof lightTheme;
+}) {
+  const config: Record<string, { label: string; bg: string; color: string; icon: React.ReactNode }> = {
+    alta: {
+      label: "Alta confiança",
+      bg: colors.successBg,
+      color: colors.success,
+      icon: <Check size={10} strokeWidth={3} />,
+    },
+    media: {
+      label: "Confiança média",
+      bg: colors.warningBg,
+      color: colors.warning,
+      icon: <AlertTriangle size={10} strokeWidth={1.5} />,
+    },
+    baixa: {
+      label: "Baixa confiança",
+      bg: colors.dangerBg,
+      color: colors.danger,
+      icon: <AlertTriangle size={10} strokeWidth={1.5} />,
+    },
+  };
+
+  const c = config[confianca] || config.alta;
+
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        color: c.color,
+        background: c.bg,
+        padding: "2px 8px",
+        borderRadius: 999,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {c.icon}
+      {c.label}
+    </span>
+  );
+}
+
+/* ─── Source badge ──────────────────────────────────── */
+function SourceBadge({
+  fonte,
+  colors,
+}: {
+  fonte: string;
+  colors: typeof lightTheme;
+}) {
+  const config: Record<string, { label: string; bg: string; color: string; icon: React.ReactNode }> = {
+    rag: {
+      label: "RAG",
+      bg: "rgba(6,182,212,0.08)",
+      color: colors.brandCyan,
+      icon: <Database size={10} strokeWidth={1.5} />,
+    },
+    cache: {
+      label: "Cache",
+      bg: colors.successBg,
+      color: colors.success,
+      icon: <Zap size={10} strokeWidth={1.5} />,
+    },
+    fallback: {
+      label: "Fallback",
+      bg: colors.warningBg,
+      color: colors.warning,
+      icon: <WifiOff size={10} strokeWidth={1.5} />,
+    },
+  };
+
+  const c = config[fonte] || config.rag;
+
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        color: c.color,
+        background: c.bg,
+        padding: "2px 8px",
+        borderRadius: 999,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {c.icon}
+      {c.label}
+    </span>
   );
 }
 
@@ -607,19 +728,21 @@ function MessageBubble({ msg, colors }: { msg: Message; colors: typeof lightThem
       )}
 
       <div style={{ maxWidth: "76%", minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>
-        {/* Name + time */}
+        {/* Name + metadata */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
             marginBottom: 6,
+            flexWrap: "wrap",
             flexDirection: isUser ? "row-reverse" : "row",
           }}
         >
           <span style={{ fontSize: 12, fontWeight: 600, color: isUser ? colors.textSecondary : colors.textPrimary }}>
             {isUser ? "Você" : "Mimir"}
           </span>
+
           {msg.colecoes && msg.colecoes.length > 0 && (
             <span
               style={{
@@ -732,33 +855,6 @@ function MessageBubble({ msg, colors }: { msg: Message; colors: typeof lightThem
             >
               {copied ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
               {copied ? "Copiado" : "Copiar"}
-            </button>
-            <button
-              title="Regenerar"
-              style={{
-                background: "transparent",
-                border: `1px solid ${colors.border}`,
-                borderRadius: 8,
-                padding: "4px 10px",
-                cursor: "pointer",
-                color: colors.textMuted,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 11,
-                transition: "all 150ms ease",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = colors.textPrimary;
-                (e.currentTarget as HTMLButtonElement).style.background = colors.canvas;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = colors.textMuted;
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-              }}
-            >
-              <RefreshCw size={12} strokeWidth={1.5} />
-              Regenerar
             </button>
           </div>
         )}
@@ -915,6 +1011,8 @@ function InputBar({
   onToggleColecao,
   externalValue,
   onExternalValueChange,
+  ignoreCache,
+  onToggleIgnoreCache,
   colors,
 }: {
   onSend: (text: string) => void;
@@ -922,6 +1020,8 @@ function InputBar({
   onToggleColecao: (id: string) => void;
   externalValue: string;
   onExternalValueChange: (val: string) => void;
+  ignoreCache: boolean;
+  onToggleIgnoreCache: () => void;
   colors: typeof lightTheme;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -954,6 +1054,32 @@ function InputBar({
         <span style={{ flexShrink: 0 }}>
           <CollectionFilter selected={selectedColecoes} onToggle={onToggleColecao} colors={colors} />
         </span>
+
+        {/* Ignore cache toggle */}
+        <button
+          onClick={onToggleIgnoreCache}
+          title={ignoreCache ? "Cache ignorado — respostas sempre frescas" : "Usar cache — respostas mais rápidas"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "7px 12px",
+            borderRadius: 999,
+            border: `1px solid ${ignoreCache ? colors.warning : colors.border}`,
+            background: ignoreCache ? colors.warningBg : colors.surface,
+            color: ignoreCache ? colors.warning : colors.textMuted,
+            fontSize: 11,
+            fontWeight: 500,
+            cursor: "pointer",
+            transition: "all 150ms ease",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          <Zap size={12} strokeWidth={1.5} />
+          {ignoreCache ? "Cache off" : "Cache on"}
+        </button>
+
         <div
           style={{
             display: "flex",
@@ -1062,10 +1188,16 @@ function InputBar({
         </button>
       </div>
 
-      <div style={{ textAlign: "center", marginTop: 10 }}>
+      {/* Status bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
         <span style={{ fontSize: 11, color: colors.textMuted }}>
           Mimir pode cometer erros. Sempre valide dados críticos nas fontes oficiais.
         </span>
+        {ignoreCache && (
+          <span style={{ fontSize: 11, color: colors.warning, fontStyle: "italic" }}>
+            Cache desativado — respostas podem ser mais lentas
+          </span>
+        )}
       </div>
     </div>
   );
@@ -1091,6 +1223,7 @@ function ChatArea({
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedColecoes, setSelectedColecoes] = useState<string[]>([]);
+  const [ignoreCache, setIgnoreCache] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
 
@@ -1102,12 +1235,10 @@ function ChatArea({
     scrollToBottom();
   }, [messages, isLoading, scrollToBottom]);
 
-  // Track previous activeChatId to save messages before switching
   const prevActiveChatRef = useRef<string | null>(null);
 
-  // Load messages when activeChatId changes
+
   useEffect(() => {
-    // Save current messages for the previous chat before switching
     if (prevActiveChatRef.current && prevActiveChatRef.current !== activeChatId && messages.length > 0) {
       const prevId = prevActiveChatRef.current;
       const updated = chats.map((c) => {
@@ -1137,6 +1268,8 @@ function ChatArea({
             time: "",
             content:
               "Olá! Sou o **Mimir**, seu assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
+            fonte_backend: "rag",
+            confianca_backend: "alta",
           },
         ]);
         setSelectedColecoes([]);
@@ -1151,6 +1284,8 @@ function ChatArea({
           time: "",
           content:
             "Olá! Sou o **Mimir**, seu assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
+          fonte_backend: "rag",
+          confianca_backend: "alta",
         },
       ]);
       setSelectedColecoes([]);
@@ -1194,7 +1329,7 @@ function ChatArea({
     setIsLoading(true);
 
     try {
-      const data: MimirResponse = await sendMessage(text, selectedColecoes);
+      const data: MimirResponse = await sendMessage(text, selectedColecoes, ignoreCache);
 
       const mimirMsg: Message = {
         id: nextId.current++,
@@ -1206,6 +1341,8 @@ function ChatArea({
         payload: data.payload || [],
         colunas: data.colunas || [],
         rotulos: data.rotulos || [],
+        fonte_backend: data.fonte || "rag",
+        confianca_backend: data.confianca || "alta",
       };
 
       setMessages((prev) => [...prev, mimirMsg]);
@@ -1216,7 +1353,11 @@ function ChatArea({
         id: nextId.current++,
         role: "mimir",
         time,
-        content: `❌ **Não foi possível conectar ao servidor.**\n\nVerifique sua conexão com a internet e tente novamente em alguns instantes.`,
+        content: `**Não foi possível processar sua pergunta.**\n\n${
+          err instanceof Error ? err.message : "Erro desconhecido"
+        }\n\nTente novamente em alguns instantes. Se o problema persistir, verifique se o servidor está ativo.`,
+        fonte_backend: "fallback",
+        confianca_backend: "baixa",
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -1332,6 +1473,8 @@ function ChatArea({
         onToggleColecao={toggleColecao}
         externalValue={inputValue}
         onExternalValueChange={setInputValue}
+        ignoreCache={ignoreCache}
+        onToggleIgnoreCache={() => setIgnoreCache((prev) => !prev)}
         colors={colors}
       />
     </div>
@@ -1430,6 +1573,8 @@ export function MimirChat() {
                   time: "",
                   content:
                     "Olá! Sou o **Mimir**, seu assistente de dados do Nordeste. 👋\n\nPosso te ajudar a consultar dados sobre escolas, municípios, bairros e setores censitários. Use o filtro de bases para refinar sua busca.",
+                  fonte_backend: "rag",
+                  confianca_backend: "alta",
                 },
               ],
               selectedColecoes: [],
