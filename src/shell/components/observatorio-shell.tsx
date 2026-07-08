@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ObservatorioDetailPanel } from "@/shell/components/observatorio-detail-panel";
@@ -26,6 +26,8 @@ import { resolveLayerByZoom } from "@/core/geospatial/use-map-layers";
 import { startObservatorioTour } from "../components/tour/observatorio-tour";
 
 const STORAGE_KEY = "odin:observatorio:shell:v1";
+
+const ZOOM_LAYER_SYNC_SUPPRESS_MS = 7000;
 
 function isLayer(value: string | null): value is ObservatoryLayer {
   return value === "municipio" || value === "bairro" || value === "escola";
@@ -153,7 +155,8 @@ function buildShareableSearchParams(state: {
   if (state.bairroId) params.set("bairro", state.bairroId);
   params.set("layer", state.activeLayer);
   if (state.activeModuleId) params.set("modulo", state.activeModuleId);
-  if (state.sidebarCollapsed) params.set("sidebar", "collapsed");
+  // Sempre inclui o estado da sidebar na URL para preservar entre navegações
+  params.set("sidebar", state.sidebarCollapsed ? "collapsed" : "expanded");
   params.set("lng", state.longitude.toFixed(6));
   params.set("lat", state.latitude.toFixed(6));
   params.set("zoom", state.zoom.toFixed(2));
@@ -171,7 +174,12 @@ export function ObservatorioShell() {
   const searchParams = useSearchParams();
   const initializedRef = useRef(false);
   const previousActiveLayerRef = useRef<ObservatoryLayer>("bairro");
-  const skipZoomLayerSyncRef = useRef(false);
+  const skipZoomLayerSyncUntilRef = useRef(0);
+  const autoSelectDoneRef = useRef(false);
+
+  function suppressZoomLayerSync(durationMs = ZOOM_LAYER_SYNC_SUPPRESS_MS) {
+    skipZoomLayerSyncUntilRef.current = Date.now() + durationMs;
+  }
 
   const handleStartTour = () => {
     startObservatorioTour();
@@ -200,6 +208,17 @@ export function ObservatorioShell() {
   const [compareSecondarySelection, setCompareSecondarySelection] = useState<import("@/core/types/shell").ObservatorySelection | null>(null);
   const [comparePanelOpen, setComparePanelOpen] = useState(false);
 
+  // initialSidebarCollapsed: mesma semântica do state (true = recolhida).
+  // Se não houver parâmetro "sidebar" na URL, undefined → o hook usa o default (true).
+  // Antes disso era "initialSidebarExpanded" e era passado direto como o valor de
+  // sidebarCollapsed dentro do hook — invertido. Isso, combinado com o restore
+  // effect abaixo assumindo um default DIFERENTE quando o parâmetro está ausente,
+  // causava o flash (um lugar assumia "recolhida por padrão", o outro "expandida").
+  const sidebarParam = searchParams.get("sidebar");
+  const initialSidebarCollapsed = sidebarParam === null
+    ? undefined
+    : sidebarParam === "collapsed";
+
   const {
     activeLayer,
     applyFilterPath,
@@ -219,7 +238,7 @@ export function ObservatorioShell() {
     setActiveModule,
     sidebarCollapsed,
     setSidebarCollapsed,
-  } = useObservatorioShell();
+  } = useObservatorioShell(initialSidebarCollapsed);
 
   function handleEntityClick(entity: import("@/core/types/shell").MapEntity) {
     selectEntity(entity);
@@ -242,7 +261,7 @@ export function ObservatorioShell() {
   };
 
   const applyProfile = (profile: InterestProfileId | "reset") => {
-    skipZoomLayerSyncRef.current = true;
+    suppressZoomLayerSync();
 
     if (profile === "family") {
       setActiveProfile("family");
@@ -302,7 +321,7 @@ export function ObservatorioShell() {
     switch (item.kind) {
       case "municipio":
         filters.setMunicipio(item.municipioIdIbge);
-        skipZoomLayerSyncRef.current = true;
+        suppressZoomLayerSync();
         setMapViewState({ longitude: lng, latitude: lat, zoom: 10 });
         break;
 
@@ -310,12 +329,12 @@ export function ObservatorioShell() {
         if (item.municipioIdIbge && item.municipioIdIbge !== filters.municipioId) {
           filters.setMunicipio(item.municipioIdIbge);
         }
-        skipZoomLayerSyncRef.current = true;
+        suppressZoomLayerSync();
         setMapViewState({ longitude: lng, latitude: lat, zoom: 13 });
         break;
 
       case "escola":
-        skipZoomLayerSyncRef.current = true;
+        suppressZoomLayerSync();
         setMapViewState({ longitude: lng, latitude: lat, zoom: 15 });
         // Abre detalhes da escola
         selectEntity({
@@ -333,7 +352,7 @@ export function ObservatorioShell() {
       case "logradouro":
       case "cep":
         // Centraliza e ativa análise por raio
-        skipZoomLayerSyncRef.current = true;
+        suppressZoomLayerSync();
         setMapViewState({ longitude: lng, latitude: lat, zoom: 14 });
         setRadiusMode(true);
         // Simula clique no ponto para disparar a análise
@@ -428,18 +447,25 @@ export function ObservatorioShell() {
     setComparePanelOpen,
   };
 
-  // Restaura estado da URL ou localStorage na inicialização
-  useEffect(() => {
+  // Restaura estado da URL ou localStorage na inicialização.
+  // useLayoutEffect roda de forma síncrona ANTES do navegador pintar,
+  // eliminando o flash da sidebar/selected ao carregar.
+  useLayoutEffect(() => {
     if (initializedRef.current) return;
 
     const queryLayer = searchParams.get("layer");
+    const querySidebarParam = searchParams.get("sidebar");
     const queryState = {
       activeModuleId: searchParams.get("modulo"),
       bairroId: searchParams.get("bairro"),
       estadoId: searchParams.get("estado"),
       layer: isLayer(queryLayer) ? queryLayer : null,
       municipioId: searchParams.get("municipio"),
-      sidebarCollapsed: searchParams.get("sidebar") === "collapsed",
+      // undefined quando não há parâmetro explícito — nesse caso não mexemos
+      // no sidebarCollapsed abaixo, deixando o valor já inicializado pelo hook.
+      sidebarCollapsed: querySidebarParam === null
+        ? undefined
+        : querySidebarParam === "collapsed",
       viewState: readMapViewState(
         searchParams,
         isLayer(queryLayer) ? queryLayer : activeLayer,
@@ -497,7 +523,9 @@ export function ObservatorioShell() {
             estadoId: parsed.estadoId ?? null,
             layer: parsedLayer,
             municipioId: parsed.municipioId ?? null,
-            sidebarCollapsed: true,
+            // Sempre recolhida ao restaurar de localStorage (comportamento
+            // já existente antes desta correção — não alterado aqui).
+            sidebarCollapsed: undefined,
             viewState: {
               longitude:
                 parsed.viewState?.longitude ??
@@ -554,6 +582,7 @@ export function ObservatorioShell() {
 
     if (initial) {
       disableBootstrapDefaults();
+      suppressZoomLayerSync();
 
       previousActiveLayerRef.current = initial.layer ?? activeLayer;
       if (initial.layer) setActiveLayer(initial.layer);
@@ -562,7 +591,14 @@ export function ObservatorioShell() {
         setActiveModule(initial.activeModuleId);
       }
 
-      setSidebarCollapsed(Boolean(initial.sidebarCollapsed));
+      // Só mexe na sidebar se houve um sinal explícito (parâmetro na URL).
+      // Sem isso, o valor já inicializado pelo useState do hook é preservado —
+      // era essa reafirmação incondicional, com um default diferente do
+      // useState, que causava o flash.
+      if (initial.sidebarCollapsed !== undefined) {
+        setSidebarCollapsed(initial.sidebarCollapsed);
+      }
+
       applyFilterPath({
         bairroId: initial.bairroId,
         estadoId: initial.estadoId,
@@ -602,16 +638,37 @@ export function ObservatorioShell() {
 
   useEffect(() => {
     if (!initializedRef.current) return;
-    if (skipZoomLayerSyncRef.current) {
-      skipZoomLayerSyncRef.current = false;
-      return;
-    }
+    if (Date.now() < skipZoomLayerSyncUntilRef.current) return;
 
     const resolvedLayer = resolveLayerByZoom(mapViewState.zoom, activeLayer);
     if (resolvedLayer !== activeLayer) {
       setActiveLayer(resolvedLayer);
     }
   }, [activeLayer, mapViewState.zoom, setActiveLayer]);
+
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    if (autoSelectDoneRef.current) return;
+
+    if (activeLayer === "municipio" && filters.municipioId) {
+      const municipio = municipios.find((m) => m.id === filters.municipioId);
+      if (municipio && municipio.id !== selected?.id) {
+        selectEntity({ kind: "municipio", data: municipio });
+        autoSelectDoneRef.current = true;
+        return;
+      }
+    }
+
+    // Bairro: seleciona quando os bairros carregam
+    if (activeLayer === "bairro" && filters.bairroId) {
+      if (bairros.length === 0) return; // ainda carregando
+      const bairro = bairros.find((b) => b.id === filters.bairroId);
+      if (bairro && bairro.id !== selected?.id) {
+        selectEntity({ kind: "bairro", data: bairro });
+      }
+      autoSelectDoneRef.current = true;
+    }
+  }, [filters.municipioId, filters.bairroId, bairros, municipios, selected?.id, selectEntity, activeLayer]);
 
   // Auto-pan quando município muda via dropdown
   useEffect(() => {
@@ -623,15 +680,18 @@ export function ObservatorioShell() {
 
     const geoProps = municipio.geoProps as Record<string, unknown>;
     const centroide = geoProps._centroide as [number, number] | undefined;
+
+    const zoomTarget = activeLayer === "municipio" ? 8 : activeLayer === "bairro" ? 12 : 13;
+
     if (centroide) {
-      skipZoomLayerSyncRef.current = true;
-      setMapViewState((prev) => ({
+      suppressZoomLayerSync();
+      setMapViewState({
         longitude: centroide[0],
         latitude: centroide[1],
-        zoom: Math.max(prev.zoom, 10),
-      }));
+        zoom: zoomTarget,
+      });
     }
-  }, [filters.municipioId, municipios]);
+  }, [filters.municipioId, municipios, activeLayer]);
 
   // Persiste em localStorage
   useEffect(() => {
@@ -846,7 +906,7 @@ export function ObservatorioShell() {
             municipioId={filters.municipioId}
             municipios={municipios}
             onLayerChange={(layer) => {
-              skipZoomLayerSyncRef.current = true;
+              suppressZoomLayerSync();
               setActiveLayer(layer);
               setMapViewState(initialViewForLayer(layer));
             }}

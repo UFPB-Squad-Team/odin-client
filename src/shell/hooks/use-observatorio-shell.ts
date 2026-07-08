@@ -58,7 +58,10 @@ async function withFallback<T>(
   }
 }
 
-export function useObservatorioShell() {
+// initialSidebarCollapsed: valor JÁ NA SEMÂNTICA DE "COLAPSADA" (true = recolhida).
+// Passar o valor "expandida" aqui e reusá-lo como se fosse "colapsada" foi a causa
+// do bug de flash da sidebar — mantenha o nome e o sentido iguais em quem chama.
+export function useObservatorioShell(initialSidebarCollapsed?: boolean) {
   const filters = useCascadeFilters();
   const {
     estadoId,
@@ -78,7 +81,13 @@ export function useObservatorioShell() {
   const [selected, setSelected] = useState<ObservatorySelection | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeModuleId, setActiveModuleId] = useState<string | null>("educacao");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  // Aceita estado inicial vindo de fora (ObservatorioShell lê searchParams)
+  // para evitar o flash SSR: servidor renderiza com o valor correto desde o início.
+  // Default (sem parâmetro na URL) é recolhida — igual ao que o restore effect
+  // no ObservatorioShell agora assume quando não há parâmetro "sidebar" explícito.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    initialSidebarCollapsed ?? true,
+  );
 
   const [showSetorDisclaimer, setShowSetorDisclaimer] = useState(false);
   const [activeBairroNome, setActiveBairroNome] = useState<string | undefined>();
