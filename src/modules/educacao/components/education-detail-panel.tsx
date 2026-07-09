@@ -184,15 +184,35 @@ function formatNum(value: unknown) {
   return num.toLocaleString("pt-BR");
 }
 
-function DataQualityNote({ source, temBairroOficial }: { source?: string; temBairroOficial?: boolean }) {
-  if (source === "setor_indicadores" || temBairroOficial === false) {
-    return (
-      <div className="rounded-md border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
-        Dados baseados em setores censitários — este município não possui delimitação oficial de vizinhanças.
-      </div>
-    );
-  }
-  return null;
+function DataQualityNote({ 
+  source, 
+  temBairroOficial, 
+  dataQualityLabel,
+  cdSetor 
+}: { 
+  source?: string; 
+  temBairroOficial?: boolean;
+  dataQualityLabel?: string;
+  cdSetor?: string;
+}) {
+  const label = dataQualityLabel || (
+    source === "setor_indicadores" || temBairroOficial === false
+      ? "Dados baseados em setores censitários — este município não possui delimitação oficial de vizinhanças."
+      : null
+  );
+
+  if (!label) return null;
+
+  return (
+    <div className="rounded-md border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
+      {label}
+      {cdSetor && (
+        <span className="ml-1.5 font-mono font-semibold">
+          (Setor {cdSetor})
+        </span>
+      )}
+    </div>
+  );
 }
 
 function SocioeconomicoSections({ socio }: { socio: Record<string, unknown> }) {
@@ -449,13 +469,20 @@ export function EducationDetailPanel({ entity }: ModuleDetailPanelProps) {
   const geoProps = data.geoProps as Record<string, unknown> | undefined;
   const entitySource = (geoProps?.source ?? data.source) as string | undefined;
   const temBairroOficial = (data.temBairroOficial ?? geoProps?.tem_bairro_oficial) as boolean | undefined;
+  const dataQualityLabel = (geoProps?.data_quality_label ?? data.data_quality_label) as string | undefined;
+  const cdSetor = (geoProps?.cd_setor ?? data.cd_setor) as string | undefined;
   const socio = (geoProps?.socioeconomico as Record<string, unknown> | undefined) ?? undefined;
   const hasSocioeconomico = entity.kind !== "escola" && socio != null;
 
   return (
     <div className="flex flex-col gap-2.5 p-4">
       {entity.kind === "bairro" && (
-        <DataQualityNote source={entitySource} temBairroOficial={temBairroOficial} />
+        <DataQualityNote 
+          source={entitySource} 
+          temBairroOficial={temBairroOficial}
+          dataQualityLabel={dataQualityLabel}
+          cdSetor={cdSetor}
+        />
       )}
 
       {edu.metrics && edu.metrics.length > 0 && (

@@ -131,8 +131,11 @@ export async function listBairros(municipioId: string): Promise<Bairro[]> {
       const idRaw = String(raw._id ?? raw.cd_bairro_ibge ?? raw.cd_setor ?? raw.id ?? "");
       const id = idRaw.replace(/\.0$/, "");
       const rawNome = String(raw.bairro ?? raw.nm_bairro ?? raw.nome_area ?? raw.nome ?? "").trim();
-      // Se o nome é vazio ou puramente numérico (código de setor), usa id ou nome amigável
-      const nome = rawNome && rawNome.length > 0 && !/^\d+$/.test(rawNome) ? rawNome : id || `Área ${index + 1}`;
+      const isSetor = raw.nivel === "setor" || raw.source === "setor_indicadores";
+      
+      const nome = isSetor && (!rawNome || /^\d+$/.test(rawNome))
+        ? `Setor ${id}`
+        : (rawNome && rawNome.length > 0 ? rawNome : id || `Área ${index + 1}`);
       const municipioIdApi = String(
         raw.municipioIdIbge ?? raw.municipio_id_ibge ?? raw.cd_municipio ?? "",
       ).replace(/\.0$/, "");

@@ -60,7 +60,7 @@ export function ObservatorioMapTooltip({
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-300">
                 {LAYER_LABELS[layer]}
               </p>
-              <p className="mt-1 text-[13px] font-semibold leading-tight text-zinc-900 dark:text-zinc-100">
+              <p className="mt-1 text-[13px] font-semibold leading-snug text-zinc-900 dark:text-zinc-100 break-words">
                 {title}
               </p>
             </div>

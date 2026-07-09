@@ -43,6 +43,7 @@ type MapboxObservatorioMapProps = {
   radiusMode?: boolean;
   radiusMeters?: number;
   onRadiusResult?: (result: import("@/shell/components/radius-analysis").RadiusAnalysisResult | null) => void;
+  selectedDependencia?: string[];
 };
 
 type ViewState = {
@@ -457,6 +458,7 @@ export function MapboxObservatorioMap({
   radiusMode = false,
   radiusMeters = 1000,
   onRadiusResult,
+  selectedDependencia,
 }: MapboxObservatorioMapProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltipState | null>(null);
@@ -507,6 +509,18 @@ export function MapboxObservatorioMap({
   const layerStyle = LAYER_STYLES[resolvedLayer];
   const ids = useMemo(() => buildLayerIds(resolvedLayer), [resolvedLayer]);
   const geojsonData = collection ?? EMPTY_COLLECTION;
+
+  const filteredEntities = useMemo(() => {
+    if (activeLayer !== "escola" || !selectedDependencia || selectedDependencia.length === 0) {
+      return entities;
+    }
+    return entities.filter((entity) => {
+      if (entity.kind !== "escola") return true;
+      const escola = entity.data as Escola;
+      const dep = escola.dependenciaAdministrativa?.toLowerCase() || escola.dependencia_adm?.toLowerCase() || "";
+      return selectedDependencia.some((d) => dep.includes(d));
+    });
+  }, [entities, activeLayer, selectedDependencia]);
 
   const { featureColors, stats } = useChoropleth({
     collection,
@@ -628,7 +642,7 @@ export function MapboxObservatorioMap({
     const { lng, lat } = event.lngLat;
     onViewStateChange({ longitude: lng, latitude: lat, zoom: viewState.zoom });
 
-    const entity = resolveEntityFromFeature(feature, entities);
+    const entity = resolveEntityFromFeature(feature, filteredEntities);
     if (entity) {
       onEntityClick(entity);
       return;
@@ -692,7 +706,7 @@ export function MapboxObservatorioMap({
       return;
     }
 
-    const entity = resolveEntityFromFeature(feature, entities);
+    const entity = resolveEntityFromFeature(feature, filteredEntities);
     const entityId = resolveChoroplethFeatureId(feature);
     const layer = resolveFeatureLayer(feature, resolvedLayer);
     const title = entity?.data.nome ?? resolveFeatureTitle(feature);
@@ -953,13 +967,13 @@ export function MapboxObservatorioMap({
 
           {!collapsedCards.entities ? (
             <div className="max-h-[min(12.5rem,calc(100vh-20rem))] space-y-1 overflow-y-auto px-2.5 py-2 sm:max-h-[14rem] sm:px-3 odin-entity-scroll">
-              {entities.length === 0 ? (
+              {filteredEntities.length === 0 ? (
                 <p className="rounded-md border border-dashed border-zinc-300 px-2 py-2 text-[12px] text-zinc-600 dark:border-zinc-700 dark:text-zinc-300 sm:px-3 sm:text-sm">
                   Nenhuma entidade no recorte.
                 </p>
               ) : (
                 <div className="grid gap-1.5">
-                  {entities.map((entity) => {
+                  {filteredEntities.map((entity) => {
                     const entityId = entity.data.id;
                     const isSelected = entityId === selectedId;
                     const isHovered = entityId === hoveredId;

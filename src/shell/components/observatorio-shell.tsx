@@ -16,12 +16,14 @@ import {
 import { RadiusAnalysisToggle, RadiusAnalysisPanel } from "@/shell/components/radius-analysis";
 import { useIndicatorGroups } from "@/shell/hooks/use-indicator-groups";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useCallback } from "react";
 import { useTheme } from "next-themes";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
 import { getModule } from "@/core/registry/module-registry";
 import { JOAO_PESSOA_IBGE_ID } from "@/core/territory/territory-api";
 import type { ShellContextType } from "@/core/types/shell";
 import type { ObservatoryLayer } from "@/core/types/territory";
+import type { DependenciaAdministrativa } from "@/core/types/comparision";
 import { resolveLayerByZoom } from "@/core/geospatial/use-map-layers";
 import { startObservatorioTour } from "../components/tour/observatorio-tour";
 
@@ -249,6 +251,7 @@ export function ObservatorioShell() {
   const [radiusMode, setRadiusMode] = useState(false);
   const [radiusMeters, setRadiusMeters] = useState(1000);
   const [radiusResult, setRadiusResult] = useState<import("@/shell/components/radius-analysis").RadiusAnalysisResult | null>(null);
+  const [selectedDependencia, setSelectedDependencia] = useState<DependenciaAdministrativa[]>([]);
   const darkMapStyle = isDarkMapStyle(mapVisualControls.styleId);
 
   const firstIndicatorFor = (moduleId: string, layer: ObservatoryLayer, preferredIndicatorId?: string) => {
@@ -306,6 +309,14 @@ export function ObservatorioShell() {
     }
     setActiveIndicatorId(indicatorId);
   };
+
+  const handleToggleDependencia = useCallback((dependencia: DependenciaAdministrativa) => {
+    setSelectedDependencia((prev) =>
+      prev.includes(dependencia)
+        ? prev.filter((d) => d !== dependencia)
+        : [...prev, dependencia],
+    );
+  }, []);
 
   /**
    * Lógica de navegação ao selecionar resultado da busca universal.
@@ -915,6 +926,8 @@ export function ObservatorioShell() {
             onSetMunicipio={filters.setMunicipio}
             onSearchSelect={handleSearchSelect}
             sidebarCollapsed={sidebarCollapsed}
+            selectedDependencia={selectedDependencia}
+            onToggleDependencia={handleToggleDependencia}
           />
 
           {/* O MAPA AGORA OCUPA 100% SEMPRE */}
@@ -945,6 +958,7 @@ export function ObservatorioShell() {
               radiusMode={radiusMode}
               radiusMeters={radiusMeters}
               onRadiusResult={setRadiusResult}
+              selectedDependencia={activeLayer === "escola" ? selectedDependencia : undefined}
             />
 
             {/* Floating indicator picker */}

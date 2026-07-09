@@ -6,6 +6,7 @@ import { SmartSearchInput } from "@/shell/components/smart-search";
 import type { SearchResultItem } from "@/shell/services/universal-search";
 import type { Bairro, Estado, Municipio } from "@/core/types/territory";
 import type { ObservatoryLayer } from "@/core/types/territory";
+import type { DependenciaAdministrativa } from "@/core/types/comparision";
 
 type SidebarProps = {
   activeLayer: ObservatoryLayer;
@@ -21,12 +22,20 @@ type SidebarProps = {
   onSetMunicipio: (municipioId: string | null) => void;
   onSearchSelect?: (item: SearchResultItem) => void;
   sidebarCollapsed: boolean;
+  selectedDependencia?: DependenciaAdministrativa[];
+  onToggleDependencia?: (dependencia: DependenciaAdministrativa) => void;
 };
 
 const LAYERS: Array<{ id: ObservatoryLayer; label: string }> = [
   { id: "municipio", label: "Município" },
   { id: "bairro", label: "Vizinhança" },
   { id: "escola", label: "Escola" },
+];
+
+const DEPENDENCIA_OPTIONS: Array<{ value: DependenciaAdministrativa; label: string }> = [
+  { value: "municipal", label: "Municipal" },
+  { value: "estadual", label: "Estadual" },
+  { value: "federal", label: "Federal" },
 ];
 
 const MIN_WIDTH = 300;
@@ -48,6 +57,8 @@ export function ObservatorioSidebar({
   onSetMunicipio,
   onSearchSelect,
   sidebarCollapsed,
+  selectedDependencia = [],
+  onToggleDependencia,
 }: SidebarProps) {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const [isDragging, setIsDragging] = useState(false);
@@ -217,6 +228,42 @@ export function ObservatorioSidebar({
                 ))}
               </div>
             </div>
+
+            {/* Filtro de Esfera Administrativa - apenas na camada de escolas */}
+            {activeLayer === "escola" && onToggleDependencia && (
+              <div className="shrink-0 pt-4 border-t border-zinc-200 dark:border-zinc-800/50">
+                <p className="mb-2.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                  🏛️ Esfera Administrativa
+                </p>
+                <div className="flex flex-col gap-2">
+                  {DEPENDENCIA_OPTIONS.map((opt) => {
+                    const isActive = selectedDependencia.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => onToggleDependencia(opt.value)}
+                        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                          isActive
+                            ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:border-cyan-500/60 dark:text-cyan-300"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-400 dark:hover:border-zinc-600"
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {isActive && (
+                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-white">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[10px] text-zinc-500 dark:text-zinc-600">
+                  Selecione uma ou mais esferas para filtrar escolas por dependência administrativa.
+                </p>
+              </div>
+            )}
           </aside>
         </div>
       </div>
