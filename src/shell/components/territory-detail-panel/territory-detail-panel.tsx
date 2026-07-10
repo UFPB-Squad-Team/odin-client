@@ -9,6 +9,7 @@ import { DimensionDivider } from "./dimension-divider";
 import { DetailMetricCard } from "./detail-metric-card";
 import { DetailSectionCard } from "./detail-section-card";
 import { PendingRouteLink } from "@/components/ui/pending-route-link";
+import { DossierDownloadButton } from "./dossier-download-button";
 
 const MODULE_COLORS: Record<string, string> = {
   educacao: "#06b6d4",
@@ -154,12 +155,18 @@ export function TerritoryDetailPanel({ entity }: TerritoryDetailPanelProps) {
         )}
 
         {entity.kind === "municipio" && (
-          <PendingRouteLink
-            href={`/observatorio/municipios/${entity.data.id}/schools`}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-500/5 px-3 py-2.5 text-sm font-medium text-cyan-700 transition-colors hover:border-cyan-500/60 hover:bg-cyan-500/10 dark:text-cyan-300"
-          >
-            Ver escolas deste município →
-          </PendingRouteLink>
+          <>
+            <DossierDownloadButton
+              municipioId={entity.data.id}
+              municipioNome={entity.data.nome}
+            />
+            <PendingRouteLink
+              href={`/observatorio/municipios/${entity.data.id}/schools`}
+              className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-500/5 px-3 py-2.5 text-sm font-medium text-cyan-700 transition-colors hover:border-cyan-500/60 hover:bg-cyan-500/10 dark:text-cyan-300"
+            >
+              Ver escolas deste município →
+            </PendingRouteLink>
+          </>
         )}
       </div>
     </div>
