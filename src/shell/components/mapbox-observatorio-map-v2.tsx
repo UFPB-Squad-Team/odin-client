@@ -504,7 +504,14 @@ export function MapboxObservatorioMap({
     collection,
     error,
     loading: layerLoading,
-  } = useMapLayers({ activeLayer, estadoId, municipioId, bairroId, zoom: viewState.zoom });
+  } = useMapLayers({
+    activeLayer,
+    estadoId,
+    municipioId,
+    bairroId,
+    zoom: viewState.zoom,
+    selectedDependencia: activeLayer === "escola" ? selectedDependencia : undefined,
+  });
 
   const layerStyle = LAYER_STYLES[resolvedLayer];
   const ids = useMemo(() => buildLayerIds(resolvedLayer), [resolvedLayer]);
@@ -883,7 +890,11 @@ export function MapboxObservatorioMap({
               id={ids.selectedFill}
               type="fill"
               filter={selectedId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], selectedId]] : ["==", ["id"], "__none__"]}
-              paint={{ "fill-color": layerStyle.selectedColor, "fill-opacity": 0.7, "fill-outline-color": contrastStrokeColor }}
+              paint={{
+                "fill-color": layerStyle.selectedColor,
+                "fill-opacity": hasChoropleth ? 0.55 : 0.7,
+                "fill-outline-color": "#ffffff",
+              }}
             />
             <Layer
               id={ids.selectedPoint}
@@ -901,7 +912,11 @@ export function MapboxObservatorioMap({
               id={ids.selectedLine}
               type="line"
               filter={selectedId ? ["all", ["!=", ["geometry-type"], "Point"], ["==", ["to-string", ["coalesce", ["get", "id"], ["to-string", ["id"]]]], selectedId]] : ["==", ["id"], "__none__"]}
-              paint={{ "line-color": contrastStrokeColor, "line-width": 3.2, "line-opacity": 1 }}
+              paint={{
+                "line-color": "#ffffff",
+                "line-width": 3.5,
+                "line-opacity": 1,
+              }}
             />
           </Source>
 

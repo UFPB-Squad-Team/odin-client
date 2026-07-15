@@ -41,7 +41,17 @@ export function LandingGovernance() {
               Feito por quem
             </p>
             <h3 id="tour-lema" className="mt-2 text-2xl font-semibold sm:text-3xl">
-              Laboratório LEMA · UFPB
+              <a
+                href="https://lema.ufpb.br/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-cyan-700 hover:text-cyan-800 dark:text-cyan-300 dark:hover:text-cyan-200 transition-colors"
+              >
+                Laboratório LEMA · UFPB
+                <svg className="h-4 w-4 shrink-0 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+              </a>
             </h3>
             <p className="mt-3 text-zinc-700 dark:text-zinc-300">
               Plataforma concebida e desenvolvida pelo Laboratório de Estudos e

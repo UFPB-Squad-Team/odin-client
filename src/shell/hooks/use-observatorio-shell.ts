@@ -289,13 +289,41 @@ export function useObservatorioShell(initialSidebarCollapsed?: boolean) {
     return () => { alive = false; };
   }, [activeLayer, estadoId, municipioId]);
 
+  const programmaticSelectionRef = useRef(false);
+
   useEffect(() => {
+    if (programmaticSelectionRef.current) {
+      programmaticSelectionRef.current = false;
+      return;
+    }
     setSelected(null);
     setDetailsOpen(false);
     if (activeLayer === "bairro") {
       bootstrapRef.current.bairro = true;
     }
   }, [estadoId, municipioId, bairroId, activeLayer]);
+
+  // Automatically select the entity matching the current cascade filter
+  // whenever the layer or data changes (handles dropdown → sidebar sync)
+  useEffect(() => {
+    const activeModule = activeModuleId ? getModule(activeModuleId) : undefined;
+    if (activeLayer === "municipio" && municipioId && municipios.length > 0) {
+      const municipio = municipios.find((m) => m.id === municipioId);
+      if (municipio && municipio.id !== selected?.id) {
+        programmaticSelectionRef.current = true;
+        selectEntity({ kind: "municipio", data: municipio });
+        return;
+      }
+    }
+    if (activeLayer === "bairro" && bairroId && bairros.length > 0) {
+      const bairro = bairros.find((b) => b.id === bairroId);
+      if (bairro && bairro.id !== selected?.id) {
+        programmaticSelectionRef.current = true;
+        selectEntity({ kind: "bairro", data: bairro });
+        return;
+      }
+    }
+  }, [activeLayer, municipioId, bairroId, municipios, bairros, selected?.id]);
 
   useEffect(() => {
     if (activeLayer === "bairro" && selected?.kind === "bairro") {
@@ -330,6 +358,29 @@ export function useObservatorioShell(initialSidebarCollapsed?: boolean) {
       });
     }
     setDetailsOpen(true);
+  }
+
+  /**
+   * Selects an entity AND updates cascade filters, without the cleanup effect
+   * clearing the selection. This keeps both sidebar and map in sync.
+   */
+  function selectEntityAndSyncFilter(entity: MapEntity) {
+    programmaticSelectionRef.current = true;
+
+    if (entity.kind === "municipio") {
+      setMunicipio(entity.data.id);
+    } else if (entity.kind === "bairro") {
+      if (entity.data.municipioId && entity.data.municipioId !== municipioId) {
+        setMunicipio(entity.data.municipioId);
+      }
+      setBairro(entity.data.id);
+    } else if (entity.kind === "escola") {
+      if (entity.data.municipioId && entity.data.municipioId !== municipioId) {
+        setMunicipio(entity.data.municipioId);
+      }
+    }
+
+    selectEntity(entity);
   }
 
   const searchCatalog = useMemo<SearchSuggestion[]>(() => {
@@ -415,6 +466,7 @@ export function useObservatorioShell(initialSidebarCollapsed?: boolean) {
     municipios,
     selected,
     selectEntity,
+    selectEntityAndSyncFilter,
     setActiveLayer,
     setDetailsOpen,
     searchSuggestions,

@@ -20,6 +20,7 @@ type UseMapLayersArgs = {
   municipioId?: string | null;
   bairroId?: string | null;
   zoom?: number;
+  selectedDependencia?: string[];
 };
 
 const LAYER_ZOOM_BREAKPOINTS: Record<ObservatoryLayer, number> = {
@@ -309,6 +310,7 @@ export function useMapLayers({
   municipioId,
   bairroId,
   zoom,
+  selectedDependencia = [],
 }: UseMapLayersArgs) {
   const cacheRef = useRef<Record<string, GeoJSONFeatureCollection>>({});
   const [collection, setCollection] = useState<GeoJSONFeatureCollection | null>(null);
@@ -333,9 +335,18 @@ export function useMapLayers({
 
   const estadoUf = useMemo(() => normalizeEstadoIdToUf(estadoId), [estadoId]);
 
+  const cacheKeySuffix = useMemo(
+    () => {
+      if (resolvedLayer !== "escola") return "";
+      const depKey = [...selectedDependencia].sort().join(",");
+      return `:${municipioId ?? ""}:${depKey}`;
+    },
+    [resolvedLayer, selectedDependencia, municipioId],
+  );
+
   const cacheKey = useMemo(
-    () => (recorteId ? `${resolvedLayer}:${recorteId}` : null),
-    [recorteId, resolvedLayer],
+    () => (recorteId ? `${resolvedLayer}:${recorteId}${cacheKeySuffix}` : null),
+    [cacheKeySuffix, recorteId, resolvedLayer],
   );
 
   useEffect(() => {
@@ -369,7 +380,32 @@ export function useMapLayers({
           nextCollection = await fetchMunicipalityCollection(estadoUf);
         }
         if (!nextCollection && resolvedLayer === "escola") {
-          nextCollection = await fetchSchoolsGeoJSON();
+          nextCollection = await fetchSchoolsGeoJSON(municipioId, selectedDependencia);
+
+          if (nextCollection && municipioId) {
+            const filteredFeatures = nextCollection.features.filter((feat) => {
+              const props = feat.properties as Record<string, unknown>;
+              const featMunicipioId = String(
+                props.municipioIdIbge ?? props.municipio_id_ibge ?? "",
+              ).replace(/\.0$/, "");
+              return featMunicipioId === municipioId;
+            });
+            nextCollection = { ...nextCollection, features: filteredFeatures };
+          }
+
+          if (nextCollection && selectedDependencia.length > 0) {
+            const lowerDeps = selectedDependencia.map((d) => d.toLowerCase());
+            nextCollection = {
+              ...nextCollection,
+              features: nextCollection.features.filter((feat) => {
+                const props = feat.properties as Record<string, unknown>;
+                const dep = String(
+                  props.dependencia_adm ?? props.dependencia ?? "",
+                ).toLowerCase();
+                return lowerDeps.some((d) => dep.includes(d));
+              }),
+            };
+          }
         }
         if (!nextCollection && resolvedLayer !== "escola") {
           const remoteCollection = await listCamadas(

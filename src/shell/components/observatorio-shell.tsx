@@ -234,6 +234,7 @@ export function ObservatorioShell() {
     municipios,
     selected,
     selectEntity,
+    selectEntityAndSyncFilter,
     setActiveLayer,
     setDetailsOpen,
     activeModuleId,
@@ -243,7 +244,7 @@ export function ObservatorioShell() {
   } = useObservatorioShell(initialSidebarCollapsed);
 
   function handleEntityClick(entity: import("@/core/types/shell").MapEntity) {
-    selectEntity(entity);
+    selectEntityAndSyncFilter(entity);
   }
 
   const indicatorGroups = useIndicatorGroups(activeLayer, activeModuleId);
