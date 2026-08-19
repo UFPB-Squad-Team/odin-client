@@ -1,11 +1,10 @@
 /**
  * Tipos centrais para o sistema de comparação do ODIN.
- * Define conceitos de segmentação por nível de ensino e esfera administrativa,
- * além de estruturas para pesos contextuais de indicadores e thresholds fixos.
+ * Define conceitos de segmentação por nível de ensino e esfera administrativa.
  */
 
 /** Níveis de ensino considerados no sistema educacional brasileiro. */
-export type EnsinoLevel = "infantil" | "fundamental" | "medio";
+export type EnsinoLevel = "infantil" | "fundamental" | "medio" | "superior" | "todas";
 
 /** Esferas administrativas de responsabilidade pela oferta educacional. */
 export type DependenciaAdministrativa =

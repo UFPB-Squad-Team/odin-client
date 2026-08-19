@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useRef, Suspense } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -8,417 +8,57 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useShellContext } from "@/shell/context/shell-context";
 import { getModule } from "@/core/registry/module-registry";
 import { listBairros } from "@/core/territory/territory-api";
+import { SegmentationSelector } from "@/components/ui/segmentation-selector";
+import {
+  extractComparableMetrics,
+  type CompareEntity,
+  type CompareEntityKind,
+  type MetricGroup,
+} from "@/core/utils/compare-metrics";
+import {
+  getSegmentationModule,
+  getSegmentationForEntity,
+  getAllSegmentationModules,
+} from "@/core/segmentation";
+import "@/core/segmentation/modules/educacao";
 import type { MapEntity, ObservatorySelection } from "@/core/types/shell";
 import type { Bairro, Municipio } from "@/core/types/territory";
+import type { SegmentId } from "@/core/segmentation/types";
+import { SegmentationModuleSelector } from "@/components/ui/segmentation-module-selector";
 
-
-function parseNum(v: unknown): number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string") {
-    const n = parseFloat(v.replace(",", "."));
-    return Number.isFinite(n) ? n : 0;
-  }
-  return 0;
-}
+// ============================================================
+// HELPERS DE FORMATAÇÃO
+// ============================================================
 
 function fmt(v: unknown, decimals = 1): string {
-  if (v === null || v === undefined || v === "") return "—";
-  const n = parseNum(v);
-  if (n === 0) return "—";
+  if (v === null || v === undefined || v === "") return "\u2014";
+  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
+  if (n === 0) return "\u2014";
   return Number.isInteger(n) ? String(n) : n.toFixed(decimals);
 }
 
 function fmtPct(v: unknown): string {
-  const n = parseNum(v);
-  if (n === 0) return "—";
+  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
+  if (n === 0) return "\u2014";
   return `${n.toFixed(1)}%`;
 }
 
 function fmtInt(v: unknown): string {
-  const n = parseNum(v);
-  if (n === 0) return "—";
+  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
+  if (n === 0) return "\u2014";
   return new Intl.NumberFormat("pt-BR").format(Math.round(n));
 }
 
-
-type MetricGroup = {
-  label: string;
-  metrics: Array<{
-    key: string;
-    label: string;
-    a: number;
-    b: number;
-    format: "int" | "pct" | "decimal";
-    higherIsBetter: boolean;
-    competitive?: boolean;
-  }>;
-};
-
-type CompareEntityKind = "municipio" | "bairro";
-
-type CompareEntity = {
-  id: string;
-  nome: string;
-  estadoId?: string;
-  municipioId?: string;
-  geoProps?: Record<string, unknown>;
-};
-
-function extractComparableMetrics(
-  a: CompareEntity | null,
-  b: CompareEntity | null,
-  kind: CompareEntityKind,
-): MetricGroup[] {
-  const pa = (a?.geoProps ?? {}) as Record<string, unknown>;
-  const pb = (b?.geoProps ?? {}) as Record<string, unknown>;
-  const ea = (pa.educacao ?? {}) as Record<string, unknown>;
-  const eb = (pb.educacao ?? {}) as Record<string, unknown>;
-  const sa = (pa.socioeconomico ?? {}) as Record<string, unknown>;
-  const sb = (pb.socioeconomico ?? {}) as Record<string, unknown>;
-
-  const saSaneamento = (sa.saneamento ?? {}) as Record<string, unknown>;
-  const sbSaneamento = (sb.saneamento ?? {}) as Record<string, unknown>;
-  const saPopulacao = (sa.populacao ?? {}) as Record<string, unknown>;
-  const sbPopulacao = (sb.populacao ?? {}) as Record<string, unknown>;
-  const saEducacaoPop = (sa.educacaoPopulacao ?? {}) as Record<string, unknown>;
-  const sbEducacaoPop = (sb.educacaoPopulacao ?? {}) as Record<string, unknown>;
-  const saEstruturaEtaria = (sa.estruturaEtaria ?? {}) as Record<string, unknown>;
-  const sbEstruturaEtaria = (sb.estruturaEtaria ?? {}) as Record<string, unknown>;
-  const saRaca = (sa.raca ?? {}) as Record<string, unknown>;
-  const sbRaca = (sb.raca ?? {}) as Record<string, unknown>;
-  const saHabitacao = (sa.habitacao ?? {}) as Record<string, unknown>;
-  const sbHabitacao = (sb.habitacao ?? {}) as Record<string, unknown>;
-  const saGenero = (sa.genero ?? {}) as Record<string, unknown>;
-  const sbGenero = (sb.genero ?? {}) as Record<string, unknown>;
-
-  const redeEscolarMetrics: MetricGroup["metrics"] = [
-    {
-      key: "totalEscolas",
-      label: "Total de escolas",
-      a: parseNum(ea.totalEscolas ?? pa.total_escolas),
-      b: parseNum(eb.totalEscolas ?? pb.total_escolas),
-      format: "int",
-      higherIsBetter: true,
-    },
-    {
-      key: "totalAlunos",
-      label: "Total de alunos",
-      a: parseNum(ea.totalMatriculas ?? pa.total_alunos),
-      b: parseNum(eb.totalMatriculas ?? pb.total_alunos),
-      format: "int",
-      higherIsBetter: true,
-    },
-  ];
-
-  if (kind === "municipio") {
-    redeEscolarMetrics.push({
-      key: "totalBairros",
-      label: "Bairros com escolas",
-      a: parseNum(ea.totalBairros),
-      b: parseNum(eb.totalBairros),
-      format: "int",
-      higherIsBetter: true,
-    });
-  }
-
-  return [
-    {
-      label: "Rede escolar",
-      metrics: redeEscolarMetrics,
-    },
-    {
-      label: "Infraestrutura escolar",
-      metrics: [
-        {
-          key: "internet",
-          label: "Com internet p/ alunos",
-          a: parseNum(ea.pctComInternet ?? pa.pct_com_internet),
-          b: parseNum(eb.pctComInternet ?? pb.pct_com_internet),
-          format: "pct",
-          higherIsBetter: true,
-        },
-        {
-          key: "biblioteca",
-          label: "Com biblioteca",
-          a: parseNum(ea.pctComBiblioteca ?? pa.pct_com_biblioteca),
-          b: parseNum(eb.pctComBiblioteca ?? pb.pct_com_biblioteca),
-          format: "pct",
-          higherIsBetter: true,
-        },
-        {
-          key: "lab",
-          label: "Com lab. informática",
-          a: parseNum(ea.pctComLabInformatica ?? pa.pct_com_lab_informatica),
-          b: parseNum(eb.pctComLabInformatica ?? pb.pct_com_lab_informatica),
-          format: "pct",
-          higherIsBetter: true,
-        },
-        {
-          key: "comAcessibilidade",
-          label: "Com acessibilidade PCD",
-          a: Math.max(
-            0,
-            100 - parseNum(ea.pctSemAcessibilidade ?? pa.pct_sem_acessibilidade),
-          ),
-          b: Math.max(
-            0,
-            100 - parseNum(eb.pctSemAcessibilidade ?? pb.pct_sem_acessibilidade),
-          ),
-          format: "pct",
-          higherIsBetter: true,
-        },
-      ],
-    },
-    {
-      label: "Demografia",
-      metrics: [
-        {
-          key: "populacaoTotal",
-          label: "População total",
-          a: parseNum(saPopulacao.total),
-          b: parseNum(sbPopulacao.total),
-          format: "int",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "totalDomicilios",
-          label: "Total de domicílios",
-          a: parseNum(saPopulacao.totalDomicilios),
-          b: parseNum(sbPopulacao.totalDomicilios),
-          format: "int",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctCriancas0a9",
-          label: "Crianças (0-9)",
-          a: parseNum(saEstruturaEtaria.pctCriancas0a9),
-          b: parseNum(sbEstruturaEtaria.pctCriancas0a9),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctJovens15a29",
-          label: "Jovens (15-29)",
-          a: parseNum(saEstruturaEtaria.pctJovens15a29),
-          b: parseNum(sbEstruturaEtaria.pctJovens15a29),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctAdultos30a59",
-          label: "Adultos (30-59)",
-          a: parseNum(saEstruturaEtaria.pctAdultos30a59),
-          b: parseNum(sbEstruturaEtaria.pctAdultos30a59),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctIdosos60Mais",
-          label: "Idosos (60+)",
-          a: parseNum(saEstruturaEtaria.pctIdosos60Mais),
-          b: parseNum(sbEstruturaEtaria.pctIdosos60Mais),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctPopMasculina",
-          label: "Pop. masculina",
-          a: parseNum(saGenero.pctPopMasculina),
-          b: parseNum(sbGenero.pctPopMasculina),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctPopFeminina",
-          label: "Pop. feminina",
-          a: parseNum(saGenero.pctPopFeminina),
-          b: parseNum(sbGenero.pctPopFeminina),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctPretaParda",
-          label: "Pop. preta/parda",
-          a: parseNum(saRaca.pctPretaParda),
-          b: parseNum(sbRaca.pctPretaParda),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctBranca",
-          label: "Pop. branca",
-          a: parseNum(saRaca.pctBranca),
-          b: parseNum(sbRaca.pctBranca),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "pctIndigena",
-          label: "Pop. indígena",
-          a: parseNum(saRaca.pctIndigena),
-          b: parseNum(sbRaca.pctIndigena),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-      ],
-    },
-    {
-      label: "Saneamento",
-      metrics: [
-        {
-          key: "aguaRedeGeral",
-          label: "Água da rede geral",
-          a: parseNum(saSaneamento.pctAguaRedeGeral),
-          b: parseNum(sbSaneamento.pctAguaRedeGeral),
-          format: "pct",
-          higherIsBetter: true,
-        },
-        {
-          key: "esgotoRedeGeral",
-          label: "Esgoto da rede geral",
-          a: parseNum(saSaneamento.pctEsgotoRedeGeral),
-          b: parseNum(sbSaneamento.pctEsgotoRedeGeral),
-          format: "pct",
-          higherIsBetter: true,
-        },
-        {
-          key: "lixoColetado",
-          label: "Lixo coletado",
-          a: parseNum(saSaneamento.pctLixoColetado),
-          b: parseNum(sbSaneamento.pctLixoColetado),
-          format: "pct",
-          higherIsBetter: true,
-        },
-        {
-          key: "aguaNaoEncanada",
-          label: "Sem água encanada",
-          a: parseNum(saSaneamento.pctAguaNaoEncanada),
-          b: parseNum(sbSaneamento.pctAguaNaoEncanada),
-          format: "pct",
-          higherIsBetter: false,
-        },
-        {
-          key: "domSemBanheiro",
-          label: "Sem banheiro",
-          a: parseNum(saSaneamento.pctDomSemBanheiro),
-          b: parseNum(sbSaneamento.pctDomSemBanheiro),
-          format: "pct",
-          higherIsBetter: false,
-        },
-        {
-          key: "aguaInadequada",
-          label: "Água inadequada",
-          a: parseNum(saSaneamento.pctAguaInadequada),
-          b: parseNum(sbSaneamento.pctAguaInadequada),
-          format: "pct",
-          higherIsBetter: false,
-        },
-        {
-          key: "esgotoInadequado",
-          label: "Esgoto inadequado",
-          a: parseNum(saSaneamento.pctEsgotoInadequado),
-          b: parseNum(sbSaneamento.pctEsgotoInadequado),
-          format: "pct",
-          higherIsBetter: false,
-        },
-        {
-          key: "lixoInadequado",
-          label: "Lixo inadequado",
-          a: parseNum(saSaneamento.pctLixoInadequado),
-          b: parseNum(sbSaneamento.pctLixoInadequado),
-          format: "pct",
-          higherIsBetter: false,
-        },
-      ],
-    },
-    {
-      label: "Habitação e vulnerabilidade",
-      metrics: [
-        {
-          key: "taxaAlfabetizacao15Mais",
-          label: "Alfabetização (15+)",
-          a: Math.max(0, 100 - parseNum(saEducacaoPop.taxaAnalfabetismo15Mais)),
-          b: Math.max(0, 100 - parseNum(sbEducacaoPop.taxaAnalfabetismo15Mais)),
-          format: "pct",
-          higherIsBetter: true,
-        },
-        {
-          key: "razaoDependencia",
-          label: "Razão de dependência",
-          a: parseNum(saEstruturaEtaria.razaoDependencia),
-          b: parseNum(sbEstruturaEtaria.razaoDependencia),
-          format: "pct",
-          higherIsBetter: false,
-        },
-        {
-          key: "domNaoSuperlotado",
-          label: "Dom. não superlotados",
-          a: Math.max(0, 100 - parseNum(saHabitacao.pctDomSuperlotado)),
-          b: Math.max(0, 100 - parseNum(sbHabitacao.pctDomSuperlotado)),
-          format: "pct",
-          higherIsBetter: true,
-        },
-        {
-          key: "domUnipessoal",
-          label: "Dom. unipessoais",
-          a: parseNum(saHabitacao.pctDomUnipessoal),
-          b: parseNum(sbHabitacao.pctDomUnipessoal),
-          format: "pct",
-          higherIsBetter: false,
-          competitive: false,
-        },
-        {
-          key: "domTipoCasa",
-          label: "Dom. tipo casa",
-          a: parseNum(saHabitacao.pctDomTipoCasa),
-          b: parseNum(sbHabitacao.pctDomTipoCasa),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "domTipoApto",
-          label: "Dom. tipo apartamento",
-          a: parseNum(saHabitacao.pctDomTipoApto),
-          b: parseNum(sbHabitacao.pctDomTipoApto),
-          format: "pct",
-          higherIsBetter: true,
-          competitive: false,
-        },
-        {
-          key: "domDegradado",
-          label: "Dom. degradado/inacabado",
-          a: parseNum(saHabitacao.pctDomDegradado),
-          b: parseNum(sbHabitacao.pctDomDegradado),
-          format: "pct",
-          higherIsBetter: false,
-        },
-      ],
-    },
-  ];
-}
-
-function formatMetricValue(
-  v: number,
-  format: "int" | "pct" | "decimal",
-): string {
-  if (v === 0) return "—";
+function formatMetricValue(v: number, format: "int" | "pct" | "decimal"): string {
+  if (v === 0) return "\u2014";
   if (format === "int") return fmtInt(v);
   if (format === "pct") return fmtPct(v);
   return fmt(v);
 }
 
+// ============================================================
+// COMPONENTE: RadarChart
+// ============================================================
 
 function RadarChart({
   groups,
@@ -511,7 +151,7 @@ function RadarChart({
                 ? "start"
                 : "end";
           const shortLabel =
-            m.label.length > 14 ? m.label.slice(0, 13) + "…" : m.label;
+            m.label.length > 14 ? m.label.slice(0, 13) + "\u2026" : m.label;
           return (
             <text
               key={m.key}
@@ -530,17 +170,24 @@ function RadarChart({
       <div className="flex gap-4 text-xs">
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-4 rounded-sm bg-cyan-400" />
-          <span className={isDark ? "text-zinc-400 truncate max-w-[100px]" : "text-zinc-600 truncate max-w-[100px]"}>{nameA}</span>
+          <span className={isDark ? "text-zinc-400 truncate max-w-[100px]" : "text-zinc-600 truncate max-w-[100px]"}>
+            {nameA}
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-4 rounded-sm bg-purple-500" />
-          <span className={isDark ? "text-zinc-400 truncate max-w-[100px]" : "text-zinc-600 truncate max-w-[100px]"}>{nameB}</span>
+          <span className={isDark ? "text-zinc-400 truncate max-w-[100px]" : "text-zinc-600 truncate max-w-[100px]"}>
+            {nameB}
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
+// ============================================================
+// COMPONENTE: CompareBar
+// ============================================================
 
 function CompareBar({
   a,
@@ -556,10 +203,12 @@ function CompareBar({
   if (a === 0 && b === 0) return null;
   const total = a + b;
   if (total === 0) return null;
+
   const pctA = (a / total) * 100;
   const pctB = (b / total) * 100;
   const aWins = higherIsBetter ? a >= b : a <= b;
   const bWins = higherIsBetter ? b > a : b < a;
+
   return (
     <div className="flex h-1.5 w-full overflow-hidden rounded-full">
       <div
@@ -575,7 +224,169 @@ function CompareBar({
 }
 
 // ============================================================
-// COMPONENTE PRINCIPAL (com conteúdo)
+// COMPONENTE: ScoreCard
+// ============================================================
+
+function ScoreCard({
+  groups,
+  nameA,
+  nameB,
+  isDark,
+}: {
+  groups: MetricGroup[];
+  nameA: string;
+  nameB: string;
+  isDark: boolean;
+}) {
+  let scoreA = 0;
+  let scoreB = 0;
+  let ties = 0;
+
+  groups.forEach((g) =>
+    g.metrics.forEach((m) => {
+      if (m.competitive === false) return;
+      if (m.a === 0 && m.b === 0) return;
+      if (m.higherIsBetter) {
+        if (m.a > m.b) scoreA++;
+        else if (m.b > m.a) scoreB++;
+        else ties++;
+      } else {
+        if (m.a < m.b) scoreA++;
+        else if (m.b < m.a) scoreB++;
+        else ties++;
+      }
+    })
+  );
+
+  const total = scoreA + scoreB + ties;
+  const pctA = total > 0 ? Math.round((scoreA / total) * 100) : 0;
+  const pctB = total > 0 ? Math.round((scoreB / total) * 100) : 0;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between text-xs">
+        <span className="text-cyan-400 font-semibold">{nameA.split(" ")[0]}</span>
+        <span className={isDark ? "text-zinc-600 text-[10px]" : "text-zinc-500 text-[10px]"}>
+          {ties > 0 ? `${ties} empate${ties > 1 ? "s" : ""}` : ""}
+        </span>
+        <span className="text-purple-400 font-semibold">{nameB.split(" ")[0]}</span>
+      </div>
+      <div className={`flex h-2 overflow-hidden rounded-full ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
+        <div style={{ width: `${pctA}%` }} className="bg-cyan-500 transition-all" />
+        <div style={{ width: `${pctB}%` }} className="bg-purple-500 transition-all" />
+      </div>
+      <div className={`flex justify-between text-xs ${isDark ? "text-zinc-500" : "text-zinc-600"}`}>
+        <span>{scoreA} indicador{scoreA !== 1 ? "es" : ""}</span>
+        <span>{scoreB} indicador{scoreB !== 1 ? "es" : ""}</span>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// COMPONENTE: MunicipioSelector
+// ============================================================
+
+function MunicipioSelector({
+  label,
+  color,
+  selected,
+  search,
+  filtered,
+  onSearch,
+  onSelect,
+  onClear,
+  isDark,
+}: {
+  label: string;
+  color: "cyan" | "purple";
+  selected: CompareEntity | null;
+  search: string;
+  filtered: CompareEntity[];
+  onSearch: (q: string) => void;
+  onSelect: (m: CompareEntity) => void;
+  onClear: () => void;
+  isDark: boolean;
+}) {
+  const accent = color === "cyan" ? "text-cyan-400" : "text-purple-400";
+  const border = color === "cyan" ? "border-cyan-500/40" : "border-purple-500/40";
+  const ring = color === "cyan" ? "focus:ring-cyan-500/30" : "focus:ring-purple-500/30";
+  const panel = isDark ? "bg-zinc-900/60" : "bg-white";
+  const input = isDark
+    ? "border-zinc-700 bg-zinc-900 text-white placeholder-zinc-600"
+    : "border-zinc-300 bg-white text-zinc-900 placeholder-zinc-400";
+
+  return (
+    <div>
+      <p className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] ${accent}`}>
+        {label}
+      </p>
+      {selected ? (
+        <div className={`rounded-xl border ${border} ${panel} p-3`}>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className={`font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>
+                {selected.nome}
+              </p>
+              {selected.estadoId && (
+                <p className={isDark ? "mt-0.5 text-xs text-zinc-500" : "mt-0.5 text-xs text-zinc-600"}>
+                  {selected.estadoId.toUpperCase()}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClear}
+              className={`mt-0.5 rounded border px-2 py-0.5 text-[10px] transition ${isDark
+                  ? "border-zinc-700 text-zinc-500 hover:text-zinc-300"
+                  : "border-zinc-300 text-zinc-600 hover:text-zinc-900"
+                }`}
+            >
+              Trocar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="relative">
+          <input
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder={`Buscar ${label.toLowerCase().replace(/ a$/, "").replace(/ b$/, "")}\u2026`}
+            className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none ring-0 transition focus:border-zinc-600 focus:ring-1 ${input} ${ring}`}
+          />
+          {filtered.length > 0 && (
+            <ul
+              className={`select-enter absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-xl border py-1 shadow-xl ${isDark ? "border-zinc-700 bg-zinc-900" : "border-zinc-200 bg-white"
+                }`}
+            >
+              {filtered.map((m) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onMouseDown={() => onSelect(m)}
+                    className={`w-full px-3 py-2 text-left transition ${isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-100"}`}
+                  >
+                    <div className={isDark ? "text-sm text-zinc-200" : "text-sm text-zinc-900"}>
+                      {m.nome}
+                    </div>
+                    {m.estadoId && (
+                      <div className={isDark ? "text-[10px] text-zinc-600" : "text-[10px] text-zinc-500"}>
+                        {m.estadoId.toUpperCase()}
+                      </div>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// COMPONENTE PRINCIPAL: ComparePageContent
 // ============================================================
 
 function ComparePageContent() {
@@ -594,6 +405,15 @@ function ComparePageContent() {
   const [secondaryId, setSecondaryId] = useState<string>("");
   const [searchA, setSearchA] = useState("");
   const [searchB, setSearchB] = useState("");
+
+  // Estados para segmentação: módulo ativo (dinâmico) e segmento selecionado para cada entidade
+  const allSegModules = useMemo(() => getAllSegmentationModules(), []);
+  const firstModuleId = allSegModules[0]?.id ?? "educacao";
+  const [activeSegModuleId, setActiveSegModuleId] = useState<string>(firstModuleId);
+  const segModule = useMemo(() => getSegmentationModule(activeSegModuleId), [activeSegModuleId]);
+  const [segmentA, setSegmentA] = useState<SegmentId>("todas");
+  const [segmentB, setSegmentB] = useState<SegmentId>("todas");
+
   const bairroCacheRef = useRef<Record<string, Bairro[]>>({});
   const isDark = mounted ? resolvedTheme !== "light" : true;
 
@@ -649,10 +469,7 @@ function ComparePageContent() {
   const bairroMunicipioOptions = useMemo(
     () =>
       [...municipios].sort((a, b) =>
-        a.nome.localeCompare(b.nome, "pt-BR", {
-          sensitivity: "base",
-          numeric: true,
-        }),
+        a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base", numeric: true }),
       ),
     [municipios],
   );
@@ -689,10 +506,7 @@ function ComparePageContent() {
       try {
         const data = await listBairros(bairroMunicipioId);
         const sorted = [...data].sort((a, b) =>
-          a.nome.localeCompare(b.nome, "pt-BR", {
-            sensitivity: "base",
-            numeric: true,
-          }),
+          a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base", numeric: true }),
         );
         bairroCacheRef.current[bairroMunicipioId] = sorted;
         if (alive) setBairrosByMunicipio(sorted);
@@ -707,9 +521,7 @@ function ComparePageContent() {
     }
 
     loadBairrosByMunicipio();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [bairroMunicipioId, bairros, compareKind]);
 
   const compareItems = useMemo<CompareEntity[]>(() => {
@@ -740,70 +552,115 @@ function ComparePageContent() {
     [compareItems, secondaryId],
   );
 
+  // Segmentação via registry
+  const segResultA = useMemo(() => {
+    if (!selectedA || !segModule) return null;
+    const geoProps = selectedA.geoProps ?? {};
+    const result = getSegmentationForEntity(activeSegModuleId, geoProps);
+    return result ? { ...result, primarySegment: segmentA } : null;
+  }, [selectedA, segModule, activeSegModuleId, segmentA]);
+
+  const segResultB = useMemo(() => {
+    if (!selectedB || !segModule) return null;
+    const geoProps = selectedB.geoProps ?? {};
+    const result = getSegmentationForEntity(activeSegModuleId, geoProps);
+    return result ? { ...result, primarySegment: segmentB } : null;
+  }, [selectedB, segModule, activeSegModuleId, segmentB]);
+
+  const availableSegmentsA = useMemo(
+    () => segResultA?.availableSegments ?? [],
+    [segResultA?.availableSegments],
+  );
+  const availableSegmentsB = useMemo(
+    () => segResultB?.availableSegments ?? [],
+    [segResultB?.availableSegments],
+  );
+
+  const segModuleForRender = useMemo(() => segModule ?? undefined, [segModule]);
+
+  // Reseta segmentos quando o módulo de segmentação muda
+  useEffect(() => {
+    const defaultSeg = segModule?.defaultSegment ?? "fundamental";
+    setSegmentA(defaultSeg);
+    setSegmentB(defaultSeg);
+  }, [activeSegModuleId, segModule]);
+
+  // Sincroniza segmento selecionado com disponíveis
+  useEffect(() => {
+    if (availableSegmentsA.length > 0 && !availableSegmentsA.includes(segmentA)) {
+      setSegmentA(availableSegmentsA[0]);
+    }
+  }, [availableSegmentsA, segmentA]);
+
+  useEffect(() => {
+    if (availableSegmentsB.length > 0 && !availableSegmentsB.includes(segmentB)) {
+      setSegmentB(availableSegmentsB[0]);
+    }
+  }, [availableSegmentsB, segmentB]);
+
   const selectionA = useMemo<ObservatorySelection | null>(() => {
     if (!selectedA) return null;
     const data = (compareKind === "bairro"
-      ? ({
-        id: selectedA.id,
-        nome: selectedA.nome,
-        municipioId: selectedA.municipioId ?? "",
-        geoProps: selectedA.geoProps,
-      } satisfies Bairro)
-      : ({
-        id: selectedA.id,
-        nome: selectedA.nome,
-        estadoId: selectedA.estadoId ?? "",
-        geoProps: selectedA.geoProps,
-      } satisfies Municipio));
+      ? ({ id: selectedA.id, nome: selectedA.nome, municipioId: selectedA.municipioId ?? "", geoProps: selectedA.geoProps } satisfies Bairro)
+      : ({ id: selectedA.id, nome: selectedA.nome, estadoId: selectedA.estadoId ?? "", geoProps: selectedA.geoProps } satisfies Municipio));
     const entity: MapEntity = { kind: compareKind, data } as MapEntity;
     const mod = activeModuleId ? getModule(activeModuleId) : undefined;
     if (mod?.buildSelection) {
       try { return mod.buildSelection(entity); } catch { /* fallback */ }
     }
-    return {
-      id: selectedA.id,
-      nome: selectedA.nome,
-      kind: compareKind,
-      subtitle: compareKind === "bairro" ? "Vizinhança" : "Município",
-    };
+    return { id: selectedA.id, nome: selectedA.nome, kind: compareKind, subtitle: compareKind === "bairro" ? "Vizinhan\u00e7a" : "Munic\u00edpio" };
   }, [selectedA, activeModuleId, compareKind]);
 
   const selectionB = useMemo<ObservatorySelection | null>(() => {
     if (!selectedB) return null;
     const data = (compareKind === "bairro"
-      ? ({
-        id: selectedB.id,
-        nome: selectedB.nome,
-        municipioId: selectedB.municipioId ?? "",
-        geoProps: selectedB.geoProps,
-      } satisfies Bairro)
-      : ({
-        id: selectedB.id,
-        nome: selectedB.nome,
-        estadoId: selectedB.estadoId ?? "",
-        geoProps: selectedB.geoProps,
-      } satisfies Municipio));
+      ? ({ id: selectedB.id, nome: selectedB.nome, municipioId: selectedB.municipioId ?? "", geoProps: selectedB.geoProps } satisfies Bairro)
+      : ({ id: selectedB.id, nome: selectedB.nome, estadoId: selectedB.estadoId ?? "", geoProps: selectedB.geoProps } satisfies Municipio));
     const entity: MapEntity = { kind: compareKind, data } as MapEntity;
     const mod = activeModuleId ? getModule(activeModuleId) : undefined;
     if (mod?.buildSelection) {
       try { return mod.buildSelection(entity); } catch { }
     }
-    return {
-      id: selectedB.id,
-      nome: selectedB.nome,
-      kind: compareKind,
-      subtitle: compareKind === "bairro" ? "Vizinhança" : "Município",
-    };
+    return { id: selectedB.id, nome: selectedB.nome, kind: compareKind, subtitle: compareKind === "bairro" ? "Vizinhan\u00e7a" : "Munic\u00edpio" };
   }, [selectedB, activeModuleId, compareKind]);
 
+  // Extrai métricas
   const groups = useMemo(
-    () => extractComparableMetrics(selectedA, selectedB, compareKind),
-    [selectedA, selectedB, compareKind],
+    () => extractComparableMetrics(selectedA, selectedB, compareKind, segmentA, segmentB),
+    [selectedA, selectedB, compareKind, segmentA, segmentB],
+  );
+
+  // Separa grupos em: módulo ativo (educação) vs socioeconômico
+  const moduleGroupLabels = useMemo(() => {
+    if (activeSegModuleId === "educacao") {
+      return ["Rede escolar", "Infraestrutura escolar"];
+    }
+    return [];
+  }, [activeSegModuleId]);
+
+  const moduleGroups = useMemo(
+    () => groups.filter((g) => moduleGroupLabels.includes(g.label)),
+    [groups, moduleGroupLabels],
+  );
+
+  const socioGroups = useMemo(
+    () => groups.filter((g) => !moduleGroupLabels.includes(g.label)),
+    [groups, moduleGroupLabels],
   );
 
   const hasAnyData = useMemo(
     () => groups.some((g) => g.metrics.some((m) => m.a > 0 || m.b > 0)),
     [groups],
+  );
+
+  const hasModuleData = useMemo(
+    () => moduleGroups.some((g) => g.metrics.some((m) => m.a > 0 || m.b > 0)),
+    [moduleGroups],
+  );
+
+  const hasSocioData = useMemo(
+    () => socioGroups.some((g) => g.metrics.some((m) => m.a > 0 || m.b > 0)),
+    [socioGroups],
   );
 
   useEffect(() => {
@@ -822,11 +679,7 @@ function ComparePageContent() {
 
     if (targetKind === "bairro") {
       const municipioFromParams =
-        primaryMunicipioId ??
-        secondaryMunicipioId ??
-        searchParams.get("municipio") ??
-        ctx.filters.municipioId ??
-        "";
+        primaryMunicipioId ?? secondaryMunicipioId ?? searchParams.get("municipio") ?? ctx.filters.municipioId ?? "";
       if (municipioFromParams) setBairroMunicipioId(municipioFromParams);
     }
 
@@ -865,21 +718,23 @@ function ComparePageContent() {
     return compareItems.filter((m) => m.nome.toLowerCase().includes(q) && m.id !== primaryId).slice(0, 12);
   }, [compareItems, searchB, primaryId]);
 
-  function swap() {
-    const pa = primaryId;
-    const pb = secondaryId;
-    setPrimaryId(pb);
-    setSecondaryId(pa);
-  }
+  const swap = useCallback(() => {
+    setPrimaryId(secondaryId);
+    setSecondaryId(primaryId);
+    setSegmentA(segmentB);
+    setSegmentB(segmentA);
+  }, [primaryId, secondaryId, segmentA, segmentB]);
 
-  function clear() {
+  const clear = useCallback(() => {
     setPrimaryId("");
     setSecondaryId("");
     setSearchA("");
     setSearchB("");
+    setSegmentA("todas");
+    setSegmentB("todas");
     didPreselect.current = false;
     router.replace("/observatorio/compare", { scroll: false });
-  }
+  }, [router]);
 
   const winner = useMemo(() => {
     if (!selectedA || !selectedB) return null;
@@ -910,9 +765,7 @@ function ComparePageContent() {
   return (
     <main
       className={`min-h-screen w-full ${theme.page}`}
-      style={{
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-      }}
+      style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
@@ -925,20 +778,17 @@ function ComparePageContent() {
       `}</style>
 
       <div className="mx-auto max-w-6xl px-4 py-8">
-
+        {/* Header */}
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-500">
-              ODIN · Observatório
+              ODIN &middot; Observat&oacute;rio
             </p>
-            <h1
-              className={`mt-1 text-2xl font-bold ${theme.text}`}
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              Comparar territórios
+            <h1 className={`mt-1 text-2xl font-bold ${theme.text}`} style={{ letterSpacing: "-0.02em" }}>
+              Comparar territ&oacute;rios
             </h1>
             <p className={`mt-1 text-sm ${theme.muted}`}>
-              Análise lado a lado de indicadores por município ou vizinhança
+              An&aacute;lise lado a lado de indicadores por munic&iacute;pio ou vizinhan&ccedil;a com segmenta&ccedil;&atilde;o inteligente
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -947,36 +797,23 @@ function ComparePageContent() {
               <button
                 type="button"
                 onClick={() => setCompareKind("municipio")}
-                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "municipio"
-                    ? "bg-cyan-600 text-white"
-                    : `${theme.mutedStrong} hover:text-cyan-600`
-                  }`}
+                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "municipio" ? "bg-cyan-600 text-white" : `${theme.mutedStrong} hover:text-cyan-600`}`}
               >
-                Município
+                Munic&iacute;pio
               </button>
               <button
                 type="button"
                 onClick={() => setCompareKind("bairro")}
-                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "bairro"
-                    ? "bg-purple-600 text-white"
-                    : `${theme.mutedStrong} hover:text-purple-600`
-                  }`}
+                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "bairro" ? "bg-purple-600 text-white" : `${theme.mutedStrong} hover:text-purple-600`}`}
               >
-                Vizinhança
+                Vizinhan&ccedil;a
               </button>
             </div>
-            <button
-              type="button"
-              onClick={clear}
-              className={`rounded-md border px-3 py-1.5 text-xs transition ${theme.buttonSoft}`}
-            >
+            <button type="button" onClick={clear} className={`rounded-md border px-3 py-1.5 text-xs transition ${theme.buttonSoft}`}>
               Limpar
             </button>
-            <Link
-              href="/observatorio"
-              className={`rounded-md border px-3 py-1.5 text-xs transition ${theme.button}`}
-            >
-              ← Voltar ao mapa
+            <Link href="/observatorio" className={`rounded-md border px-3 py-1.5 text-xs transition ${theme.button}`}>
+              &larr; Voltar ao mapa
             </Link>
           </div>
         </div>
@@ -987,14 +824,27 @@ function ComparePageContent() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
-            <span className={`text-sm ${theme.muted}`}>Carregando dados de comparação…</span>
+            <span className={`text-sm ${theme.muted}`}>Carregando dados de compara&ccedil;&atilde;o&hellip;</span>
           </div>
         ) : (
           <>
+            {/* Seletor de módulo de segmentação */}
+            {allSegModules.length > 0 && (
+              <div className="mb-4 max-w-xs">
+                <SegmentationModuleSelector
+                  modules={allSegModules}
+                  selectedModuleId={activeSegModuleId}
+                  onModuleChange={setActiveSegModuleId}
+                  isDark={isDark}
+                />
+              </div>
+            )}
+
+            {/* Seletor de município para bairros */}
             {compareKind === "bairro" && (
               <div className={`mb-4 grid gap-2 rounded-xl border px-4 py-3 sm:grid-cols-[1fr_240px] sm:items-center ${theme.surfaceSoft}`}>
                 <p className={`text-sm ${theme.muted}`}>
-                  Escolha o município para listar e comparar suas vizinhanças.
+                  Escolha o munic&iacute;pio para listar e comparar suas vizinhan&ccedil;as.
                 </p>
                 <select
                   value={bairroMunicipioId}
@@ -1008,9 +858,7 @@ function ComparePageContent() {
                   className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${theme.input}`}
                 >
                   {bairroMunicipioOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.nome}
-                    </option>
+                    <option key={item.id} value={item.id}>{item.nome}</option>
                   ))}
                 </select>
               </div>
@@ -1018,67 +866,118 @@ function ComparePageContent() {
 
             {compareKind === "bairro" && compareItems.length === 0 && !isLoadingBairroItems && (
               <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${theme.empty}`}>
-                Nenhum bairro disponível para o município selecionado.
+                Nenhum bairro dispon&iacute;vel para o munic&iacute;pio selecionado.
               </div>
             )}
 
-            <div className="mb-6 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
-              <MunicipioSelector
-                label={compareKind === "bairro" ? "Bairro A" : "Município A"}
-                color="cyan"
-                selected={selectedA}
-                search={searchA}
-                filtered={filteredA}
-                onSearch={setSearchA}
-                onSelect={(m) => { setPrimaryId(m.id); setSearchA(""); }}
-                onClear={() => { setPrimaryId(""); setSearchA(""); }}
-                isDark={isDark}
-              />
+            {/* Seletores de entidade com segmentação */}
+            <div className="mb-8 grid grid-cols-[1fr_56px_1fr] items-start gap-0">
+              <div className="space-y-3">
+                <MunicipioSelector
+                  label={compareKind === "bairro" ? "Bairro A" : "Municipio A"}
+                  color="cyan"
+                  selected={selectedA}
+                  search={searchA}
+                  filtered={filteredA}
+                  onSearch={setSearchA}
+                  onSelect={(m) => { setPrimaryId(m.id); setSearchA(""); }}
+                  onClear={() => { setPrimaryId(""); setSearchA(""); }}
+                  isDark={isDark}
+                />
+                {selectedA && segModuleForRender && (
+                  <div className="pt-1.5 pl-1">
+                    <SegmentationSelector
+                      module={segModuleForRender}
+                      availableSegments={availableSegmentsA}
+                      selectedSegment={segmentA}
+                      onSegmentChange={setSegmentA}
+                      isDark={isDark}
+                      variant="pill"
+                    />
+                  </div>
+                )}
+              </div>
 
-              <div className="flex flex-col items-center justify-center pt-7 gap-2">
+              <div className="flex flex-col items-center justify-start pt-11">
                 <button
                   type="button"
                   onClick={swap}
                   disabled={!primaryId || !secondaryId}
                   title="Trocar"
-                  className={`rounded-full border p-2 transition disabled:opacity-30 ${theme.buttonSoft}`}
+                  className={`rounded-full border p-2.5 transition disabled:opacity-30 hover:scale-105 active:scale-95 ${theme.buttonSoft}`}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
                   </svg>
                 </button>
               </div>
 
-              <MunicipioSelector
-                label={compareKind === "bairro" ? "Bairro B" : "Município B"}
-                color="purple"
-                selected={selectedB}
-                search={searchB}
-                filtered={filteredB}
-                onSearch={setSearchB}
-                onSelect={(m) => { setSecondaryId(m.id); setSearchB(""); }}
-                onClear={() => { setSecondaryId(""); setSearchB(""); }}
-                isDark={isDark}
-              />
+              <div className="space-y-3">
+                <MunicipioSelector
+                  label={compareKind === "bairro" ? "Bairro B" : "Municipio B"}
+                  color="purple"
+                  selected={selectedB}
+                  search={searchB}
+                  filtered={filteredB}
+                  onSearch={setSearchB}
+                  onSelect={(m) => { setSecondaryId(m.id); setSearchB(""); }}
+                  onClear={() => { setSecondaryId(""); setSearchB(""); }}
+                  isDark={isDark}
+                />
+                {selectedB && segModuleForRender && (
+                  <div className="pt-1.5 pl-1">
+                    <SegmentationSelector
+                      module={segModuleForRender}
+                      availableSegments={availableSegmentsB}
+                      selectedSegment={segmentB}
+                      onSegmentChange={setSegmentB}
+                      isDark={isDark}
+                      variant="pill"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Conteúdo da comparação */}
             {selectedA && selectedB ? (
               <div className="space-y-4">
+                {/* Status da comparação */}
+                <div className={`rounded-xl border px-4 py-2 ${theme.surfaceSoft}`}>
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className={isDark ? "text-zinc-500" : "text-zinc-600"}>Comparando:</span>
+                    <span className="text-cyan-400 font-medium">{selectedA.nome}</span>
+                    {segModuleForRender && (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${isDark ? "bg-cyan-500/10 text-cyan-400" : "bg-cyan-50 text-cyan-700"
+                        }`}>
+                        {segModuleForRender.segments[segmentA]?.label || segmentA}
+                      </span>
+                    )}
+                    <span className={isDark ? "text-zinc-600" : "text-zinc-400"}>vs</span>
+                    <span className="text-purple-400 font-medium">{selectedB.nome}</span>
+                    {segModuleForRender && (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${isDark ? "bg-purple-500/10 text-purple-400" : "bg-purple-50 text-purple-700"
+                        }`}>
+                        {segModuleForRender.segments[segmentB]?.label || segmentB}
+                      </span>
+                    )}
+                    {segmentA !== segmentB && (
+                      <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-700"
+                        }`}>
+                        Segmentos diferentes
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 {winner && winner !== "tie" && (
-                  <div
-                    className={`rounded-xl border px-4 py-3 ${winner === "a"
-                        ? "border-cyan-500/30 bg-cyan-950/20"
-                        : "border-purple-500/30 bg-purple-950/20"
-                      }`}
-                  >
+                  <div className={`rounded-xl border px-4 py-3 ${winner === "a" ? "border-cyan-500/30 bg-cyan-950/20" : "border-purple-500/30 bg-purple-950/20"
+                    }`}>
                     <p className="text-xs text-zinc-400">
-                      <span
-                        className={`font-semibold ${winner === "a" ? "text-cyan-400" : "text-purple-400"}`}
-                      >
+                      <span className={`font-semibold ${winner === "a" ? "text-cyan-400" : "text-purple-400"}`}>
                         {winner === "a" ? selectedA.nome : selectedB.nome}
                       </span>{" "}
-                      se destaca na maioria dos indicadores disponíveis.
+                      se destaca na maioria dos indicadores dispon&iacute;veis.
                     </p>
                   </div>
                 )}
@@ -1086,20 +985,16 @@ function ComparePageContent() {
                 {!hasAnyData && (
                   <div className={`rounded-xl border px-4 py-6 text-center ${theme.surfaceSoft}`}>
                     <p className={`text-sm ${theme.muted}`}>
-                      Dados agregados ainda não disponíveis para este recorte.
-                      Os indicadores são preenchidos conforme o Censo Escolar.
+                      Dados agregados ainda n&atilde;o dispon&iacute;veis para este recorte. Os indicadores s&atilde;o preenchidos conforme o Censo Escolar.
                     </p>
                   </div>
                 )}
 
                 <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-
+                  {/* Tabela de métricas */}
                   <div className="space-y-3">
                     {groups.map((group) => (
-                      <div
-                        key={group.label}
-                        className={`overflow-hidden rounded-xl border ${theme.surface}`}
-                      >
+                      <div key={group.label} className={`overflow-hidden rounded-xl border ${theme.surface}`}>
                         <div className={`border-b px-4 py-2.5 ${theme.border}`}>
                           <h3 className={`text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
                             {group.label}
@@ -1116,23 +1011,12 @@ function ComparePageContent() {
                             const aVal = formatMetricValue(m.a, m.format);
                             const bVal = formatMetricValue(m.b, m.format);
                             const isCompetitive = m.competitive !== false;
-                            const aWins =
-                              isCompetitive &&
-                              m.a > 0 &&
-                              m.b > 0 &&
-                              (m.higherIsBetter ? m.a > m.b : m.a < m.b);
-                            const bWins =
-                              isCompetitive &&
-                              m.a > 0 &&
-                              m.b > 0 &&
-                              (m.higherIsBetter ? m.b > m.a : m.b < m.a);
+                            const aWins = isCompetitive && m.a > 0 && m.b > 0 && (m.higherIsBetter ? m.a > m.b : m.a < m.b);
+                            const bWins = isCompetitive && m.a > 0 && m.b > 0 && (m.higherIsBetter ? m.b > m.a : m.b < m.a);
                             const noData = m.a === 0 && m.b === 0;
 
                             return (
-                              <div
-                                key={m.key}
-                                className={`metric-row grid grid-cols-[1fr_1fr_1fr] items-center gap-4 border-t px-4 py-3 transition-colors ${theme.border}`}
-                              >
+                              <div key={m.key} className={`metric-row grid grid-cols-[1fr_1fr_1fr] items-center gap-4 border-t px-4 py-3 transition-colors ${theme.border}`}>
                                 <div className="flex items-center gap-2">
                                   <span className={`text-sm ${theme.muted}`}>{m.label}</span>
                                   {isCompetitive && !m.higherIsBetter && (
@@ -1144,13 +1028,10 @@ function ComparePageContent() {
 
                                 <div className="text-right">
                                   {noData ? (
-                                    <span className={theme.mutedStrong}>—</span>
+                                    <span className={theme.mutedStrong}>{`\u2014`}</span>
                                   ) : (
                                     <div className="flex flex-col items-end gap-1">
-                                      <span
-                                        className={`text-sm font-semibold tabular-nums ${aWins ? "text-cyan-400" : aVal === "—" ? theme.mutedStrong : theme.textSoft
-                                          }`}
-                                      >
+                                      <span className={`text-sm font-semibold tabular-nums ${aWins ? "text-cyan-400" : aVal === "\u2014" ? theme.mutedStrong : theme.textSoft}`}>
                                         {aVal}
                                       </span>
                                       {isCompetitive && m.a > 0 && m.b > 0 && (
@@ -1162,13 +1043,10 @@ function ComparePageContent() {
 
                                 <div className="text-right">
                                   {noData ? (
-                                    <span className={theme.mutedStrong}>—</span>
+                                    <span className={theme.mutedStrong}>{`\u2014`}</span>
                                   ) : (
                                     <div className="flex flex-col items-end gap-1">
-                                      <span
-                                        className={`text-sm font-semibold tabular-nums ${bWins ? "text-purple-400" : bVal === "—" ? theme.mutedStrong : theme.textSoft
-                                          }`}
-                                      >
+                                      <span className={`text-sm font-semibold tabular-nums ${bWins ? "text-purple-400" : bVal === "\u2014" ? theme.mutedStrong : theme.textSoft}`}>
                                         {bVal}
                                       </span>
                                     </div>
@@ -1182,47 +1060,53 @@ function ComparePageContent() {
                     ))}
                   </div>
 
+                  {/* Sidebar */}
                   <div className="space-y-4">
+                    {/* Radar do módulo ativo */}
+                    {moduleGroups.length > 0 && (
+                      <div className={`rounded-xl border p-4 ${theme.surface}`}>
+                        <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
+                          {segModuleForRender?.label ?? "Módulo"}
+                        </p>
+                        {hasModuleData ? (
+                          <RadarChart groups={moduleGroups} nameA={selectedA.nome} nameB={selectedB.nome} isDark={isDark} />
+                        ) : (
+                          <div className="flex h-32 items-center justify-center">
+                            <p className={`text-xs ${theme.mutedStrong}`}>Sem dados</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Radar socioeconômico */}
                     <div className={`rounded-xl border p-4 ${theme.surface}`}>
                       <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
-                        Radar
+                        Socioecon&ocirc;mico
                       </p>
-                      {hasAnyData ? (
-                        <RadarChart
-                          groups={groups}
-                          nameA={selectedA.nome}
-                          nameB={selectedB.nome}
-                          isDark={isDark}
-                        />
+                      {hasSocioData ? (
+                        <RadarChart groups={socioGroups} nameA={selectedA.nome} nameB={selectedB.nome} isDark={isDark} />
                       ) : (
-                        <div className="flex h-40 items-center justify-center">
+                        <div className="flex h-32 items-center justify-center">
                           <p className={`text-xs ${theme.mutedStrong}`}>Sem dados</p>
                         </div>
                       )}
                     </div>
 
-                    {hasAnyData && (
-                      <div className={`rounded-xl border p-4 ${theme.surface}`}>
-                        <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
-                          Placar
-                        </p>
-                        <ScoreCard
-                          groups={groups}
-                          nameA={selectedA.nome}
-                          nameB={selectedB.nome}
-                          isDark={isDark}
-                        />
-                      </div>
-                    )}
+                    <div className={`rounded-xl border p-4 ${theme.surface}`}>
+                      <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>Placar</p>
+                      {hasAnyData ? (
+                        <ScoreCard groups={groups} nameA={selectedA.nome} nameB={selectedB.nome} isDark={isDark} />
+                      ) : (
+                        <div className="flex h-12 items-center justify-center">
+                          <p className={`text-xs ${theme.mutedStrong}`}>Sem dados</p>
+                        </div>
+                      )}
+                    </div>
 
                     <div className="space-y-2">
                       {selectedA && (
-                        <div
-                          className={`rounded-xl border p-3 ${theme.surface} ${winner === "a" ? "winner-glow-a" : ""}`}
-                        >
-                          <p className={`text-[10px] ${theme.muted}`}>
-                            {compareKind === "bairro" ? "Bairro A" : "Município A"}
-                          </p>
+                        <div className={`rounded-xl border p-3 ${theme.surface} ${winner === "a" ? "winner-glow-a" : ""}`}>
+                          <p className={`text-[10px] ${theme.muted}`}>{compareKind === "bairro" ? "Bairro A" : "Municipio A"}</p>
                           <p className={`mt-0.5 text-sm font-medium ${theme.text}`}>{selectedA.nome}</p>
                           {selectionA?.metrics?.map((m) => (
                             <div key={m.label} className="mt-1 flex justify-between text-xs">
@@ -1233,12 +1117,8 @@ function ComparePageContent() {
                         </div>
                       )}
                       {selectedB && (
-                        <div
-                          className={`rounded-xl border p-3 ${theme.surface} ${winner === "b" ? "winner-glow-b" : ""}`}
-                        >
-                          <p className={`text-[10px] ${theme.muted}`}>
-                            {compareKind === "bairro" ? "Bairro B" : "Município B"}
-                          </p>
+                        <div className={`rounded-xl border p-3 ${theme.surface} ${winner === "b" ? "winner-glow-b" : ""}`}>
+                          <p className={`text-[10px] ${theme.muted}`}>{compareKind === "bairro" ? "Bairro B" : "Municipio B"}</p>
                           <p className={`mt-0.5 text-sm font-medium ${theme.text}`}>{selectedB.nome}</p>
                           {selectionB?.metrics?.map((m) => (
                             <div key={m.label} className="mt-1 flex justify-between text-xs">
@@ -1255,7 +1135,7 @@ function ComparePageContent() {
             ) : (
               <div className={`rounded-xl border border-dashed py-16 text-center ${theme.empty}`}>
                 <p className={`text-sm ${theme.mutedStrong}`}>
-                  Selecione dois {compareKind === "bairro" ? "bairros" : "municípios"} para iniciar a comparação
+                  Selecione dois {compareKind === "bairro" ? "bairros" : "munic\u00edpios"} para iniciar a compara\u00e7\u00e3o
                 </p>
               </div>
             )}
@@ -1270,168 +1150,16 @@ function ComparePageContent() {
 // COMPONENTE PRINCIPAL (com Suspense)
 // ============================================================
 
-function ScoreCard({
-  groups,
-  nameA,
-  nameB,
-  isDark,
-}: {
-  groups: MetricGroup[];
-  nameA: string;
-  nameB: string;
-  isDark: boolean;
-}) {
-  let scoreA = 0;
-  let scoreB = 0;
-  let ties = 0;
-
-  groups.forEach((g) =>
-    g.metrics.forEach((m) => {
-      if (m.competitive === false) return;
-      if (m.a === 0 && m.b === 0) return;
-      if (m.higherIsBetter) {
-        if (m.a > m.b) scoreA++;
-        else if (m.b > m.a) scoreB++;
-        else ties++;
-      } else {
-        if (m.a < m.b) scoreA++;
-        else if (m.b < m.a) scoreB++;
-        else ties++;
-      }
-    }),
-  );
-
-  const total = scoreA + scoreB + ties;
-  const pctA = total > 0 ? Math.round((scoreA / total) * 100) : 0;
-  const pctB = total > 0 ? Math.round((scoreB / total) * 100) : 0;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between text-xs">
-        <span className="text-cyan-400 font-semibold">{nameA.split(" ")[0]}</span>
-        <span className={isDark ? "text-zinc-600 text-[10px]" : "text-zinc-500 text-[10px]"}>
-          {ties > 0 ? `${ties} empate${ties > 1 ? "s" : ""}` : ""}
-        </span>
-        <span className="text-purple-400 font-semibold">{nameB.split(" ")[0]}</span>
-      </div>
-      <div className={`flex h-2 overflow-hidden rounded-full ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
-        <div style={{ width: `${pctA}%` }} className="bg-cyan-500 transition-all" />
-        <div style={{ width: `${pctB}%` }} className="bg-purple-500 transition-all" />
-      </div>
-      <div className={`flex justify-between text-xs ${isDark ? "text-zinc-500" : "text-zinc-600"}`}>
-        <span>{scoreA} indicador{scoreA !== 1 ? "es" : ""}</span>
-        <span>{scoreB} indicador{scoreB !== 1 ? "es" : ""}</span>
-      </div>
-    </div>
-  );
-}
-
-function MunicipioSelector({
-  label,
-  color,
-  selected,
-  search,
-  filtered,
-  onSearch,
-  onSelect,
-  onClear,
-  isDark,
-}: {
-  label: string;
-  color: "cyan" | "purple";
-  selected: CompareEntity | null;
-  search: string;
-  filtered: CompareEntity[];
-  onSearch: (q: string) => void;
-  onSelect: (m: CompareEntity) => void;
-  onClear: () => void;
-  isDark: boolean;
-}) {
-  const accent = color === "cyan" ? "text-cyan-400" : "text-purple-400";
-  const border = color === "cyan" ? "border-cyan-500/40" : "border-purple-500/40";
-  const ring = color === "cyan" ? "focus:ring-cyan-500/30" : "focus:ring-purple-500/30";
-  const panel = isDark ? "bg-zinc-900/60" : "bg-white";
-  const input = isDark
-    ? "border-zinc-700 bg-zinc-900 text-white placeholder-zinc-600"
-    : "border-zinc-300 bg-white text-zinc-900 placeholder-zinc-400";
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  return (
-    <div>
-      <p className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] ${accent}`}>
-        {label}
-      </p>
-      {selected ? (
-        <div className={`rounded-xl border ${border} ${panel} p-3`}>
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className={`font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>{selected.nome}</p>
-              {selected.estadoId && (
-                <p className={isDark ? "mt-0.5 text-xs text-zinc-500" : "mt-0.5 text-xs text-zinc-600"}>
-                  {selected.estadoId.toUpperCase()}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onClear}
-              className={`mt-0.5 rounded border px-2 py-0.5 text-[10px] transition ${isDark
-                  ? "border-zinc-700 text-zinc-500 hover:text-zinc-300"
-                  : "border-zinc-300 text-zinc-600 hover:text-zinc-900"
-                }`}
-            >
-              Trocar
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="relative">
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder={`Buscar ${label.toLowerCase().replace(" a", "").replace(" b", "")}…`}
-            className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none ring-0 transition focus:border-zinc-600 focus:ring-1 ${input} ${ring}`}
-          />
-          {filtered.length > 0 && (
-            <ul
-              className={`select-enter absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-xl border py-1 shadow-xl ${isDark ? "border-zinc-700 bg-zinc-900" : "border-zinc-200 bg-white"
-                }`}
-            >
-              {filtered.map((m) => (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    onMouseDown={() => onSelect(m)}
-                    className={`w-full px-3 py-2 text-left transition ${isDark ? "hover:bg-zinc-800" : "hover:bg-zinc-100"}`}
-                  >
-                    <div className={isDark ? "text-sm text-zinc-200" : "text-sm text-zinc-900"}>{m.nome}</div>
-                    {m.estadoId && <div className={isDark ? "text-[10px] text-zinc-600" : "text-[10px] text-zinc-500"}>{m.estadoId.toUpperCase()}</div>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// EXPORT PRINCIPAL COM SUSPENSE
-// ============================================================
-
 export default function ComparePage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <svg className="h-8 w-8 animate-spin text-cyan-500" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
           </svg>
-          <span className="text-sm text-zinc-400">Carregando comparador...</span>
+          <span className="text-sm text-zinc-500">Carregando...</span>
         </div>
       </div>
     }>
