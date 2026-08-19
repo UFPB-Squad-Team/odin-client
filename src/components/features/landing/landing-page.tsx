@@ -7,6 +7,7 @@ import { LandingHero } from "@/components/features/landing/landing-hero";
 import { LandingNavbar } from "@/components/features/landing/landing-navbar";
 import { LandingWowFactor } from "@/components/features/landing/landing-wow-factor";
 import { LandingSources } from "@/components/features/landing/landing-sources";
+import { MimirButton } from "@/components/features/mimir/mimir-button";
 
 export function LandingPage() {
   return (
@@ -34,6 +35,8 @@ export function LandingPage() {
 
       <LandingCta />
       <LandingFooter />
+
+      <MimirButton />
     </main>
   );
 }
