@@ -20,7 +20,13 @@ import { useCallback } from "react";
 import { useTheme } from "next-themes";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
 import { getModule } from "@/core/registry/module-registry";
-import { JOAO_PESSOA_IBGE_ID } from "@/core/territory/territory-api";
+import {
+  JOAO_PESSOA_IBGE_ID,
+  NORDESTE_VIEWPORT,
+  getEstadoViewport,
+  normalizeEstadoId,
+  resolveDefaultEstadoId,
+} from "@/core/territory/territory-api";
 import type { ShellContextType } from "@/core/types/shell";
 import type { ObservatoryLayer } from "@/core/types/territory";
 import type { DependenciaAdministrativa } from "@/core/types/comparision";
@@ -70,7 +76,13 @@ function initialViewForLayer(layer: ObservatoryLayer): MapViewState {
     return { longitude: -34.86, latitude: -7.12, zoom: 9.5 };
   }
 
-  return { longitude: -34.86, latitude: -7.12, zoom: 4.9 };
+  // Camada de município: view padrão é a visão geral do Nordeste ("todos os
+  // estados"). Ao escolher uma UF no filtro, o mapa faz pan para o estado.
+  return {
+    longitude: NORDESTE_VIEWPORT.longitude,
+    latitude: NORDESTE_VIEWPORT.latitude,
+    zoom: NORDESTE_VIEWPORT.zoom,
+  };
 }
 
 function isMapStyleId(value: string | null): value is MapStyleId {
@@ -245,6 +257,29 @@ export function ObservatorioShell() {
 
   function handleEntityClick(entity: import("@/core/types/shell").MapEntity) {
     selectEntityAndSyncFilter(entity);
+  }
+
+  /**
+   * Seleção de estado — raiz do filtro em cascata territorial.
+   *
+   * - Limpar o campo (✕) volta ao estado padrão (`DEFAULT_ESTADO_UF`) em vez de
+   *   deixar o observatório sem recorte territorial.
+   * - Enquadra a UF escolhida no mapa e alinha a camada ativa ao nível estadual,
+   *   pois a cascata reseta município/bairro ao trocar de estado.
+   */
+  function handleSetEstado(estadoId: string | null) {
+    const nextEstadoId = estadoId ?? resolveDefaultEstadoId(estados);
+    if (!nextEstadoId) return;
+
+    filters.setEstado(nextEstadoId);
+
+    const viewport = getEstadoViewport(nextEstadoId);
+    setActiveLayer("municipio");
+    setMapViewState({
+      longitude: viewport.longitude,
+      latitude: viewport.latitude,
+      zoom: viewport.zoom,
+    });
   }
 
   const indicatorGroups = useIndicatorGroups(activeLayer, activeModuleId);
@@ -470,7 +505,9 @@ export function ObservatorioShell() {
     const queryState = {
       activeModuleId: searchParams.get("modulo"),
       bairroId: searchParams.get("bairro"),
-      estadoId: searchParams.get("estado"),
+      // Normaliza a UF recebida na URL: aceita "PB", "pb" ou nome do estado.
+      // Valor inválido é tratado como ausente (cai no default da plataforma).
+      estadoId: normalizeEstadoId(searchParams.get("estado")),
       layer: isLayer(queryLayer) ? queryLayer : null,
       municipioId: searchParams.get("municipio"),
       // undefined quando não há parâmetro explícito — nesse caso não mexemos
@@ -532,7 +569,8 @@ export function ObservatorioShell() {
           storageState = {
             activeModuleId: parsed.activeModuleId ?? null,
             bairroId: parsed.bairroId ?? null,
-            estadoId: parsed.estadoId ?? null,
+            // Sessão antiga pode ter gravado a sigla em caixa alta.
+            estadoId: normalizeEstadoId(parsed.estadoId ?? null),
             layer: parsedLayer,
             municipioId: parsed.municipioId ?? null,
             // Sempre recolhida ao restaurar de localStorage (comportamento
@@ -923,7 +961,7 @@ export function ObservatorioShell() {
               setMapViewState(initialViewForLayer(layer));
             }}
             onSetBairro={filters.setBairro}
-            onSetEstado={filters.setEstado}
+            onSetEstado={handleSetEstado}
             onSetMunicipio={filters.setMunicipio}
             onSearchSelect={handleSearchSelect}
             sidebarCollapsed={sidebarCollapsed}

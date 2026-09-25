@@ -9,6 +9,7 @@ import {
   listBairros,
   listEstados,
   listMunicipios,
+  resolveDefaultEstadoId,
 } from "@/core/territory/territory-api";
 import {
   MOCK_BAIRROS,
@@ -69,12 +70,12 @@ export function useShellFilters(initialState?: InitialState) {
   });
 
   const pendingPathRef = useRef<{ municipioId?: string; bairroId?: string } | null>(null);
-  const bootstrapRef = useRef({ estado: true, municipio: true, bairro: true });
+  const bootstrapRef = useRef({ municipio: true, bairro: true });
 
   // Aplicar estado inicial da persistência (URL/localStorage)
   useEffect(() => {
     if (initialState?.estadoId && !estadoId) {
-      bootstrapRef.current = { estado: false, municipio: false, bairro: false };
+      bootstrapRef.current = { municipio: false, bairro: false };
       pendingPathRef.current = {
         municipioId: initialState.municipioId ?? undefined,
         bairroId: initialState.bairroId ?? undefined,
@@ -91,9 +92,11 @@ export function useShellFilters(initialState?: InitialState) {
       const data = await withFallback(listEstados, MOCK_ESTADOS);
       if (alive) {
         setEstados(data);
-        if (bootstrapRef.current.estado && !estadoId && data[0]) {
-          setEstado(data[0].id);
-          bootstrapRef.current.estado = false;
+        // Estado é a raiz do filtro em cascata — se nenhum foi restaurado,
+        // assume o default da plataforma em vez de deixar a cascata vazia.
+        if (!estadoId) {
+          const defaultEstadoId = resolveDefaultEstadoId(data);
+          if (defaultEstadoId) setEstado(defaultEstadoId);
         }
       }
       setLoading((prev) => ({ ...prev, estados: false }));
@@ -266,8 +269,13 @@ export function useShellFilters(initialState?: InitialState) {
     if (path.bairroId && path.bairroId !== bairroId) setBairro(path.bairroId);
   }
 
+  /**
+   * Desativa os defaults automáticos de município/bairro quando um estado
+   * explícito foi restaurado (URL/localStorage). O estado é a raiz da cascata
+   * e é sempre resolvido pelo `loadEstados` (default = `DEFAULT_ESTADO_UF`).
+   */
   function disableBootstrapDefaults() {
-    bootstrapRef.current = { estado: false, municipio: false, bairro: false };
+    bootstrapRef.current = { municipio: false, bairro: false };
   }
 
   return {

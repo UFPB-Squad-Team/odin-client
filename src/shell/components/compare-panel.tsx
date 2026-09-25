@@ -4,14 +4,28 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useShellContext } from "@/shell/context/shell-context";
 import RadarChart from "@/shell/components/radar-chart";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
+import { NORDESTE_ESTADOS } from "@/core/territory/estados-nordeste";
 
 type Option = {
   id: string;
   label: string;
   subtitle?: string;
-  kind: "municipio" | "bairro" | "escola";
+  kind: "estado" | "municipio" | "bairro" | "escola";
   source: import("@/core/types/shell").ObservatorySelection;
 };
+
+const ESTADO_OPTIONS: Option[] = NORDESTE_ESTADOS.map((estado) => ({
+  id: `estado-${estado.id}`,
+  label: estado.nome,
+  subtitle: estado.sigla,
+  kind: "estado",
+  source: {
+    id: estado.id,
+    nome: estado.nome,
+    kind: "estado",
+    subtitle: `Estado · ${estado.sigla}`,
+  },
+}));
 
 export default function ComparePanel() {
   const ctx = useShellContext();
@@ -22,7 +36,7 @@ export default function ComparePanel() {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const options: Option[] = useMemo(() => {
+  const layerOptions: Option[] = useMemo(() => {
     if (activeLayer === "municipio") {
       return municipios.map((m) => ({
         id: m.id,
@@ -49,6 +63,11 @@ export default function ComparePanel() {
       source: { id: s.id, nome: s.nome, kind: "escola", subtitle: s.bairroNome?.toUpperCase() ?? s.municipioNome?.toUpperCase() ?? "Escola" },
     }));
   }, [activeLayer, bairros, escolas, municipios]);
+
+  const options: Option[] = useMemo(
+    () => [...ESTADO_OPTIONS, ...layerOptions],
+    [layerOptions],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

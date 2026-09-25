@@ -7,7 +7,13 @@ import { useTheme } from "next-themes";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useShellContext } from "@/shell/context/shell-context";
 import { getModule } from "@/core/registry/module-registry";
-import { listBairros } from "@/core/territory/territory-api";
+import { listBairros, listMunicipios } from "@/core/territory/territory-api";
+import { fetchMunicipiosGeoJSON } from "@/core/geospatial/geospatial-api";
+import {
+  DEFAULT_ESTADO_ID,
+  NORDESTE_ESTADOS,
+  normalizeEstadoId,
+} from "@/core/territory/estados-nordeste";
 import type { MapEntity, ObservatorySelection } from "@/core/types/shell";
 import type { Bairro, Municipio } from "@/core/types/territory";
 
@@ -41,6 +47,105 @@ function fmtInt(v: unknown): string {
 }
 
 
+/** Rótulo do lado ("Estado A", "Município B"…) conforme a granularidade atual. */
+function kindNoun(kind: CompareEntityKind, side: "A" | "B"): string {
+  const base = kind === "estado" ? "Estado" : kind === "bairro" ? "Bairro" : "Município";
+  return `${base} ${side}`;
+}
+
+/** Plural da granularidade para textos de estado vazio. */
+function kindPlural(kind: CompareEntityKind): string {
+  return kind === "estado" ? "estados" : kind === "bairro" ? "bairros" : "municípios";
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function toFiniteNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = parseFloat(v.replace(",", "."));
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+/** Chaves de taxa/proporção → média simples; demais chaves numéricas → soma. */
+function isAggMeanKey(key: string): boolean {
+  return /^(pct|taxa|razao|media|média)/i.test(key);
+}
+
+type AggAcc = { total: number; count: number };
+
+function collectAggValues(
+  node: Record<string, unknown>,
+  prefix: string,
+  into: Map<string, AggAcc>,
+) {
+  for (const [key, raw] of Object.entries(node)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (isRecord(raw)) {
+      collectAggValues(raw, path, into);
+      continue;
+    }
+    const num = toFiniteNumber(raw);
+    if (num === null) continue;
+    const acc = into.get(path) ?? { total: 0, count: 0 };
+    acc.total += num;
+    acc.count += 1;
+    into.set(path, acc);
+  }
+}
+
+function setPathValue(target: Record<string, unknown>, path: string, value: number) {
+  const parts = path.split(".");
+  let node = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (!isRecord(node[part])) node[part] = {};
+    node = node[part] as Record<string, unknown>;
+  }
+  node[parts[parts.length - 1]] = value;
+}
+
+/**
+ * Agrega as props dos municípios de um estado em um único objeto no formato
+ * esperado por `extractComparableMetrics` (`educacao` / `socioeconomico`):
+ * somatório para totais, média simples para percentuais/taxas.
+ */
+function aggregateEstadoProps(
+  collection: { features?: Array<{ properties?: unknown }> } | null,
+): Record<string, unknown> | null {
+  const features = (collection?.features ?? []).filter((f) =>
+    isRecord(f?.properties),
+  ) as Array<{ properties: Record<string, unknown> }>;
+  if (features.length === 0) return null;
+
+  const sections: Record<string, unknown> = {};
+  let hasValues = false;
+
+  for (const section of ["educacao", "socioeconomico"] as const) {
+    const acc = new Map<string, AggAcc>();
+    for (const feature of features) {
+      const sec = feature.properties[section];
+      if (isRecord(sec)) collectAggValues(sec, "", acc);
+    }
+    if (acc.size === 0) continue;
+
+    const out: Record<string, unknown> = {};
+    for (const [path, { total, count }] of acc) {
+      const leaf = path.split(".").pop() ?? path;
+      setPathValue(out, path, isAggMeanKey(leaf) ? total / count : total);
+    }
+    sections[section] = out;
+    hasValues = true;
+  }
+
+  return hasValues ? sections : null;
+}
+
+
 type MetricGroup = {
   label: string;
   metrics: Array<{
@@ -54,7 +159,7 @@ type MetricGroup = {
   }>;
 };
 
-type CompareEntityKind = "municipio" | "bairro";
+type CompareEntityKind = "estado" | "municipio" | "bairro";
 
 type CompareEntity = {
   id: string;
@@ -110,7 +215,7 @@ function extractComparableMetrics(
     },
   ];
 
-  if (kind === "municipio") {
+  if (kind !== "bairro") {
     redeEscolarMetrics.push({
       key: "totalBairros",
       label: "Bairros com escolas",
@@ -587,14 +692,27 @@ function ComparePageContent() {
   const [mounted, setMounted] = useState(false);
 
   const [compareKind, setCompareKind] = useState<CompareEntityKind>("municipio");
-  const [bairroMunicipioId, setBairroMunicipioId] = useState<string>("");
-  const [bairrosByMunicipio, setBairrosByMunicipio] = useState<Bairro[]>([]);
-  const [isLoadingBairroItems, setIsLoadingBairroItems] = useState(false);
+  const [ufA, setUfA] = useState<string>("");
+  const [ufB, setUfB] = useState<string>("");
+  const [municipiosA, setMunicipiosA] = useState<Municipio[]>([]);
+  const [municipiosB, setMunicipiosB] = useState<Municipio[]>([]);
+  const [isLoadingMunicipiosA, setIsLoadingMunicipiosA] = useState(true);
+  const [isLoadingMunicipiosB, setIsLoadingMunicipiosB] = useState(true);
+  const [bairroMunicipioIdA, setBairroMunicipioIdA] = useState<string>("");
+  const [bairroMunicipioIdB, setBairroMunicipioIdB] = useState<string>("");
+  const [bairrosByMunicipioA, setBairrosByMunicipioA] = useState<Bairro[]>([]);
+  const [bairrosByMunicipioB, setBairrosByMunicipioB] = useState<Bairro[]>([]);
+  const [isLoadingBairroItemsA, setIsLoadingBairroItemsA] = useState(false);
+  const [isLoadingBairroItemsB, setIsLoadingBairroItemsB] = useState(false);
+  const [estadoAgg, setEstadoAgg] = useState<Record<string, Record<string, unknown>>>({});
+  const [isLoadingEstadoAgg, setIsLoadingEstadoAgg] = useState(false);
   const [primaryId, setPrimaryId] = useState<string>("");
   const [secondaryId, setSecondaryId] = useState<string>("");
   const [searchA, setSearchA] = useState("");
   const [searchB, setSearchB] = useState("");
+  const didInitUfs = useRef(false);
   const bairroCacheRef = useRef<Record<string, Bairro[]>>({});
+  const municipiosCacheRef = useRef<Record<string, Municipio[]>>({});
   const isDark = mounted ? resolvedTheme !== "light" : true;
 
   useEffect(() => {
@@ -646,75 +764,209 @@ function ComparePageContent() {
     [ctx.bairros],
   );
 
-  const bairroMunicipioOptions = useMemo(
-    () =>
-      [...municipios].sort((a, b) =>
-        a.nome.localeCompare(b.nome, "pt-BR", {
-          sensitivity: "base",
-          numeric: true,
-        }),
-      ),
-    [municipios],
-  );
+  // Inicialização das UFs por lado: query string > filtro do shell > padrão.
+  useEffect(() => {
+    if (didInitUfs.current) return;
+    const urlPrimaria = normalizeEstadoId(searchParams.get("primaryEstado"));
+    const urlSecundaria = normalizeEstadoId(searchParams.get("secondaryEstado"));
+    if (urlPrimaria || urlSecundaria) {
+      const base = urlPrimaria ?? urlSecundaria ?? DEFAULT_ESTADO_ID;
+      setUfA(urlPrimaria ?? base);
+      setUfB(urlSecundaria ?? base);
+      didInitUfs.current = true;
+      return;
+    }
+    if (!ctx.filters.estadoId) return;
+    const shellUf = normalizeEstadoId(ctx.filters.estadoId) ?? DEFAULT_ESTADO_ID;
+    setUfA(shellUf);
+    setUfB(shellUf);
+    didInitUfs.current = true;
+  }, [ctx.filters.estadoId, searchParams]);
+
+  // Lista de municípios por lado (modos município e bairro), com cache por UF.
+  useEffect(() => {
+    if (compareKind === "estado") return;
+    if (!ufA) return;
+    const cached = municipiosCacheRef.current[ufA];
+    if (cached) {
+      setMunicipiosA(cached);
+      setIsLoadingMunicipiosA(false);
+      return;
+    }
+    let alive = true;
+    setIsLoadingMunicipiosA(true);
+    setMunicipiosA([]);
+    listMunicipios(ufA)
+      .then((data) => {
+        municipiosCacheRef.current[ufA] = data;
+        if (alive) setMunicipiosA(data);
+      })
+      .catch(() => {
+        if (alive) setMunicipiosA([]);
+      })
+      .finally(() => {
+        if (alive) setIsLoadingMunicipiosA(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [compareKind, ufA]);
+
+  useEffect(() => {
+    if (compareKind === "estado") return;
+    if (!ufB) return;
+    const cached = municipiosCacheRef.current[ufB];
+    if (cached) {
+      setMunicipiosB(cached);
+      setIsLoadingMunicipiosB(false);
+      return;
+    }
+    let alive = true;
+    setIsLoadingMunicipiosB(true);
+    setMunicipiosB([]);
+    listMunicipios(ufB)
+      .then((data) => {
+        municipiosCacheRef.current[ufB] = data;
+        if (alive) setMunicipiosB(data);
+      })
+      .catch(() => {
+        if (alive) setMunicipiosB([]);
+      })
+      .finally(() => {
+        if (alive) setIsLoadingMunicipiosB(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [compareKind, ufB]);
+
+  // Município de partida de cada lado no modo bairro.
+  useEffect(() => {
+    if (compareKind !== "bairro") return;
+    if (isLoadingMunicipiosA || municipiosA.length === 0) return;
+    const isKnown = (id: string) => municipiosA.some((m) => m.id === id);
+    if (bairroMunicipioIdA && isKnown(bairroMunicipioIdA)) return;
+    const fromUrl = searchParams.get("municipio") ?? "";
+    const fromShell = ctx.filters.municipioId ?? "";
+    setBairroMunicipioIdA(
+      isKnown(fromUrl) ? fromUrl : isKnown(fromShell) ? fromShell : municipiosA[0].id,
+    );
+  }, [bairroMunicipioIdA, compareKind, ctx.filters.municipioId, isLoadingMunicipiosA, municipiosA, searchParams]);
 
   useEffect(() => {
     if (compareKind !== "bairro") return;
-    if (bairroMunicipioId) return;
+    if (isLoadingMunicipiosB || municipiosB.length === 0) return;
+    const isKnown = (id: string) => municipiosB.some((m) => m.id === id);
+    if (bairroMunicipioIdB && isKnown(bairroMunicipioIdB)) return;
+    const fromShell = ctx.filters.municipioId ?? "";
+    setBairroMunicipioIdB(isKnown(fromShell) ? fromShell : municipiosB[0].id);
+  }, [bairroMunicipioIdB, compareKind, ctx.filters.municipioId, isLoadingMunicipiosB, municipiosB]);
 
-    const municipioFromUrl = searchParams.get("municipio") ?? "";
-    const currentShellMunicipio = ctx.filters.municipioId ?? "";
-    const defaultMunicipio =
-      municipioFromUrl || currentShellMunicipio || bairroMunicipioOptions[0]?.id || "";
-
-    if (defaultMunicipio) setBairroMunicipioId(defaultMunicipio);
-  }, [bairroMunicipioId, bairroMunicipioOptions, compareKind, ctx.filters.municipioId, searchParams]);
-
+  // Bairros por lado, com cache por município.
   useEffect(() => {
     if (compareKind !== "bairro") return;
-    if (!bairroMunicipioId) {
-      setBairrosByMunicipio([]);
+    if (!bairroMunicipioIdA) {
+      setBairrosByMunicipioA([]);
+      setIsLoadingBairroItemsA(false);
       return;
     }
 
-    const cached = bairroCacheRef.current[bairroMunicipioId];
+    const cached = bairroCacheRef.current[bairroMunicipioIdA];
     if (cached) {
-      setBairrosByMunicipio(cached);
+      setBairrosByMunicipioA(cached);
+      setIsLoadingBairroItemsA(false);
       return;
     }
 
     let alive = true;
-    setIsLoadingBairroItems(true);
+    setIsLoadingBairroItemsA(true);
 
-    async function loadBairrosByMunicipio() {
+    async function loadBairrosA() {
       try {
-        const data = await listBairros(bairroMunicipioId);
+        const data = await listBairros(bairroMunicipioIdA);
         const sorted = [...data].sort((a, b) =>
           a.nome.localeCompare(b.nome, "pt-BR", {
             sensitivity: "base",
             numeric: true,
           }),
         );
-        bairroCacheRef.current[bairroMunicipioId] = sorted;
-        if (alive) setBairrosByMunicipio(sorted);
+        bairroCacheRef.current[bairroMunicipioIdA] = sorted;
+        if (alive) setBairrosByMunicipioA(sorted);
       } catch {
         if (alive) {
-          const fallback = bairros.filter((item) => item.municipioId === bairroMunicipioId);
-          setBairrosByMunicipio(fallback);
+          const fallback = bairros.filter((item) => item.municipioId === bairroMunicipioIdA);
+          setBairrosByMunicipioA(fallback);
         }
       } finally {
-        if (alive) setIsLoadingBairroItems(false);
+        if (alive) setIsLoadingBairroItemsA(false);
       }
     }
 
-    loadBairrosByMunicipio();
+    loadBairrosA();
     return () => {
       alive = false;
     };
-  }, [bairroMunicipioId, bairros, compareKind]);
+  }, [bairroMunicipioIdA, bairros, compareKind]);
 
-  const compareItems = useMemo<CompareEntity[]>(() => {
+  useEffect(() => {
+    if (compareKind !== "bairro") return;
+    if (!bairroMunicipioIdB) {
+      setBairrosByMunicipioB([]);
+      setIsLoadingBairroItemsB(false);
+      return;
+    }
+
+    const cached = bairroCacheRef.current[bairroMunicipioIdB];
+    if (cached) {
+      setBairrosByMunicipioB(cached);
+      setIsLoadingBairroItemsB(false);
+      return;
+    }
+
+    let alive = true;
+    setIsLoadingBairroItemsB(true);
+
+    async function loadBairrosB() {
+      try {
+        const data = await listBairros(bairroMunicipioIdB);
+        const sorted = [...data].sort((a, b) =>
+          a.nome.localeCompare(b.nome, "pt-BR", {
+            sensitivity: "base",
+            numeric: true,
+          }),
+        );
+        bairroCacheRef.current[bairroMunicipioIdB] = sorted;
+        if (alive) setBairrosByMunicipioB(sorted);
+      } catch {
+        if (alive) {
+          const fallback = bairros.filter((item) => item.municipioId === bairroMunicipioIdB);
+          setBairrosByMunicipioB(fallback);
+        }
+      } finally {
+        if (alive) setIsLoadingBairroItemsB(false);
+      }
+    }
+
+    loadBairrosB();
+    return () => {
+      alive = false;
+    };
+  }, [bairroMunicipioIdB, bairros, compareKind]);
+
+  const estadoItems = useMemo<CompareEntity[]>(
+    () =>
+      NORDESTE_ESTADOS.map((estado) => ({
+        id: estado.id,
+        nome: estado.nome,
+        estadoId: estado.sigla,
+      })),
+    [],
+  );
+
+  const compareItemsA = useMemo<CompareEntity[]>(() => {
+    if (compareKind === "estado") return estadoItems;
     if (compareKind === "bairro") {
-      return bairrosByMunicipio.map((item) => ({
+      return bairrosByMunicipioA.map((item) => ({
         id: item.id,
         nome: item.nome,
         municipioId: item.municipioId,
@@ -722,26 +974,54 @@ function ComparePageContent() {
       }));
     }
 
-    return municipios.map((item) => ({
+    return municipiosA.map((item) => ({
       id: item.id,
       nome: item.nome,
       estadoId: item.estadoId,
       municipioId: item.id,
       geoProps: item.geoProps,
     }));
-  }, [bairrosByMunicipio, compareKind, municipios]);
+  }, [bairrosByMunicipioA, compareKind, estadoItems, municipiosA]);
+
+  const compareItemsB = useMemo<CompareEntity[]>(() => {
+    if (compareKind === "estado") return estadoItems;
+    if (compareKind === "bairro") {
+      return bairrosByMunicipioB.map((item) => ({
+        id: item.id,
+        nome: item.nome,
+        municipioId: item.municipioId,
+        geoProps: item.geoProps,
+      }));
+    }
+
+    return municipiosB.map((item) => ({
+      id: item.id,
+      nome: item.nome,
+      estadoId: item.estadoId,
+      municipioId: item.id,
+      geoProps: item.geoProps,
+    }));
+  }, [bairrosByMunicipioB, compareKind, estadoItems, municipiosB]);
 
   const selectedA = useMemo(
-    () => compareItems.find((item) => item.id === primaryId) ?? null,
-    [compareItems, primaryId],
+    () => compareItemsA.find((item) => item.id === primaryId) ?? null,
+    [compareItemsA, primaryId],
   );
   const selectedB = useMemo(
-    () => compareItems.find((item) => item.id === secondaryId) ?? null,
-    [compareItems, secondaryId],
+    () => compareItemsB.find((item) => item.id === secondaryId) ?? null,
+    [compareItemsB, secondaryId],
   );
 
   const selectionA = useMemo<ObservatorySelection | null>(() => {
     if (!selectedA) return null;
+    if (compareKind === "estado") {
+      return {
+        id: selectedA.id,
+        nome: selectedA.nome,
+        kind: "estado",
+        subtitle: `Estado · ${selectedA.estadoId ?? selectedA.id.toUpperCase()}`,
+      };
+    }
     const data = (compareKind === "bairro"
       ? ({
         id: selectedA.id,
@@ -770,6 +1050,14 @@ function ComparePageContent() {
 
   const selectionB = useMemo<ObservatorySelection | null>(() => {
     if (!selectedB) return null;
+    if (compareKind === "estado") {
+      return {
+        id: selectedB.id,
+        nome: selectedB.nome,
+        kind: "estado",
+        subtitle: `Estado · ${selectedB.estadoId ?? selectedB.id.toUpperCase()}`,
+      };
+    }
     const data = (compareKind === "bairro"
       ? ({
         id: selectedB.id,
@@ -796,10 +1084,58 @@ function ComparePageContent() {
     };
   }, [selectedB, activeModuleId, compareKind]);
 
-  const groups = useMemo(
-    () => extractComparableMetrics(selectedA, selectedB, compareKind),
-    [selectedA, selectedB, compareKind],
-  );
+  const groups = useMemo(() => {
+    if (compareKind === "estado") {
+      const withAgg = (sel: CompareEntity | null): CompareEntity | null =>
+        sel ? { ...sel, geoProps: estadoAgg[sel.id] ?? sel.geoProps } : null;
+      return extractComparableMetrics(withAgg(selectedA), withAgg(selectedB), "estado");
+    }
+    return extractComparableMetrics(selectedA, selectedB, compareKind);
+  }, [selectedA, selectedB, compareKind, estadoAgg]);
+
+  // Agrega os municípios de cada estado selecionado em props estaduais.
+  useEffect(() => {
+    if (compareKind !== "estado") return;
+    const wanted = [selectedA?.id, selectedB?.id].filter((id): id is string => Boolean(id));
+    const missing = wanted.filter((id) => !estadoAgg[id]);
+    if (missing.length === 0) {
+      setIsLoadingEstadoAgg(false);
+      return;
+    }
+
+    let alive = true;
+    setIsLoadingEstadoAgg(true);
+
+    void (async () => {
+      const results = await Promise.all(
+        missing.map(async (id) => {
+          try {
+            const collection = await fetchMunicipiosGeoJSON(id.toUpperCase());
+            const props = aggregateEstadoProps(collection);
+            return props ? ([id, props] as const) : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (!alive) return;
+      const found = results.filter(
+        (entry): entry is readonly [string, Record<string, unknown>] => entry !== null,
+      );
+      if (found.length > 0) {
+        setEstadoAgg((prev) => {
+          const next = { ...prev };
+          for (const [id, props] of found) next[id] = props;
+          return next;
+        });
+      }
+      setIsLoadingEstadoAgg(false);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [compareKind, selectedA?.id, selectedB?.id, estadoAgg]);
 
   const hasAnyData = useMemo(
     () => groups.some((g) => g.metrics.some((m) => m.a > 0 || m.b > 0)),
@@ -816,9 +1152,22 @@ function ComparePageContent() {
     const secondaryMunicipioId = searchParams.get("secondaryMunicipioId");
 
     const targetKind: CompareEntityKind =
-      pk === "bairro" || sk === "bairro" ? "bairro" : "municipio";
+      pk === "bairro" || sk === "bairro"
+        ? "bairro"
+        : pk === "estado" || sk === "estado"
+          ? "estado"
+          : "municipio";
 
     setCompareKind(targetKind);
+
+    const estadoPrimario = normalizeEstadoId(searchParams.get("primaryEstado"));
+    const estadoSecundario = normalizeEstadoId(searchParams.get("secondaryEstado"));
+    if (estadoPrimario || estadoSecundario) {
+      const base = estadoPrimario ?? estadoSecundario ?? DEFAULT_ESTADO_ID;
+      setUfA(estadoPrimario ?? base);
+      setUfB(estadoSecundario ?? base);
+      didInitUfs.current = true;
+    }
 
     if (targetKind === "bairro") {
       const municipioFromParams =
@@ -827,7 +1176,10 @@ function ComparePageContent() {
         searchParams.get("municipio") ??
         ctx.filters.municipioId ??
         "";
-      if (municipioFromParams) setBairroMunicipioId(municipioFromParams);
+      if (municipioFromParams) {
+        setBairroMunicipioIdA(municipioFromParams);
+        setBairroMunicipioIdB(municipioFromParams);
+      }
     }
 
     if (pk === targetKind && pid) setPrimaryId(pid);
@@ -838,38 +1190,66 @@ function ComparePageContent() {
   }, [ctx.filters.municipioId, searchParams]);
 
   useEffect(() => {
-    if (compareItems.length === 0) {
-      if (compareKind === "bairro" && isLoadingBairroItems) return;
-      setPrimaryId("");
-      setSecondaryId("");
-      return;
-    }
+    const pendingA =
+      compareKind !== "estado" &&
+      (isLoadingMunicipiosA ||
+        (compareKind === "bairro" &&
+          (isLoadingBairroItemsA || (!bairroMunicipioIdA && municipiosA.length > 0))));
+    const pendingB =
+      compareKind !== "estado" &&
+      (isLoadingMunicipiosB ||
+        (compareKind === "bairro" &&
+          (isLoadingBairroItemsB || (!bairroMunicipioIdB && municipiosB.length > 0))));
 
-    setPrimaryId((current) =>
-      current && compareItems.some((item) => item.id === current) ? current : "",
-    );
-    setSecondaryId((current) =>
-      current && compareItems.some((item) => item.id === current) ? current : "",
-    );
-  }, [compareItems, compareKind, isLoadingBairroItems]);
+    if (!pendingA) {
+      setPrimaryId((current) =>
+        current && compareItemsA.some((item) => item.id === current) ? current : "",
+      );
+    }
+    if (!pendingB) {
+      setSecondaryId((current) =>
+        current && compareItemsB.some((item) => item.id === current) ? current : "",
+      );
+    }
+  }, [
+    bairroMunicipioIdA,
+    bairroMunicipioIdB,
+    compareItemsA,
+    compareItemsB,
+    compareKind,
+    isLoadingBairroItemsA,
+    isLoadingBairroItemsB,
+    isLoadingMunicipiosA,
+    isLoadingMunicipiosB,
+    municipiosA,
+    municipiosB,
+  ]);
 
   const filteredA = useMemo(() => {
     const q = searchA.trim().toLowerCase();
-    if (!q) return compareItems.slice(0, 8);
-    return compareItems.filter((m) => m.nome.toLowerCase().includes(q)).slice(0, 12);
-  }, [compareItems, searchA]);
+    if (!q) return compareItemsA.slice(0, 8);
+    return compareItemsA.filter((m) => m.nome.toLowerCase().includes(q)).slice(0, 12);
+  }, [compareItemsA, searchA]);
 
   const filteredB = useMemo(() => {
     const q = searchB.trim().toLowerCase();
-    if (!q) return compareItems.slice(0, 8);
-    return compareItems.filter((m) => m.nome.toLowerCase().includes(q) && m.id !== primaryId).slice(0, 12);
-  }, [compareItems, searchB, primaryId]);
+    if (!q) return compareItemsB.slice(0, 8);
+    return compareItemsB.filter((m) => m.nome.toLowerCase().includes(q) && m.id !== primaryId).slice(0, 12);
+  }, [compareItemsB, searchB, primaryId]);
 
   function swap() {
     const pa = primaryId;
     const pb = secondaryId;
     setPrimaryId(pb);
     setSecondaryId(pa);
+    if (compareKind !== "estado") {
+      setUfA(ufB);
+      setUfB(ufA);
+    }
+    if (compareKind === "bairro") {
+      setBairroMunicipioIdA(bairroMunicipioIdB);
+      setBairroMunicipioIdB(bairroMunicipioIdA);
+    }
   }
 
   function clear() {
@@ -877,6 +1257,7 @@ function ComparePageContent() {
     setSecondaryId("");
     setSearchA("");
     setSearchB("");
+    setEstadoAgg({});
     didPreselect.current = false;
     router.replace("/observatorio/compare", { scroll: false });
   }
@@ -903,9 +1284,16 @@ function ComparePageContent() {
   }, [groups, selectedA, selectedB]);
 
   const isLoading =
-    compareKind === "municipio"
-      ? municipios.length === 0
-      : bairroMunicipioOptions.length > 0 && (!bairroMunicipioId || isLoadingBairroItems);
+    compareKind === "estado"
+      ? isLoadingEstadoAgg
+      : compareKind === "municipio"
+        ? isLoadingMunicipiosA || isLoadingMunicipiosB
+        : isLoadingMunicipiosA ||
+        isLoadingMunicipiosB ||
+        (municipiosA.length > 0 && !bairroMunicipioIdA) ||
+        (municipiosB.length > 0 && !bairroMunicipioIdB) ||
+        isLoadingBairroItemsA ||
+        isLoadingBairroItemsB;
 
   return (
     <main
@@ -938,7 +1326,7 @@ function ComparePageContent() {
               Comparar territórios
             </h1>
             <p className={`mt-1 text-sm ${theme.muted}`}>
-              Análise lado a lado de indicadores por município ou vizinhança
+              Análise lado a lado de indicadores por estado, município ou vizinhança
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -946,10 +1334,20 @@ function ComparePageContent() {
             <div className={`mr-2 flex items-center gap-1 rounded-md border p-1 ${theme.borderSoft} ${isDark ? "bg-zinc-900" : "bg-white"}`}>
               <button
                 type="button"
+                onClick={() => setCompareKind("estado")}
+                className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "estado"
+                  ? "bg-emerald-600 text-white"
+                  : `${theme.mutedStrong} hover:text-emerald-600`
+                  }`}
+              >
+                Estado
+              </button>
+              <button
+                type="button"
                 onClick={() => setCompareKind("municipio")}
                 className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "municipio"
-                    ? "bg-cyan-600 text-white"
-                    : `${theme.mutedStrong} hover:text-cyan-600`
+                  ? "bg-cyan-600 text-white"
+                  : `${theme.mutedStrong} hover:text-cyan-600`
                   }`}
               >
                 Município
@@ -958,8 +1356,8 @@ function ComparePageContent() {
                 type="button"
                 onClick={() => setCompareKind("bairro")}
                 className={`rounded px-2 py-1 text-[10px] uppercase tracking-wide transition ${compareKind === "bairro"
-                    ? "bg-purple-600 text-white"
-                    : `${theme.mutedStrong} hover:text-purple-600`
+                  ? "bg-purple-600 text-white"
+                  : `${theme.mutedStrong} hover:text-purple-600`
                   }`}
               >
                 Vizinhança
@@ -991,49 +1389,71 @@ function ComparePageContent() {
           </div>
         ) : (
           <>
-            {compareKind === "bairro" && (
-              <div className={`mb-4 grid gap-2 rounded-xl border px-4 py-3 sm:grid-cols-[1fr_240px] sm:items-center ${theme.surfaceSoft}`}>
-                <p className={`text-sm ${theme.muted}`}>
-                  Escolha o município para listar e comparar suas vizinhanças.
-                </p>
-                <select
-                  value={bairroMunicipioId}
-                  onChange={(event) => {
-                    setBairroMunicipioId(event.target.value);
-                    setPrimaryId("");
-                    setSecondaryId("");
-                    setSearchA("");
-                    setSearchB("");
-                  }}
-                  className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${theme.input}`}
-                >
-                  {bairroMunicipioOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {compareKind === "bairro" && compareItems.length === 0 && !isLoadingBairroItems && (
-              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${theme.empty}`}>
-                Nenhum bairro disponível para o município selecionado.
-              </div>
-            )}
+            {compareKind === "bairro" &&
+              !isLoadingBairroItemsA &&
+              !isLoadingBairroItemsB &&
+              compareItemsA.length === 0 &&
+              compareItemsB.length === 0 && (
+                <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${theme.empty}`}>
+                  Nenhum bairro disponível para o município selecionado.
+                </div>
+              )}
 
             <div className="mb-6 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
-              <MunicipioSelector
-                label={compareKind === "bairro" ? "Bairro A" : "Município A"}
-                color="cyan"
-                selected={selectedA}
-                search={searchA}
-                filtered={filteredA}
-                onSearch={setSearchA}
-                onSelect={(m) => { setPrimaryId(m.id); setSearchA(""); }}
-                onClear={() => { setPrimaryId(""); setSearchA(""); }}
-                isDark={isDark}
-              />
+              <div className="flex flex-col gap-2">
+                {compareKind !== "estado" && (
+                  <label className="flex flex-col gap-1">
+                    <span className={`text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
+                      Estado A
+                    </span>
+                    <select
+                      value={ufA}
+                      onChange={(event) => {
+                        setUfA(event.target.value);
+                        if (compareKind === "bairro") setBairroMunicipioIdA("");
+                      }}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${theme.input}`}
+                    >
+                      {NORDESTE_ESTADOS.map((estado) => (
+                        <option key={estado.id} value={estado.id}>
+                          {estado.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                {compareKind === "bairro" && (
+                  <label className="flex flex-col gap-1">
+                    <span className={`text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
+                      Município A
+                    </span>
+                    <select
+                      value={bairroMunicipioIdA}
+                      onChange={(event) => setBairroMunicipioIdA(event.target.value)}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${theme.input}`}
+                    >
+                      {municipiosA.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <MunicipioSelector
+                  label={kindNoun(compareKind, "A")}
+                  color="cyan"
+                  selected={selectedA}
+                  search={searchA}
+                  filtered={filteredA}
+                  onSearch={setSearchA}
+                  onSelect={(m) => { setPrimaryId(m.id); setSearchA(""); }}
+                  onClear={() => { setPrimaryId(""); setSearchA(""); }}
+                  isDark={isDark}
+                />
+              </div>
 
               <div className="flex flex-col items-center justify-center pt-7 gap-2">
                 <button
@@ -1049,17 +1469,60 @@ function ComparePageContent() {
                 </button>
               </div>
 
-              <MunicipioSelector
-                label={compareKind === "bairro" ? "Bairro B" : "Município B"}
-                color="purple"
-                selected={selectedB}
-                search={searchB}
-                filtered={filteredB}
-                onSearch={setSearchB}
-                onSelect={(m) => { setSecondaryId(m.id); setSearchB(""); }}
-                onClear={() => { setSecondaryId(""); setSearchB(""); }}
-                isDark={isDark}
-              />
+              <div className="flex flex-col gap-2">
+                {compareKind !== "estado" && (
+                  <label className="flex flex-col gap-1">
+                    <span className={`text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
+                      Estado B
+                    </span>
+                    <select
+                      value={ufB}
+                      onChange={(event) => {
+                        setUfB(event.target.value);
+                        if (compareKind === "bairro") setBairroMunicipioIdB("");
+                      }}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${theme.input}`}
+                    >
+                      {NORDESTE_ESTADOS.map((estado) => (
+                        <option key={estado.id} value={estado.id}>
+                          {estado.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                {compareKind === "bairro" && (
+                  <label className="flex flex-col gap-1">
+                    <span className={`text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
+                      Município B
+                    </span>
+                    <select
+                      value={bairroMunicipioIdB}
+                      onChange={(event) => setBairroMunicipioIdB(event.target.value)}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-zinc-500 ${theme.input}`}
+                    >
+                      {municipiosB.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <MunicipioSelector
+                  label={kindNoun(compareKind, "B")}
+                  color="purple"
+                  selected={selectedB}
+                  search={searchB}
+                  filtered={filteredB}
+                  onSearch={setSearchB}
+                  onSelect={(m) => { setSecondaryId(m.id); setSearchB(""); }}
+                  onClear={() => { setSecondaryId(""); setSearchB(""); }}
+                  isDark={isDark}
+                />
+              </div>
             </div>
 
             {selectedA && selectedB ? (
@@ -1068,8 +1531,8 @@ function ComparePageContent() {
                 {winner && winner !== "tie" && (
                   <div
                     className={`rounded-xl border px-4 py-3 ${winner === "a"
-                        ? "border-cyan-500/30 bg-cyan-950/20"
-                        : "border-purple-500/30 bg-purple-950/20"
+                      ? "border-cyan-500/30 bg-cyan-950/20"
+                      : "border-purple-500/30 bg-purple-950/20"
                       }`}
                   >
                     <p className="text-xs text-zinc-400">
@@ -1221,7 +1684,7 @@ function ComparePageContent() {
                           className={`rounded-xl border p-3 ${theme.surface} ${winner === "a" ? "winner-glow-a" : ""}`}
                         >
                           <p className={`text-[10px] ${theme.muted}`}>
-                            {compareKind === "bairro" ? "Bairro A" : "Município A"}
+                            {kindNoun(compareKind, "A")}
                           </p>
                           <p className={`mt-0.5 text-sm font-medium ${theme.text}`}>{selectedA.nome}</p>
                           {selectionA?.metrics?.map((m) => (
@@ -1237,7 +1700,7 @@ function ComparePageContent() {
                           className={`rounded-xl border p-3 ${theme.surface} ${winner === "b" ? "winner-glow-b" : ""}`}
                         >
                           <p className={`text-[10px] ${theme.muted}`}>
-                            {compareKind === "bairro" ? "Bairro B" : "Município B"}
+                            {kindNoun(compareKind, "B")}
                           </p>
                           <p className={`mt-0.5 text-sm font-medium ${theme.text}`}>{selectedB.nome}</p>
                           {selectionB?.metrics?.map((m) => (
@@ -1255,7 +1718,7 @@ function ComparePageContent() {
             ) : (
               <div className={`rounded-xl border border-dashed py-16 text-center ${theme.empty}`}>
                 <p className={`text-sm ${theme.mutedStrong}`}>
-                  Selecione dois {compareKind === "bairro" ? "bairros" : "municípios"} para iniciar a comparação
+                  Selecione dois {kindPlural(compareKind)} para iniciar a comparação
                 </p>
               </div>
             )}
@@ -1376,8 +1839,8 @@ function MunicipioSelector({
               type="button"
               onClick={onClear}
               className={`mt-0.5 rounded border px-2 py-0.5 text-[10px] transition ${isDark
-                  ? "border-zinc-700 text-zinc-500 hover:text-zinc-300"
-                  : "border-zinc-300 text-zinc-600 hover:text-zinc-900"
+                ? "border-zinc-700 text-zinc-500 hover:text-zinc-300"
+                : "border-zinc-300 text-zinc-600 hover:text-zinc-900"
                 }`}
             >
               Trocar

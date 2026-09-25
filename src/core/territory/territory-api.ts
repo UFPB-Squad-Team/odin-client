@@ -1,12 +1,29 @@
 import type { Bairro, Estado, Municipio } from "@/core/types/territory";
+import {
+  NORDESTE_ESTADOS,
+  normalizeEstadoId,
+} from "@/core/territory/estados-nordeste";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-const LOCAL_ESTADOS: Estado[] = [
-  { id: "pb", nome: "Paraíba", sigla: "PB" },
-  { id: "pe", nome: "Pernambuco", sigla: "PE" },
-  { id: "ce", nome: "Ceará", sigla: "CE" },
-];
+export {
+  DEFAULT_ESTADO_ID,
+  DEFAULT_ESTADO_UF,
+  ESTADO_VIEWPORTS,
+  NORDESTE_ESTADOS,
+  NORDESTE_IDS,
+  NORDESTE_VIEWPORT,
+  formatEstadoLabel,
+  getEstadoViewport,
+  isEstadoId,
+  normalizeEstadoId,
+  resolveDefaultEstadoId,
+} from "@/core/territory/estados-nordeste";
+export type {
+  EstadoId,
+  EstadoUf,
+  EstadoViewport,
+} from "@/core/territory/estados-nordeste";
 
 export const JOAO_PESSOA_IBGE_ID = "2507507";
 
@@ -71,9 +88,47 @@ function normalizeMunicipioLabel(props: Record<string, unknown>, fallbackId: str
   return String(props.municipio ?? props.nome ?? props.name ?? props.description ?? fallbackId);
 }
 
+/**
+ * Lista os estados disponíveis para o filtro em cascata.
+ *
+ * Consome `GET /api/v1/estados` quando `NEXT_PUBLIC_API_BASE_URL` está
+ * configurada e normaliza cada item para o contrato `Estado` do frontend
+ * (`id` = UF minúscula). Estados fora do escopo do ODIN (9 UFs do Nordeste)
+ * são descartados. Em caso de falha/indisponibilidade, devolve a lista
+ * canônica local — o seletor da sidebar nunca fica vazio.
+ */
 export async function listEstados(): Promise<Estado[]> {
-  void API_BASE_URL;
-  return LOCAL_ESTADOS;
+  if (!API_BASE_URL) return NORDESTE_ESTADOS;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/estados`);
+    if (!response.ok) throw new Error(`estados falhou: ${response.status}`);
+
+    const payload = (await response.json()) as Array<{
+      id?: unknown;
+      nome?: unknown;
+      sigla?: unknown;
+    }>;
+
+    const normalized = (Array.isArray(payload) ? payload : [])
+      .map((item): Estado | null => {
+        const uf = normalizeEstadoId(
+          typeof item.sigla === "string" ? item.sigla : String(item.id ?? ""),
+        );
+        if (!uf) return null;
+        const nome =
+          typeof item.nome === "string" && item.nome.trim()
+            ? item.nome.trim()
+            : (NORDESTE_ESTADOS.find((estado) => estado.id === uf)?.nome ?? uf);
+        return { id: uf, nome, sigla: uf.toUpperCase() };
+      })
+      .filter((estado): estado is Estado => estado !== null);
+
+    return normalized.length > 0 ? normalized : NORDESTE_ESTADOS;
+  } catch (error) {
+    console.warn("[listEstados] API indisponível, usando lista canônica:", error);
+    return NORDESTE_ESTADOS;
+  }
 }
 
 export async function listMunicipios(estadoId: string): Promise<Municipio[]> {
@@ -132,7 +187,7 @@ export async function listBairros(municipioId: string): Promise<Bairro[]> {
       const id = idRaw.replace(/\.0$/, "");
       const rawNome = String(raw.bairro ?? raw.nm_bairro ?? raw.nome_area ?? raw.nome ?? "").trim();
       const isSetor = raw.nivel === "setor" || raw.source === "setor_indicadores";
-      
+
       const nome = isSetor && (!rawNome || /^\d+$/.test(rawNome))
         ? `Setor ${id}`
         : (rawNome && rawNome.length > 0 ? rawNome : id || `Área ${index + 1}`);

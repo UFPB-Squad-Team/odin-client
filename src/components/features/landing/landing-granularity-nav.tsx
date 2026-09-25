@@ -12,54 +12,129 @@ import {
   Layers,
   Trash2,
   Loader2,
+  Map,
 } from "lucide-react";
 import { PendingRouteLink } from "@/components/ui/pending-route-link";
-import { listMunicipios, listBairros, listEscolasByMunicipio } from "@/modules/educacao/services/education-api";
-import type { Municipio, Bairro, Escola } from "@/core/types/territory";
+import {
+  listEstados,
+  listMunicipios,
+  listBairros,
+  listEscolasByMunicipio,
+} from "@/modules/educacao/services/education-api";
+import type { Estado, Municipio, Bairro, Escola } from "@/core/types/territory";
+import {
+  DEFAULT_ESTADO_ID,
+  formatEstadoLabel,
+} from "@/core/territory/estados-nordeste";
 
-type GranularityLevel = "municipio" | "bairro" | "escola";
+/**
+ * Níveis de granularidade territorial do ODIN: estado → município → bairro → escola.
+ * O estado é a raiz do filtro em cascata — os níveis abaixo dependem dele.
+ */
+type GranularityLevel = "estado" | "municipio" | "bairro" | "escola";
+
+const GRANULARITY_OPTIONS = [
+  { id: "estado", label: "Estado", Icon: Map },
+  { id: "municipio", label: "Município", Icon: MapPin },
+  { id: "bairro", label: "Bairro", Icon: Building2 },
+  { id: "escola", label: "Escola", Icon: School2 },
+] as const;
+
+const GRANULARITY_LABELS: Record<GranularityLevel, string> = {
+  estado: "estado",
+  escola: "escola",
+  bairro: "bairro",
+  municipio: "município",
+};
 
 export function LandingGranularityNav() {
   const router = useRouter();
 
   const [granularity, setGranularity] = useState<GranularityLevel>("municipio");
+  const [selectedEstado, setSelectedEstado] = useState<Estado | null>(null);
   const [selectedMunicipio, setSelectedMunicipio] = useState<Municipio | null>(null);
   const [selectedBairro, setSelectedBairro] = useState<Bairro | null>(null);
   const [selectedEscola, setSelectedEscola] = useState<Escola | null>(null);
 
+  const [estadoSearch, setEstadoSearch] = useState("");
   const [municipioSearch, setMunicipioSearch] = useState("");
   const [bairroSearch, setBairroSearch] = useState("");
   const [escolaSearch, setEscolaSearch] = useState("");
 
+  const [showEstadoDropdown, setShowEstadoDropdown] = useState(false);
   const [showMunicipioDropdown, setShowMunicipioDropdown] = useState(false);
   const [showBairroDropdown, setShowBairroDropdown] = useState(false);
   const [showEscolaDropdown, setShowEscolaDropdown] = useState(false);
 
+  const [estados, setEstados] = useState<Estado[]>([]);
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [bairros, setBairros] = useState<Bairro[]>([]);
   const [escolas, setEscolas] = useState<Escola[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingEstados, setLoadingEstados] = useState(true);
+  const [loadingMunicipios, setLoadingMunicipios] = useState(false);
   const [loadingEscolas, setLoadingEscolas] = useState(false);
   const [navigating, setNavigating] = useState(false);
 
+  const estadoRef = useRef<HTMLDivElement>(null);
   const municipioRef = useRef<HTMLDivElement>(null);
   const bairroRef = useRef<HTMLDivElement>(null);
   const escolaRef = useRef<HTMLDivElement>(null);
 
+  // Catálogo de estados (9 UFs do Nordeste) + estado padrão da plataforma.
   useEffect(() => {
+    let alive = true;
+
+    const fetchEstados = async () => {
+      try {
+        const data = await listEstados();
+        if (!alive) return;
+        setEstados(data);
+        const defaultEstado =
+          data.find((estado) => estado.id === DEFAULT_ESTADO_ID) ?? data[0] ?? null;
+        if (defaultEstado) {
+          setSelectedEstado(defaultEstado);
+          setEstadoSearch(formatEstadoLabel(defaultEstado));
+        }
+      } catch (error) {
+        console.error("Erro ao carregar estados:", error);
+      } finally {
+        if (alive) setLoadingEstados(false);
+      }
+    };
+
+    fetchEstados();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Municípios seguem o estado selecionado (filtro em cascata).
+  useEffect(() => {
+    if (!selectedEstado) {
+      setMunicipios([]);
+      return;
+    }
+
+    let alive = true;
+    setLoadingMunicipios(true);
+
     const fetchMunicipios = async () => {
       try {
-        const data = await listMunicipios("pb");
-        setMunicipios(data);
+        const data = await listMunicipios(selectedEstado.id);
+        if (alive) setMunicipios(data);
       } catch (error) {
         console.error("Erro ao carregar municípios:", error);
+        if (alive) setMunicipios([]);
       } finally {
-        setLoading(false);
+        if (alive) setLoadingMunicipios(false);
       }
     };
 
     fetchMunicipios();
-  }, []);
+    return () => {
+      alive = false;
+    };
+  }, [selectedEstado]);
 
   useEffect(() => {
     if (!selectedMunicipio || granularity !== "bairro") return;
@@ -100,6 +175,9 @@ export function LandingGranularityNav() {
   // Fecha dropdowns ao clicar fora
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (estadoRef.current && !estadoRef.current.contains(e.target as Node)) {
+        setShowEstadoDropdown(false);
+      }
       if (municipioRef.current && !municipioRef.current.contains(e.target as Node)) {
         setShowMunicipioDropdown(false);
       }
@@ -114,6 +192,16 @@ export function LandingGranularityNav() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Filtra estados por nome ou sigla
+  const filteredEstados = estados.filter((estado) => {
+    const term = estadoSearch.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      estado.nome.toLowerCase().includes(term) ||
+      estado.sigla.toLowerCase().includes(term)
+    );
+  });
 
   // Filtra municípios por busca
   const filteredMunicipios = municipios.filter((m) =>
@@ -143,6 +231,8 @@ export function LandingGranularityNav() {
     setEscolaSearch("");
     setBairros([]);
     setEscolas([]);
+    // O estado selecionado é o escopo da navegação (raiz da cascata) e é
+    // preservado — "limpar seleção" zera apenas o drill-down abaixo dele.
   }, []);
 
   const handleGranularityChange = useCallback(
@@ -150,7 +240,16 @@ export function LandingGranularityNav() {
       setGranularity(level);
 
       // Ao mudar toggle, limpa campos que não são mais relevantes
-      if (level === "municipio") {
+      if (level === "estado") {
+        setSelectedMunicipio(null);
+        setSelectedBairro(null);
+        setSelectedEscola(null);
+        setMunicipioSearch("");
+        setBairroSearch("");
+        setEscolaSearch("");
+        setBairros([]);
+        setEscolas([]);
+      } else if (level === "municipio") {
         setSelectedBairro(null);
         setSelectedEscola(null);
         setBairroSearch("");
@@ -165,6 +264,22 @@ export function LandingGranularityNav() {
     },
     [],
   );
+
+  const handleEstadoSelect = useCallback((estado: Estado) => {
+    setSelectedEstado(estado);
+    setEstadoSearch(formatEstadoLabel(estado));
+    setShowEstadoDropdown(false);
+    // Troca de escopo territorial: zera todo o drill-down abaixo do estado.
+    setSelectedMunicipio(null);
+    setSelectedBairro(null);
+    setSelectedEscola(null);
+    setMunicipioSearch("");
+    setBairroSearch("");
+    setEscolaSearch("");
+    setMunicipios([]);
+    setBairros([]);
+    setEscolas([]);
+  }, []);
 
   const handleMunicipioSelect = useCallback((municipio: Municipio) => {
     setSelectedMunicipio(municipio);
@@ -197,12 +312,17 @@ export function LandingGranularityNav() {
     setNavigating(true);
 
     setTimeout(() => {
-      if (granularity === "municipio" && selectedMunicipio) {
+      if (granularity === "estado" && selectedEstado) {
+        // Visão estadual: polígonos dos municípios da UF selecionada.
+        router.push(
+          `/observatorio?estado=${selectedEstado.id}&layer=municipio&modulo=educacao&sidebar=expanded`,
+        );
+      } else if (granularity === "municipio" && selectedMunicipio) {
         router.push(
           `/observatorio?estado=${selectedMunicipio.estadoId}&layer=municipio&municipio=${selectedMunicipio.id}&modulo=educacao&sidebar=expanded`,
         );
       } else if (granularity === "bairro" && selectedBairro) {
-        const estadoId = selectedMunicipio?.estadoId ?? "pb";
+        const estadoId = selectedMunicipio?.estadoId ?? selectedEstado?.id ?? "pb";
         router.push(
           `/observatorio?estado=${estadoId}&layer=bairro&municipio=${selectedBairro.municipioId}&bairro=${selectedBairro.id}&modulo=educacao&sidebar=expanded`,
         );
@@ -210,15 +330,24 @@ export function LandingGranularityNav() {
         router.push(`/schools/${selectedEscola.inepId ?? selectedEscola.id}`);
       }
     }, 150);
-  }, [granularity, selectedMunicipio, selectedBairro, selectedEscola, router]);
+  }, [granularity, selectedEstado, selectedMunicipio, selectedBairro, selectedEscola, router]);
 
   const canNavigate =
     !navigating &&
-    ((granularity === "municipio" && selectedMunicipio) ||
-      (granularity === "bairro" && selectedBairro) ||
-      (granularity === "escola" && selectedEscola));
+    ((granularity === "estado" && Boolean(selectedEstado)) ||
+      (granularity === "municipio" && Boolean(selectedMunicipio)) ||
+      (granularity === "bairro" && Boolean(selectedBairro)) ||
+      (granularity === "escola" && Boolean(selectedEscola)));
 
   const breadcrumbItems = [
+    ...(selectedEstado
+      ? [
+          {
+            label: selectedEstado.nome,
+            href: `/observatorio?estado=${selectedEstado.id}&layer=municipio&modulo=educacao`,
+          },
+        ]
+      : []),
     ...(selectedMunicipio
       ? [
           {
@@ -231,7 +360,7 @@ export function LandingGranularityNav() {
       ? [
           {
             label: selectedBairro.nome,
-            href: `/observatorio?estado=${selectedMunicipio?.estadoId ?? "pb"}&layer=bairro&municipio=${selectedBairro.municipioId}&bairro=${selectedBairro.id}&modulo=educacao`,
+            href: `/observatorio?estado=${selectedMunicipio?.estadoId ?? selectedEstado?.id ?? "pb"}&layer=bairro&municipio=${selectedBairro.municipioId}&bairro=${selectedBairro.id}&modulo=educacao`,
           },
         ]
       : []),
@@ -246,7 +375,7 @@ export function LandingGranularityNav() {
   ];
 
   // Loading state inicial
-  if (loading) {
+  if (loadingEstados) {
     return (
       <section className="relative rounded-3xl border border-zinc-200/70 bg-white/85 p-6 shadow-lg shadow-cyan-500/5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/75 sm:p-8">
         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
@@ -257,8 +386,8 @@ export function LandingGranularityNav() {
             <div className="h-8 w-64 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
             <div className="mt-4 h-4 w-96 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-12 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-700" />
             ))}
           </div>
@@ -284,50 +413,105 @@ export function LandingGranularityNav() {
           <h2 className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100 sm:text-3xl">
             Explore o território
           </h2>
+          <p className="mt-3 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+            Comece pelo estado e desça até a escola: estado → município → bairro →
+            escola. Cobertura atual: os 9 estados do Nordeste.
+          </p>
         </div>
 
         {/* Granularity Selector */}
         <div className="mb-6 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => handleGranularityChange("municipio")}
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
-              granularity === "municipio"
-                ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:border-cyan-500/60 dark:text-cyan-300"
-                : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <MapPin className="h-4 w-4" />
-            Município
-          </button>
-          <button
-            type="button"
-            onClick={() => handleGranularityChange("bairro")}
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
-              granularity === "bairro"
-                ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:border-cyan-500/60 dark:text-cyan-300"
-                : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <Building2 className="h-4 w-4" />
-            Bairro
-          </button>
-          <button
-            type="button"
-            onClick={() => handleGranularityChange("escola")}
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
-              granularity === "escola"
-                ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:border-cyan-500/60 dark:text-cyan-300"
-                : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            }`}
-          >
-            <School2 className="h-4 w-4" />
-            Escola
-          </button>
+          {GRANULARITY_OPTIONS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={granularity === id}
+              onClick={() => handleGranularityChange(id)}
+              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
+                granularity === id
+                  ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:border-cyan-500/60 dark:text-cyan-300"
+                  : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Selection Inputs */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Estado Selector */}
+          <div className="relative" ref={estadoRef}>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
+              Estado
+            </label>
+            <div className="relative">
+              <Map className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                value={estadoSearch}
+                onChange={(e) => {
+                  setEstadoSearch(e.target.value);
+                  setShowEstadoDropdown(true);
+                }}
+                onFocus={() => setShowEstadoDropdown(true)}
+                placeholder="Buscar estado (UF)..."
+                autoComplete="off"
+                className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-8 text-sm text-zinc-900 placeholder-zinc-400 transition focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-cyan-500"
+              />
+              {selectedEstado && (
+                <button
+                  type="button"
+                  aria-label="Limpar busca de estado"
+                  onClick={() => {
+                    // O estado é a raiz da cascata: limpar o texto apenas libera
+                    // o campo para uma nova busca — a UF atual segue aplicada.
+                    setEstadoSearch("");
+                    setShowEstadoDropdown(true);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown */}
+            {showEstadoDropdown && (
+              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                {loadingEstados ? (
+                  <div className="flex items-center justify-center gap-2 px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando estados...
+                  </div>
+                ) : filteredEstados.length > 0 ? (
+                  filteredEstados.map((estado) => (
+                    <button
+                      key={estado.id}
+                      type="button"
+                      onClick={() => handleEstadoSelect(estado)}
+                      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
+                        selectedEstado?.id === estado.id
+                          ? "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-300"
+                          : "text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <Map className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                      <span className="flex-1">{estado.nome}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                        {estado.sigla}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-3 py-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                    Nenhum estado encontrado
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           {/* Município Selector */}
           <div className="relative" ref={municipioRef}>
             <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
@@ -343,11 +527,14 @@ export function LandingGranularityNav() {
                   setShowMunicipioDropdown(true);
                 }}
                 onFocus={() => setShowMunicipioDropdown(true)}
-                placeholder="Buscar município..."
+                disabled={!selectedEstado}
+                placeholder={
+                  selectedEstado ? "Buscar município..." : "Selecione um estado"
+                }
                 autoComplete="off"
-                className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-8 text-sm text-zinc-900 placeholder-zinc-400 transition focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-cyan-500"
+                className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-8 text-sm text-zinc-900 placeholder-zinc-400 transition focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-cyan-500"
               />
-              {municipioSearch && (
+              {municipioSearch && selectedEstado && (
                 <button
                   type="button"
                   onClick={() => {
@@ -368,9 +555,14 @@ export function LandingGranularityNav() {
             </div>
 
             {/* Dropdown */}
-            {showMunicipioDropdown && (
+            {showMunicipioDropdown && selectedEstado && (
               <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-                {filteredMunicipios.length > 0 ? (
+                {loadingMunicipios ? (
+                  <div className="flex items-center justify-center gap-2 px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando municípios...
+                  </div>
+                ) : filteredMunicipios.length > 0 ? (
                   filteredMunicipios.map((municipio) => (
                     <button
                       key={municipio.id}
@@ -603,7 +795,7 @@ export function LandingGranularityNav() {
                 </>
               ) : (
                 <>
-                  Acessar {granularity === "municipio" ? "município" : granularity === "bairro" ? "bairro" : "escola"}
+                  Acessar {GRANULARITY_LABELS[granularity]}
                   <ChevronRight className="h-4 w-4" />
                 </>
               )}

@@ -7,6 +7,7 @@ import type { SearchResultItem } from "@/shell/services/universal-search";
 import type { Bairro, Estado, Municipio } from "@/core/types/territory";
 import type { ObservatoryLayer } from "@/core/types/territory";
 import type { DependenciaAdministrativa } from "@/core/types/comparision";
+import { formatEstadoLabel } from "@/core/territory/estados-nordeste";
 
 type SidebarProps = {
   activeLayer: ObservatoryLayer;
@@ -103,7 +104,10 @@ export function ObservatorioSidebar({
     };
   }, [isDragging, sidebarWidth]);
 
-  const estadoOptions = estados.map((e) => ({ id: e.id, label: e.nome }));
+  const estadoOptions = useMemo(
+    () => estados.map((estado) => ({ id: estado.id, label: formatEstadoLabel(estado) })),
+    [estados],
+  );
   const municipioOptions = municipios.map((m) => ({ id: m.id, label: m.nome }));
   const bairroOptions = useMemo(
     () =>
@@ -179,13 +183,18 @@ export function ObservatorioSidebar({
             </div>
 
             <div className="flex flex-col gap-4">
-              <SearchableCombobox
-                ariaLabel="Selecionar Estado"
-                label="ESTADO"
-                value={estadoId}
-                options={estadoOptions}
-                onSelect={onSetEstado}
-              />
+              <div className="flex flex-col gap-1.5">
+                <SearchableCombobox
+                  ariaLabel="Selecionar Estado"
+                  label="ESTADO"
+                  value={estadoId}
+                  options={estadoOptions}
+                  onSelect={onSetEstado}
+                />
+                <p className="text-[9px] text-zinc-500 dark:text-zinc-600">
+                  9 estados do Nordeste cobertos (AL, BA, CE, MA, PB, PE, PI, RN, SE).
+                </p>
+              </div>
 
               <SearchableCombobox
                 ariaLabel="Selecionar Município"

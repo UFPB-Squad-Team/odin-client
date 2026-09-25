@@ -1,16 +1,27 @@
 import type { Bairro, Escola, Estado, Municipio } from "@/core/types/territory";
+import { NORDESTE_ESTADOS } from "@/core/territory/estados-nordeste";
 
-export const MOCK_ESTADOS: Estado[] = [
-  { id: "pb", nome: "Paraíba", sigla: "PB" },
-  { id: "pe", nome: "Pernambuco", sigla: "PE" },
-  { id: "ce", nome: "Ceará", sigla: "CE" },
-];
+/**
+ * Fallback offline: mesma lista canônica usada pela sidebar em produção,
+ * garantindo que os 9 estados do Nordeste sempre apareçam no seletor.
+ */
+export const MOCK_ESTADOS: Estado[] = NORDESTE_ESTADOS;
 
+/**
+ * Um município-âncora por estado apenas para manter o filtro em cascata
+ * funcional quando a API está indisponível (modo mock/demo).
+ */
 export const MOCK_MUNICIPIOS: Municipio[] = [
   { id: "jp", nome: "João Pessoa", estadoId: "pb" },
   { id: "cg", nome: "Campina Grande", estadoId: "pb" },
-  { id: "rec", nome: "Recife", estadoId: "pe" },
+  { id: "maceio", nome: "Maceió", estadoId: "al" },
+  { id: "salvador", nome: "Salvador", estadoId: "ba" },
   { id: "for", nome: "Fortaleza", estadoId: "ce" },
+  { id: "saoluis", nome: "São Luís", estadoId: "ma" },
+  { id: "rec", nome: "Recife", estadoId: "pe" },
+  { id: "teresina", nome: "Teresina", estadoId: "pi" },
+  { id: "natal", nome: "Natal", estadoId: "rn" },
+  { id: "aracaju", nome: "Aracaju", estadoId: "se" },
 ];
 
 export const MOCK_BAIRROS: Bairro[] = [

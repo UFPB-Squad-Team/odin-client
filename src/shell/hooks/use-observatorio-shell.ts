@@ -10,6 +10,7 @@ import {
   listBairros,
   listEstados,
   listMunicipios,
+  resolveDefaultEstadoId,
 } from "@/core/territory/territory-api";
 import {
   MOCK_BAIRROS,
@@ -99,7 +100,6 @@ export function useObservatorioShell(initialSidebarCollapsed?: boolean) {
   const municipioIdRef = useRef<string | null>(municipioId);
   const bairroIdRef = useRef<string | null>(bairroId);
   const bootstrapRef = useRef({
-    estado: true,
     municipio: true,
     bairro: true,
   });
@@ -126,9 +126,12 @@ export function useObservatorioShell(initialSidebarCollapsed?: boolean) {
       const data = await withFallback(listEstados, MOCK_ESTADOS);
       if (alive) {
         setEstados(data);
-        if (bootstrapRef.current.estado && !estadoId && data[0]) {
-          setEstado(data[0].id);
-          bootstrapRef.current.estado = false;
+        // O estado é a raiz do filtro em cascata: nunca pode ficar vazio,
+        // caso contrário o mapa fica sem recorte. Se nenhum estado foi
+        // restaurado (URL/localStorage), assume o default da plataforma.
+        if (!estadoId) {
+          const defaultEstadoId = resolveDefaultEstadoId(data);
+          if (defaultEstadoId) setEstado(defaultEstadoId);
         }
       }
       setLoading((prev) => ({ ...prev, estados: false }));
@@ -436,8 +439,16 @@ export function useObservatorioShell(initialSidebarCollapsed?: boolean) {
     }
   }
 
+  /**
+   * Desativa os defaults automáticos de município/bairro quando um estado
+   * explícito foi restaurado (URL/localStorage).
+   *
+   * O estado NÃO entra aqui: ele é a raiz da cascata e deve sempre existir —
+   * quando nada é restaurado, o próprio `loadEstados` assume
+   * `DEFAULT_ESTADO_UF` para o observatório nunca ficar sem recorte.
+   */
   function disableBootstrapDefaults() {
-    bootstrapRef.current = { estado: false, municipio: false, bairro: false };
+    bootstrapRef.current = { ...bootstrapRef.current, municipio: false, bairro: false };
   }
 
   function applyFilterPath(path: { estadoId?: string | null; municipioId?: string | null; bairroId?: string | null }) {

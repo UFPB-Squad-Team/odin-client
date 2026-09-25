@@ -5,7 +5,10 @@ import type {
   Municipio,
 } from "@/core/types/territory";
 import { fetchAllSchools } from "@/core/geospatial/geospatial-api";
-import { listBairros as listBairrosFromTerritory } from "@/core/territory/territory-api";
+import {
+  listBairros as listBairrosFromTerritory,
+  listEstados as listEstadosFromTerritory,
+} from "@/core/territory/territory-api";
 import type { SchoolDetail } from "../types/school-detail";
 export { fetchSchoolsGeoJSON } from "@/core/geospatial/geospatial-api";
 
@@ -26,12 +29,12 @@ function normalizeMunicipioLabel(
   );
 }
 
+/**
+ * Delega para o catálogo territorial do core — cobre os 9 estados do
+ * Nordeste (fonte única de verdade em `@/core/territory/estados-nordeste`).
+ */
 export async function listEstados(): Promise<Estado[]> {
-  return [
-    { id: "pb", nome: "Paraíba", sigla: "PB" },
-    { id: "pe", nome: "Pernambuco", sigla: "PE" },
-    { id: "ce", nome: "Ceará", sigla: "CE" },
-  ];
+  return listEstadosFromTerritory();
 }
 
 export async function listMunicipios(estadoId: string): Promise<Municipio[]> {

@@ -7,6 +7,11 @@ import {
   listCamadas,
 } from "@/core/geospatial/geospatial-api";
 import { buildMockCollection } from "@/core/geospatial/geospatial-mock-data";
+import {
+  UF_TO_IBGE_STATE_CODE,
+  normalizeEstadoId,
+} from "@/core/territory/estados-nordeste";
+import type { EstadoId } from "@/core/territory/estados-nordeste";
 import type {
   GeoJSONFeatureCollection,
   GeoJSONMultiPolygonCoordinates,
@@ -36,8 +41,8 @@ type RawGeoJSONFeature = {
   geometry: {
     type: "Polygon" | "MultiPolygon" | "Point";
     coordinates:
-      | GeoJSONFeatureCollection["features"][number]["geometry"]["coordinates"]
-      | [number, number];
+    | GeoJSONFeatureCollection["features"][number]["geometry"]["coordinates"]
+    | [number, number];
   };
 };
 
@@ -48,47 +53,15 @@ type RawGeoJSONCollection = {
 
 const MUNICIPALITY_CODE_TO_ENTITY_ID: Record<string, string> = {};
 
-const UF_TO_IBGE_STATE_CODE: Record<string, string> = {
-  ma: "21",
-  pi: "22",
-  ce: "23",
-  rn: "24",
-  pb: "25",
-  pe: "26",
-  al: "27",
-  se: "28",
-  ba: "29",
-};
-
-const IBGE_STATE_CODE_TO_UF = Object.fromEntries(
-  Object.entries(UF_TO_IBGE_STATE_CODE).map(([uf, code]) => [code, uf]),
-) as Record<string, string>;
-
-const ESTADO_NAME_TO_UF: Record<string, string> = {
-  paraiba: "pb",
-  pernambuco: "pe",
-  ceara: "ce",
-  riograndedonorte: "rn",
-  maranhao: "ma",
-  piaui: "pi",
-  alagoas: "al",
-  sergipe: "se",
-  bahia: "ba",
-};
-
+/**
+ * Normalização de estado delegada ao catálogo canônico do Nordeste
+ * (`@/core/territory/estados-nordeste`). Aceita UF (`"PB"`/`"pb"`), código
+ * IBGE (`"25"`) ou o nome do estado (`"Paraíba"`).
+ */
 function normalizeEstadoIdToUf(
   estadoId: string | null | undefined,
-): string | null {
-  if (!estadoId) return null;
-  const trimmed = estadoId.trim().toLowerCase();
-  if (!trimmed) return null;
-  if (trimmed.length === 2 && UF_TO_IBGE_STATE_CODE[trimmed]) return trimmed;
-  if (IBGE_STATE_CODE_TO_UF[trimmed]) return IBGE_STATE_CODE_TO_UF[trimmed];
-  const normalizedName = trimmed
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "");
-  return ESTADO_NAME_TO_UF[normalizedName] ?? null;
+): EstadoId | null {
+  return normalizeEstadoId(estadoId);
 }
 
 function normalizeCollection(
@@ -99,27 +72,27 @@ function normalizeCollection(
     .map((feature) => {
       const rawId = String(
         feature.properties.codarea ??
-          feature.properties.id ??
-          feature.properties.cod ??
-          feature.properties.codigo ??
-          feature.id ??
-          "",
+        feature.properties.id ??
+        feature.properties.cod ??
+        feature.properties.codigo ??
+        feature.id ??
+        "",
       );
 
       const entityId =
         layer === "municipio"
           ? (MUNICIPALITY_CODE_TO_ENTITY_ID[rawId] ?? rawId)
           : rawId ||
-            String(
-              feature.properties.nome ?? feature.properties.name ?? "item",
-            );
+          String(
+            feature.properties.nome ?? feature.properties.name ?? "item",
+          );
 
       const nome = String(
         feature.properties.nome ??
-          feature.properties.name ??
-          feature.properties.nm_mun ??
-          feature.properties.description ??
-          entityId,
+        feature.properties.name ??
+        feature.properties.nm_mun ??
+        feature.properties.description ??
+        entityId,
       );
 
       let geometry:
@@ -182,14 +155,14 @@ async function fetchJsonFromCandidates(
   return null;
 }
 
-function buildMunicipalityFallbackCandidates(estadoUf: string | null) {
+function buildMunicipalityFallbackCandidates(estadoUf: EstadoId | null) {
   if (!estadoUf) return [] as string[];
   const code = UF_TO_IBGE_STATE_CODE[estadoUf];
   return code ? [`/data/geojs-${code}-mun.json`] : [];
 }
 
 async function fetchIbgeMunicipalities(
-  estadoUf: string,
+  estadoUf: EstadoId,
 ): Promise<GeoJSONFeatureCollection> {
   const response = await fetch(
     `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${estadoUf.toUpperCase()}/municipios?formato=application/vnd.geo+json`,
@@ -225,7 +198,7 @@ function computeFeatureCentroid(
 }
 
 async function fetchMunicipalityCollection(
-  estadoUf: string | null,
+  estadoUf: EstadoId | null,
 ): Promise<GeoJSONFeatureCollection | null> {
   if (!estadoUf) return null;
 

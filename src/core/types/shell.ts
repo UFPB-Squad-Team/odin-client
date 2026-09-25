@@ -8,7 +8,7 @@ export type MapEntity =
 export type ObservatorySelection = {
   id: string;
   nome: string;
-  kind: ObservatoryLayer;
+  kind: ObservatoryLayer | "estado";
   subtitle: string;
   sourceEntity?: MapEntity;
   metrics?: Array<{
