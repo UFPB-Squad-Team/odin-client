@@ -134,10 +134,10 @@ function aggregateEstadoProps(
     if (acc.size === 0) continue;
 
     const out: Record<string, unknown> = {};
-    for (const [path, { total, count }] of acc) {
+    acc.forEach(({ total, count }, path) => {
       const leaf = path.split(".").pop() ?? path;
       setPathValue(out, path, isAggMeanKey(leaf) ? total / count : total);
-    }
+    });
     sections[section] = out;
     hasValues = true;
   }
@@ -755,10 +755,6 @@ function ComparePageContent() {
 
   const activeModuleId = ctx.activeModuleId ?? null;
 
-  const municipios = useMemo(
-    () => (ctx.municipios ?? []) as Municipio[],
-    [ctx.municipios],
-  );
   const bairros = useMemo(
     () => (ctx.bairros ?? []) as Bairro[],
     [ctx.bairros],
