@@ -7,6 +7,12 @@ import type { ObservatoryLayer } from "@/core/types/territory";
 import { computeChoroplethStats, normalizeValue } from "./normalize";
 import type { ChoroplethColors } from "./types";
 import type { ThresholdCor } from "@/core/types/comparision";
+import type { ColorVisionMode } from "@/core/types/a11y";
+import {
+  getBandColors,
+  hasAccessiblePalette,
+  resolveAccessibleColor,
+} from "@/core/a11y/palettes";
 
 type GeoJSONFeature = GeoJSONFeatureCollection["features"][number];
 
@@ -18,15 +24,15 @@ function resolveFeatureId(feature: GeoJSONFeature): string {
   const props = feature.properties as Record<string, unknown>;
   return normalizeFeatureId(
     feature.id ??
-      props.id ??
-      props.codarea ??
-      props.municipioIdIbge ??
-      props.municipio_id_ibge ??
-      props.escola_id_inep ??
-      props.inep ??
-      props.codigo ??
-      props.cod ??
-      "",
+    props.id ??
+    props.codarea ??
+    props.municipioIdIbge ??
+    props.municipio_id_ibge ??
+    props.escola_id_inep ??
+    props.inep ??
+    props.codigo ??
+    props.cod ??
+    "",
   );
 }
 
@@ -36,6 +42,8 @@ interface UseChoroplethArgs {
   activeLayer: ObservatoryLayer | null;
   activeIndicatorId: string | null;
   simplifiedView?: boolean;
+  /** Modo de visão de cores; quando ≠ "default" substitui a paleta do indicador. */
+  colorVisionMode?: ColorVisionMode;
 }
 
 interface UseChoroplethResult {
@@ -47,26 +55,58 @@ interface UseChoroplethResult {
   activeThresholds: ThresholdCor[] | null;
 }
 
+/** Thresholds padrão da visão simplificada quando o indicador não declara faixas. */
+const DEFAULT_THRESHOLDS: ThresholdCor[] = [
+  { min: 0, max: 34, cor: "#ea580c", rotulo: "Crítico" },
+  { min: 34, max: 67, cor: "#facc15", rotulo: "Atenção" },
+  { min: 67, max: 101, cor: "#0f766e", rotulo: "Bom" },
+];
+
 /**
- * Determina a cor com base em thresholds fixos (visão simplificada).
+ * Índice da faixa (threshold) que contém o valor. Trabalhar com o índice — em vez
+ * da cor final — permite trocar a paleta (acessibilidade) sem perder o significado
+ * de cada faixa.
  */
-function resolveThresholdColor(
+function resolveThresholdIndex(
   value: number,
   thresholds: ThresholdCor[],
   higherIsBetter: boolean,
   forceHigherIsBetter: boolean,
-): string | null {
+): number {
   const effectiveValue = (!higherIsBetter && forceHigherIsBetter)
-    ? 100 - value 
+    ? 100 - value
     : value;
 
-  for (const threshold of thresholds) {
+  for (let index = 0; index < thresholds.length; index++) {
+    const threshold = thresholds[index];
     if (effectiveValue >= threshold.min && effectiveValue < threshold.max) {
-      return threshold.cor;
+      return index;
     }
   }
 
-  return thresholds[thresholds.length - 1]?.cor ?? "#6b7280";
+  return Math.max(0, thresholds.length - 1);
+}
+
+/**
+ * Faixas exibidas na régua da visão simplificada, já com a paleta do modo de visão
+ * de cores: a cor de cada faixa é derivada da rampa acessível, preservando a ordem
+ * (crítico → adequado) e os rótulos declarados pelo indicador.
+ */
+function buildActiveThresholds(
+  simplifiedView: boolean,
+  thresholds: ThresholdCor[] | null,
+  colorVisionMode: ColorVisionMode,
+): ThresholdCor[] | null {
+  if (!simplifiedView) return null;
+
+  const base = thresholds ?? DEFAULT_THRESHOLDS;
+  if (!hasAccessiblePalette(colorVisionMode)) return base;
+
+  const bandColors = getBandColors(colorVisionMode);
+  return base.map((threshold, index) => ({
+    ...threshold,
+    cor: bandColors[Math.min(index, bandColors.length - 1)],
+  }));
 }
 
 export function useChoropleth({
@@ -75,6 +115,7 @@ export function useChoropleth({
   activeLayer,
   activeIndicatorId,
   simplifiedView = false,
+  colorVisionMode = "default",
 }: UseChoroplethArgs): UseChoroplethResult {
   return useMemo(() => {
     const empty: UseChoroplethResult = {
@@ -95,6 +136,9 @@ export function useChoropleth({
     const higherIsBetter = indicator?.higherIsBetter ?? true;
     const forceHigherIsBetter = indicator?.forceHigherIsBetter ?? false;
     const thresholdsSimplificado = indicator?.thresholdsSimplificado ?? null;
+    // Paleta acessível do modo ativo (rampa em Oklab) e faixas da visão simplificada.
+    const accessiblePalette = hasAccessiblePalette(colorVisionMode);
+    const bandColors = getBandColors(colorVisionMode);
 
     const extractor = activeModule.indicatorValueExtractor(activeIndicatorId);
     if (!extractor) return empty;
@@ -114,16 +158,19 @@ export function useChoropleth({
       const normalized = normalizeValue(raw, stats.min, stats.max);
 
       if (simplifiedView && thresholdsSimplificado) {
-        
         const percentual = normalized * 100;
-        
-        const color = resolveThresholdColor(
+
+        const bandIndex = resolveThresholdIndex(
           percentual,
           thresholdsSimplificado,
           higherIsBetter,
           forceHigherIsBetter,
         );
-        
+
+        const color = accessiblePalette
+          ? bandColors[Math.min(bandIndex, bandColors.length - 1)]
+          : thresholdsSimplificado[bandIndex]?.cor;
+
         if (color) {
           featureColors.set(featureId, color);
         }
@@ -131,12 +178,6 @@ export function useChoropleth({
       }
 
       if (simplifiedView) {
-        const simplifiedPalette = {
-          critical: "#ea580c",
-          attention: "#facc15",
-          good: "#0f766e",
-        };
-
         const performanceValue =
           indicator?.comparisonMode === "relative"
             ? normalized
@@ -144,14 +185,16 @@ export function useChoropleth({
               ? normalized
               : 1 - normalized;
 
-        const color =
-          performanceValue >= 0.67
-            ? simplifiedPalette.good
-            : performanceValue >= 0.34
-              ? simplifiedPalette.attention
-              : simplifiedPalette.critical;
+        const bandIndex =
+          performanceValue >= 0.67 ? 2 : performanceValue >= 0.34 ? 1 : 0;
 
-        featureColors.set(featureId, color);
+        featureColors.set(featureId, bandColors[bandIndex]);
+        continue;
+      }
+
+      const accessibleColor = resolveAccessibleColor(colorVisionMode, normalized);
+      if (accessibleColor) {
+        featureColors.set(featureId, accessibleColor);
         continue;
       }
 
@@ -162,11 +205,18 @@ export function useChoropleth({
     return {
       featureColors,
       stats,
-      activeThresholds: simplifiedView ? (thresholdsSimplificado ?? [
-        { min: 0, max: 34, cor: "#ea580c", rotulo: "Crítico" },
-        { min: 34, max: 67, cor: "#facc15", rotulo: "Atenção" },
-        { min: 67, max: 101, cor: "#0f766e", rotulo: "Bom" },
-      ]) : null,
+      activeThresholds: buildActiveThresholds(
+        simplifiedView,
+        thresholdsSimplificado,
+        colorVisionMode,
+      ),
     };
-  }, [collection, activeLayer, activeModuleId, activeIndicatorId, simplifiedView]);
+  }, [
+    collection,
+    activeLayer,
+    activeModuleId,
+    activeIndicatorId,
+    simplifiedView,
+    colorVisionMode,
+  ]);
 }

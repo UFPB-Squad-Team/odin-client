@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { A11yProvider } from "@/components/providers/a11y-provider";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -42,7 +43,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <A11yProvider>{children}</A11yProvider>
         </ThemeProvider>
       </body>
     </html>

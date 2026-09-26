@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { OdinLogoPlaceholder } from "@/components/features/landing/odin-logo-placeholder";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { A11yMenu } from "@/components/ui/a11y-menu";
 import { PageContainer } from "@/components/layout/page-container";
 import { LandingTourButton } from "@/components/features/landing/landing-tour-button";
 import { PendingRouteLink } from "@/components/ui/pending-route-link";
@@ -42,6 +43,7 @@ export function LandingNavbar() {
             <span className="sm:hidden">Entrar</span>
             <span className="hidden sm:inline">Acessar Observatório</span>
           </PendingRouteLink>
+          <A11yMenu />
           <ThemeToggle />
         </nav>
       </PageContainer>

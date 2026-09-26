@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
-import type { MouseEvent, ReactNode } from "react";
+import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
 type PendingRouteLinkProps = {
   href: string;
   children: ReactNode;
   className?: string;
+  /** Estilo inline, usado para cores dinâmicas (ex.: acento acessível do módulo). */
+  style?: CSSProperties;
   ariaLabel?: string;
   id?: string;
   replace?: boolean;
@@ -19,6 +21,7 @@ export function PendingRouteLink({
   href,
   children,
   className,
+  style,
   ariaLabel,
   id,
   replace = false,
@@ -61,6 +64,7 @@ export function PendingRouteLink({
       aria-busy={isPending}
       onClick={handleClick}
       className={`relative ${className ?? ""}`}
+      style={style}
     >
       {loadingVariant === "inline" ? (
         <span className="inline-flex items-center gap-2">

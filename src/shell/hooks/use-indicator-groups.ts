@@ -4,16 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listModules } from "@/core/registry/module-registry";
 import type { ObservatoryLayer } from "@/core/types/territory";
 import type { IndicatorGroup } from "@/shell/components/map-indicator-picker";
-
-const MODULE_COLORS: Record<string, string> = {
-  educacao: "#06b6d4",       // cyan
-  socioeconomico: "#a78bfa", // violet
-  saude: "#10b981",          // emerald
-  habitacao: "#f59e0b",      // amber
-  seguranca: "#f43f5e",      // rose
-};
-
-const DEFAULT_COLOR = "#6b7280"; // gray
+import { useModuleAccents } from "@/shell/hooks/use-module-accents";
 
 /**
  * Builds indicator groups from all registered modules for the active layer.
@@ -23,6 +14,7 @@ export function useIndicatorGroups(
   activeLayer: ObservatoryLayer,
   activeModuleId?: string | null,
 ): IndicatorGroup[] {
+  const { accentFor } = useModuleAccents();
   const [moduleCount, setModuleCount] = useState(() => listModules().length);
 
   // Poll until modules are registered (handles async bootstrap)
@@ -51,11 +43,11 @@ export function useIndicatorGroups(
         return {
           moduleId: mod.id,
           moduleLabel: mod.label,
-          colorAccent: MODULE_COLORS[mod.id] ?? DEFAULT_COLOR,
+          colorAccent: accentFor(mod.id),
           indicators,
         };
       })
       .filter(Boolean) as IndicatorGroup[];
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeLayer, moduleCount, activeModuleId]);
+  }, [activeLayer, moduleCount, activeModuleId, accentFor]);
 }

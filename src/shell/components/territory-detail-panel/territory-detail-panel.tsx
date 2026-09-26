@@ -10,18 +10,38 @@ import { DetailMetricCard } from "./detail-metric-card";
 import { DetailSectionCard } from "./detail-section-card";
 import { PendingRouteLink } from "@/components/ui/pending-route-link";
 import { DossierDownloadButton } from "./dossier-download-button";
-
-const MODULE_COLORS: Record<string, string> = {
-  educacao: "#06b6d4",
-  socioeconomico: "#a78bfa",
-  saude: "#10b981",
-  habitacao: "#f59e0b",
-  seguranca: "#f43f5e",
-};
-
-const DEFAULT_COLOR = "#6b7280";
+import {
+  MODULE_ACCENT_FALLBACK,
+  MODULE_ACCENT_FALLBACKS,
+  useModuleAccents,
+} from "@/shell/hooks/use-module-accents";
 
 const STORAGE_KEY = "odin:detail-panel:dimensions";
+
+/**
+ * Estilo dos links de ação do painel: no modo padrão mantém o ciano histórico e,
+ * nos modos acessíveis, acompanha o acento do módulo de Educação — o mesmo tom
+ * usado no mapa para a camada de escolas.
+ */
+function actionLinkPresentation(accent: string, isAccessiblePalette: boolean) {
+  if (!isAccessiblePalette) {
+    return {
+      className:
+        "mt-2 inline-flex w-full items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-500/5 px-3 py-2.5 text-sm font-medium text-cyan-700 transition-colors hover:border-cyan-500/60 hover:bg-cyan-500/10 dark:text-cyan-300",
+      style: undefined,
+    };
+  }
+
+  return {
+    className:
+      "mt-2 inline-flex w-full items-center justify-center rounded-lg border px-3 py-2.5 text-sm font-medium transition-opacity hover:opacity-85",
+    style: {
+      borderColor: `${accent}66`,
+      backgroundColor: `${accent}0D`,
+      color: accent,
+    },
+  };
+}
 
 function loadVisibility(): DimensionVisibility {
   try {
@@ -43,6 +63,10 @@ type TerritoryDetailPanelProps = {
 };
 
 export function TerritoryDetailPanel({ entity }: TerritoryDetailPanelProps) {
+  // Acento dos módulos: cores históricas do shell no modo padrão e rampa
+  // acessível nos modos de visão de cores — assim o painel acompanha o mapa.
+  const { accentFor, isAccessiblePalette } = useModuleAccents();
+  const actionLink = actionLinkPresentation(accentFor("educacao"), isAccessiblePalette);
   const [visibility, setVisibility] = useState<DimensionVisibility>(loadVisibility);
   const [moduleCount, setModuleCount] = useState(() => listModules().length);
 
@@ -77,7 +101,7 @@ export function TerritoryDetailPanel({ entity }: TerritoryDetailPanelProps) {
         return {
           moduleId: mod.id,
           moduleLabel: mod.label,
-          colorAccent: MODULE_COLORS[mod.id] ?? DEFAULT_COLOR,
+          colorAccent: MODULE_ACCENT_FALLBACKS[mod.id] ?? MODULE_ACCENT_FALLBACK,
           contribution,
         };
       })
@@ -99,7 +123,7 @@ export function TerritoryDetailPanel({ entity }: TerritoryDetailPanelProps) {
   const dimensionsMeta = contributions.map((c) => ({
     moduleId: c.moduleId,
     moduleLabel: c.moduleLabel,
-    colorAccent: c.colorAccent,
+    colorAccent: accentFor(c.moduleId),
   }));
 
   if (contributions.length === 0) {
@@ -119,37 +143,37 @@ export function TerritoryDetailPanel({ entity }: TerritoryDetailPanelProps) {
       />
 
       <div className="flex flex-col gap-2.5 p-4">
-        {visibleContributions.map((dim) => (
-          <div key={dim.moduleId} className="flex flex-col gap-2">
-            <DimensionDivider label={dim.moduleLabel} colorAccent={dim.colorAccent} />
+        {visibleContributions.map((dim) => {
+          const accent = accentFor(dim.moduleId);
+          return (
+            <div key={dim.moduleId} className="flex flex-col gap-2">
+              <DimensionDivider label={dim.moduleLabel} colorAccent={accent} />
 
-            {dim.contribution.metrics.length > 0 && (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {dim.contribution.metrics.map((metric) => (
-                  <DetailMetricCard
-                    key={metric.label}
-                    metric={metric}
-                    colorAccent={dim.colorAccent}
-                  />
-                ))}
-              </div>
-            )}
+              {dim.contribution.metrics.length > 0 && (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {dim.contribution.metrics.map((metric) => (
+                    <DetailMetricCard
+                      key={metric.label}
+                      metric={metric}
+                      colorAccent={accent}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {dim.contribution.sections.map((section) => (
-              <DetailSectionCard
-                key={section.title}
-                section={section}
-                colorAccent={dim.colorAccent}
-              />
-            ))}
-          </div>
-        ))}
+              {dim.contribution.sections.map((section) => (
+                <DetailSectionCard
+                  key={section.title}
+                  section={section}
+                  colorAccent={accent}
+                />
+              ))}
+            </div>
+          );
+        })}
 
         {entity.kind === "escola" && (
-          <PendingRouteLink
-            href={`/schools/${entity.data.id}`}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-500/5 px-3 py-2.5 text-sm font-medium text-cyan-700 transition-colors hover:border-cyan-500/60 hover:bg-cyan-500/10 dark:text-cyan-300"
-          >
+          <PendingRouteLink href={`/schools/${entity.data.id}`} {...actionLink}>
             Abrir página completa da escola →
           </PendingRouteLink>
         )}
@@ -162,7 +186,7 @@ export function TerritoryDetailPanel({ entity }: TerritoryDetailPanelProps) {
             />
             <PendingRouteLink
               href={`/observatorio/municipios/${entity.data.id}/schools`}
-              className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-500/5 px-3 py-2.5 text-sm font-medium text-cyan-700 transition-colors hover:border-cyan-500/60 hover:bg-cyan-500/10 dark:text-cyan-300"
+              {...actionLink}
             >
               Ver escolas deste município →
             </PendingRouteLink>

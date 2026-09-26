@@ -10,6 +10,12 @@ import Map, {
 } from "react-map-gl/maplibre";
 import type { StyleSpecification } from "maplibre-gl";
 import { useTheme } from "next-themes";
+import { useA11y } from "@/components/providers/a11y-provider";
+import {
+  getAccessibleLayerColors,
+  getSequentialRamp,
+} from "@/core/a11y/palettes";
+import { hexToRgba, sampleRampHex } from "@/core/a11y/oklab";
 import { useMapLayers } from "@/core/geospatial/use-map-layers";
 import { getModule } from "@/core/registry/module-registry";
 import { useChoropleth } from "@/core/choropleth/use-choropleth";
@@ -217,7 +223,7 @@ function generateRadiusCircle(centerLng: number, centerLat: number, radiusMeters
     const angle = (2 * Math.PI * i) / segments;
     const lat = Math.asin(
       Math.sin((centerLat * Math.PI) / 180) * Math.cos(radiusMeters / R) +
-        Math.cos((centerLat * Math.PI) / 180) * Math.sin(radiusMeters / R) * Math.cos(angle),
+      Math.cos((centerLat * Math.PI) / 180) * Math.sin(radiusMeters / R) * Math.cos(angle),
     );
     const lng =
       ((centerLng * Math.PI) / 180) +
@@ -237,15 +243,15 @@ function resolveChoroplethFeatureId(
   const props = feature.properties as Record<string, unknown> | undefined;
   return normalizeId(
     feature.id ??
-      props?.id ??
-      props?.codarea ??
-      props?.municipioIdIbge ??
-      props?.municipio_id_ibge ??
-      props?.escola_id_inep ??
-      props?.inep ??
-      props?.codigo ??
-      props?.cod ??
-      "",
+    props?.id ??
+    props?.codarea ??
+    props?.municipioIdIbge ??
+    props?.municipio_id_ibge ??
+    props?.escola_id_inep ??
+    props?.inep ??
+    props?.codigo ??
+    props?.cod ??
+    "",
   );
 }
 
@@ -465,6 +471,8 @@ export function MapboxObservatorioMap({
   const [radiusCenter, setRadiusCenter] = useState<[number, number] | null>(null);
   const mapRef = useRef<MapRef | null>(null);
   const { resolvedTheme } = useTheme();
+  // Preferências de acessibilidade (modo de visão de cores e contornos reforçados).
+  const { colorVisionMode, isAccessiblePalette, useStrongOutlines } = useA11y();
   const [mounted, setMounted] = useState(false);
   const [, setMarkersReady] = useState(false);
 
@@ -513,7 +521,21 @@ export function MapboxObservatorioMap({
     selectedDependencia: activeLayer === "escola" ? selectedDependencia : undefined,
   });
 
-  const layerStyle = LAYER_STYLES[resolvedLayer];
+  // Identidade visual da camada. No modo acessível ela também vem da rampa do
+  // modo: o ciano/roxo/verde padrão é justamente o eixo confundido em CVD e, sem
+  // isso, a troca de modo não teria efeito visível sem um indicador ativo.
+  const accessibleLayerColors = useMemo(
+    () => getAccessibleLayerColors(resolvedLayer, colorVisionMode),
+    [colorVisionMode, resolvedLayer],
+  );
+  const layerStyle = useMemo(
+    () =>
+      accessibleLayerColors
+        ? { ...LAYER_STYLES[resolvedLayer], ...accessibleLayerColors }
+        : LAYER_STYLES[resolvedLayer],
+    [accessibleLayerColors, resolvedLayer],
+  );
+  const escolaPointColor = accessibleLayerColors?.color ?? "#06b6d4";
   const ids = useMemo(() => buildLayerIds(resolvedLayer), [resolvedLayer]);
   const geojsonData = collection ?? EMPTY_COLLECTION;
 
@@ -535,6 +557,7 @@ export function MapboxObservatorioMap({
     activeLayer: resolvedLayer,
     activeIndicatorId,
     simplifiedView: visualControls.simplifiedView,
+    colorVisionMode,
   });
 
   const activeModule = useMemo(() => (activeModuleId ? getModule(activeModuleId) : null), [activeModuleId]);
@@ -582,12 +605,25 @@ export function MapboxObservatorioMap({
   }, [visualControls.styleId]);
 
   const fillOpacityFactor = clamp(visualControls.fillOpacity / 100, 0.2, 1);
-  const effectiveFillOpacity = clamp(Math.min(layerStyle.opacity, 0.2) * fillOpacityFactor, 0.04, 0.32);
+  const baseFillOpacity = clamp(Math.min(layerStyle.opacity, 0.2) * fillOpacityFactor, 0.04, 0.32);
+  // Piso de contraste em modo acessível: a leitura da cor não pode depender de o
+  // slider de opacidade estar no máximo (WCAG 1.4.11 — contraste não textual).
+  const accessibleFillFloor = isAccessiblePalette ? (useStrongOutlines ? 0.6 : 0.45) : 0;
+  const effectiveFillOpacity = Math.max(baseFillOpacity, accessibleFillFloor);
   const pointScaleFactor = clamp(visualControls.pointScale / 100, 0.7, 1.6);
   const mapIsDark = isDarkMapStyle(visualControls.styleId);
   const appIsDark = mounted ? resolvedTheme === "dark" : false;
   const contrastStrokeColor = mapIsDark ? "rgba(255,255,255,0.88)" : "rgba(15,23,42,0.82)";
   const subtleOutlineColor = mapIsDark ? "rgba(255,255,255,0.34)" : "rgba(15,23,42,0.28)";
+  // Dupla codificação: com contornos reforçados os polígonos continuam separáveis
+  // mesmo quando a cor deixa de ser um bom discriminador (CVD / alto contraste).
+  const polygonOutlineColor = useStrongOutlines ? contrastStrokeColor : subtleOutlineColor;
+  const choroplethFillOpacity = hasChoropleth
+    ? useStrongOutlines
+      ? 0.92
+      : 0.82
+    : effectiveFillOpacity;
+  const polygonLineWidth = useStrongOutlines ? 2.2 : 1.35;
   const radiusFillOpacity = mapIsDark ? (appIsDark ? 0.24 : 0.2) : (appIsDark ? 0.28 : 0.24);
   const radiusLineOpacity = mapIsDark ? 0.95 : 0.88;
 
@@ -604,30 +640,55 @@ export function MapboxObservatorioMap({
     const sourceFeatures: PointFeature[] =
       features.length > 0
         ? features.flatMap((feature, index) => {
-            const centroid = getCentroid(feature);
-            if (!centroid) return [];
-            const rawProperties = feature.properties as Record<string, unknown>;
-            const rawIdeb = rawProperties.ideb;
-            const intensity =
-              typeof rawIdeb === "number"
-                ? Math.max(0.35, Math.min(1, rawIdeb / 10))
-                : Math.max(0.35, 1 - index * 0.08);
-            return [{
-              type: "Feature",
-              id: String(feature.id),
-              properties: { id: feature.properties.id, nome: feature.properties.nome, nivel: feature.properties.nivel, intensity },
-              geometry: { type: "Point", coordinates: centroid },
-            }];
-          })
-        : fallbackPreviewPoints.map((p) => ({
+          const centroid = getCentroid(feature);
+          if (!centroid) return [];
+          const rawProperties = feature.properties as Record<string, unknown>;
+          const rawIdeb = rawProperties.ideb;
+          const intensity =
+            typeof rawIdeb === "number"
+              ? Math.max(0.35, Math.min(1, rawIdeb / 10))
+              : Math.max(0.35, 1 - index * 0.08);
+          return [{
             type: "Feature",
-            id: p.id,
-            properties: { id: p.id, nome: p.nome, nivel: p.nivel, intensity: p.intensity },
-            geometry: { type: "Point", coordinates: p.coordinates },
-          }));
+            id: String(feature.id),
+            properties: { id: feature.properties.id, nome: feature.properties.nome, nivel: feature.properties.nivel, intensity },
+            geometry: { type: "Point", coordinates: centroid },
+          }];
+        })
+        : fallbackPreviewPoints.map((p) => ({
+          type: "Feature",
+          id: p.id,
+          properties: { id: p.id, nome: p.nome, nivel: p.nivel, intensity: p.intensity },
+          geometry: { type: "Point", coordinates: p.coordinates },
+        }));
 
     return { type: "FeatureCollection", features: sourceFeatures };
   }, [geojsonData, resolvedLayer]);
+
+  // Ciano→roxo é o eixo mais confundido em protanopia/deuteranopia: no modo
+  // acessível a camada de calor passa a usar a mesma rampa do modo de visão.
+  const heatColorExpression = useMemo<unknown>(() => {
+    const ramp = getSequentialRamp(colorVisionMode);
+    if (!ramp) {
+      return [
+        "interpolate", ["linear"], ["heatmap-density"],
+        0, "rgba(255,255,255,0)",
+        0.2, "rgba(120, 203, 255, 0.28)",
+        0.4, "rgba(45, 212, 191, 0.48)",
+        0.65, "rgba(168, 85, 247, 0.68)",
+        1, "rgba(14, 165, 233, 0.9)",
+      ];
+    }
+
+    return [
+      "interpolate", ["linear"], ["heatmap-density"],
+      0, "rgba(255,255,255,0)",
+      0.22, hexToRgba(sampleRampHex(ramp, 0.2), 0.26),
+      0.45, hexToRgba(sampleRampHex(ramp, 0.45), 0.5),
+      0.72, hexToRgba(sampleRampHex(ramp, 0.72), 0.72),
+      1, hexToRgba(ramp[ramp.length - 1], 0.92),
+    ];
+  }, [colorVisionMode]);
 
   const handleFeatureClick = (event: MapLayerMouseEvent) => {
     // Radius mode: compute aggregation instead of selecting entity
@@ -807,14 +868,7 @@ export function MapboxObservatorioMap({
                 "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 9, 1, 13, 1.4],
                 "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 5, 18, 9, 30, 13, 42],
                 "heatmap-opacity": 0.85,
-                "heatmap-color": [
-                  "interpolate", ["linear"], ["heatmap-density"],
-                  0, "rgba(255,255,255,0)",
-                  0.2, "rgba(120, 203, 255, 0.28)",
-                  0.4, "rgba(45, 212, 191, 0.48)",
-                  0.65, "rgba(168, 85, 247, 0.68)",
-                  1, "rgba(14, 165, 233, 0.9)",
-                ],
+                "heatmap-color": heatColorExpression as never,
               }}
             />
             <Layer
@@ -836,8 +890,8 @@ export function MapboxObservatorioMap({
               filter={["!=", ["geometry-type"], "Point"]}
               paint={{
                 "fill-color": fillColorExpression,
-                "fill-opacity": hasChoropleth ? 0.82 : effectiveFillOpacity,
-                "fill-outline-color": subtleOutlineColor,
+                "fill-opacity": choroplethFillOpacity,
+                "fill-outline-color": polygonOutlineColor,
               }}
             />
             <Layer
@@ -850,7 +904,7 @@ export function MapboxObservatorioMap({
                   12, 6 * pointScaleFactor,
                   15, 9 * pointScaleFactor,
                 ],
-                "circle-color": resolvedLayer === "escola" ? "#06b6d4" : fillColorExpression,
+                "circle-color": resolvedLayer === "escola" ? escolaPointColor : fillColorExpression,
                 "circle-stroke-color": "#ffffff",
                 "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 1.5, 15, 2.5],
                 "circle-opacity": 0.92,
@@ -859,7 +913,7 @@ export function MapboxObservatorioMap({
             <Layer
               id={ids.line}
               type="line"
-              paint={{ "line-color": layerStyle.hoverColor, "line-width": 1.35, "line-opacity": 0.9 }}
+              paint={{ "line-color": useStrongOutlines ? contrastStrokeColor : layerStyle.hoverColor, "line-width": polygonLineWidth, "line-opacity": 0.9 }}
               filter={["!=", ["geometry-type"], "Point"]}
             />
             <Layer
@@ -963,6 +1017,8 @@ export function MapboxObservatorioMap({
             higherIsBetter={activeIndicator.higherIsBetter}
             comparisonMode={activeIndicator.comparisonMode}
             simplifiedView={visualControls.simplifiedView}
+            colorVisionMode={colorVisionMode}
+            noDataColor={layerStyle.color}
           />
         ) : null}
 

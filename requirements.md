@@ -463,3 +463,20 @@ O campo `tem_bairro_oficial` presente em cada documento de setor censitário ind
 4. THE API SHALL incluir no payload do resumo estadual o campo `metodo_agregacao` com valor `"ponderado_populacao"` para indicadores demográficos e `"ponderado_domicilios"` para indicadores domiciliares, permitindo que o frontend exiba a metodologia ao usuário.
 5. THE API SHALL retornar o endpoint de resumo estadual com tempo de resposta inferior a 500ms.
 6. WHEN o Painel_de_Detalhes ou qualquer componente do Frontend exibir indicadores agregados para o estado da Paraíba, THE Frontend SHALL buscar esses valores exclusivamente do endpoint `GET /api/v1/estados/{id}/resumo`, sem calcular médias localmente a partir dos dados de municípios.
+
+### Requisito 25: Modo de Visão de Cores (Daltonismo) e Dupla Codificação
+
+**User Story:** Como pessoa com deficiência de visão de cores (daltonismo), quero escolher um modo de paleta acessível no Observatório, para que eu consiga distinguir os valores do mapa sem depender da leitura de vermelho, verde ou azul.
+
+#### Critérios de Aceitação
+
+1. THE Frontend SHALL oferecer um menu "Acessibilidade" com os modos de visão de cores — Padrão, Protanopia, Deuteranopia, Tritanopia e Alto contraste (acromatopsia) — apresentados como `radiogroup` navegável por teclado (setas, Home e End).
+2. WHEN um modo diferente de "Padrão" é ativado, THE Frontend SHALL substituir a rampa do choropleth pela rampa acessível daquele modo, com paradas interpoladas em Oklab (uniformidade perceptual de luminância).
+3. WHILE um modo acessível estiver ativo, THE Frontend SHALL derivar também as cores de identidade da Camada_Ativa (`municipio`, `bairro`, `escola`), os pontos e a camada de calor da mesma rampa — exceção ao critério 5 do Requisito 6, que permanece válido no modo Padrão.
+4. THE Frontend SHALL refletir o modo ativo na legenda do mapa (gradiente, faixas, selo `Paleta: {modo}`, tom de "sem dado" e símbolos das faixas), de forma que mapa e legenda nunca divirjam.
+5. THE Frontend SHALL manter a preferência em `localStorage` e publicá-la em `<html data-cvd="{modo}">`, reaplicando-a automaticamente nos próximos carregamentos.
+6. THE Frontend SHALL garantir dupla codificação (WCAG 1.4.1 — Uso de Cor): as faixas da visão simplificada exibem glifos (`▼`, `◆`, `▲`) e rótulos, e o mapa usa piso de opacidade de preenchimento em modo acessível e contornos reforçados nos polígonos (WCAG 1.4.11 — Contraste Não Textual).
+7. THE Frontend SHALL manter as rampas validadas por simulação de deficiência de visão de cores (Machado, Oliveira & Fernandes, 2009) contra os fundos claro e escuro do mapa.
+
+---
+

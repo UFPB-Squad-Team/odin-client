@@ -9,6 +9,7 @@ import type {
   ShellContextType,
   MapEntity,
 } from "@/core/types/shell";
+import { useModuleAccents } from "@/shell/hooks/use-module-accents";
 
 type DetailPanelProps = {
   isOpen: boolean;
@@ -35,6 +36,16 @@ export function ObservatorioDetailPanel({
 }: DetailPanelProps) {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
+
+  // Acento do cabeçalho do painel: segue o módulo ativo no mapa e, sem módulo
+  // ativo, usa o acento neutro do painel. `null` no modo padrão — nesse caso
+  // valem as classes históricas (ciano/indigo).
+  const { accentFor, surfaceAccent, isAccessiblePalette } = useModuleAccents();
+  const panelAccent = isAccessiblePalette
+    ? activeModuleId
+      ? accentFor(activeModuleId)
+      : surfaceAccent
+    : null;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -166,7 +177,10 @@ export function ObservatorioDetailPanel({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-cyan-600 dark:text-cyan-400 sm:text-xs">
+            <p
+              className="text-[11px] uppercase tracking-[0.14em] text-cyan-600 dark:text-cyan-400 sm:text-xs"
+              style={panelAccent ? { color: panelAccent } : undefined}
+            >
               Detalhes
             </p>
             <h2 className="mt-1 truncate text-base font-semibold sm:text-lg">
@@ -188,6 +202,15 @@ export function ObservatorioDetailPanel({
                     disabled={isNavigating}
                     onClick={handleCompareClick}
                     className="inline-flex items-center gap-1.5 rounded-md border border-cyan-600 bg-cyan-50 px-2 py-1 text-[10px] font-medium text-cyan-700 transition hover:bg-cyan-100 disabled:opacity-60 dark:border-cyan-500/30 dark:bg-cyan-900/30 dark:text-cyan-200 sm:px-3 sm:py-1.5 sm:text-xs"
+                    style={
+                      panelAccent
+                        ? {
+                            borderColor: panelAccent,
+                            backgroundColor: `${panelAccent}26`,
+                            color: panelAccent,
+                          }
+                        : undefined
+                    }
                   >
                     {isNavigating ? (
                       <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">

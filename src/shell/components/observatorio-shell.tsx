@@ -16,6 +16,7 @@ import {
 import { RadiusAnalysisToggle, RadiusAnalysisPanel } from "@/shell/components/radius-analysis";
 import { useIndicatorGroups } from "@/shell/hooks/use-indicator-groups";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { A11yMenu } from "@/components/ui/a11y-menu";
 import { useCallback } from "react";
 import { useTheme } from "next-themes";
 import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
@@ -931,6 +932,9 @@ export function ObservatorioShell() {
               >
                 Voltar
               </Link>
+              <div className="a11y-menu">
+                <A11yMenu />
+              </div>
               <div className="theme-toggle">
                 <ThemeToggle />
               </div>
