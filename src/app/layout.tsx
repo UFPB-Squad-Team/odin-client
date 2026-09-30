@@ -21,6 +21,31 @@ export const metadata: Metadata = {
     "Plataforma de análise geoespacial de dados públicos no Nordeste, com foco granular em nível de bairro.",
 };
 
+const fontScaleBootstrap = `
+(function () {
+  var key = "odin-a11y-font-size";
+  var allowed = {
+    small: true,
+    default: true,
+    large: true,
+    "extra-large": true
+  };
+
+  try {
+    var value = localStorage.getItem(key);
+
+    if (!allowed[value]) {
+      var cookie = document.cookie.match(/(?:^|; )odin-a11y-font-size=([^;]+)/);
+      value = cookie ? decodeURIComponent(cookie[1]) : "default";
+    }
+
+    document.documentElement.dataset.fontScale = allowed[value] ? value : "default";
+  } catch {
+    document.documentElement.dataset.fontScale = "default";
+  }
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,6 +53,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: fontScaleBootstrap }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

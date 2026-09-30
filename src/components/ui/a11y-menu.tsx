@@ -27,6 +27,9 @@ export function A11yMenu() {
     setColorVisionMode,
     outlineEmphasis,
     setOutlineEmphasis,
+    fontSizeScale,
+    setFontSizeScale,
+    fontSizeOptions,
   } = useA11y();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -207,6 +210,68 @@ export function A11yMenu() {
                 APENAS VÁLIDO NA ÁREA DE MAPA E DETALHES DO OBSERVATÓRIO.
               </span>
             </p>
+
+            <fieldset className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-700">
+              <legend className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Tamanho do texto
+              </legend>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Diminuir tamanho do texto"
+                  disabled={fontSizeScale === fontSizeOptions[0].id}
+                  onClick={() => {
+                    const index = fontSizeOptions.findIndex(
+                      (option) => option.id === fontSizeScale,
+                    );
+                    setFontSizeScale(
+                      fontSizeOptions[Math.max(0, index - 1)].id,
+                    );
+                  }}
+                  className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  A-
+                </button>
+                <span className="min-w-24 text-center text-sm text-zinc-700 dark:text-zinc-200" aria-live="polite">
+                  {fontSizeOptions.find((option) => option.id === fontSizeScale)?.label}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Aumentar tamanho do texto"
+                  disabled={
+                    fontSizeScale ===
+                    fontSizeOptions[fontSizeOptions.length - 1].id
+                  }
+                  onClick={() => {
+                    const index = fontSizeOptions.findIndex(
+                      (option) => option.id === fontSizeScale,
+                    );
+                    setFontSizeScale(
+                      fontSizeOptions[
+                        Math.min(fontSizeOptions.length - 1, index + 1)
+                      ].id,
+                    );
+                  }}
+                  className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  A+
+                </button>
+              </div>
+              <div className="mt-2 grid grid-cols-4 gap-1" role="radiogroup" aria-label="Escala do texto">
+                {fontSizeOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={option.id === fontSizeScale}
+                    onClick={() => setFontSizeScale(option.id)}
+                    className="min-h-9 rounded-md px-2 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
           </div>
         </div>
       ) : null}

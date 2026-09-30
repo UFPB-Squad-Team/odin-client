@@ -56,15 +56,15 @@ export function MapLegend({
   const bands = (
     comparisonMode === "relative"
       ? [
-          { label: "Muito baixo", description: "Quantidade bem abaixo do restante" },
-          { label: "Na média", description: "Quantidade próxima ao conjunto" },
-          { label: "Muito alto", description: "Quantidade bem acima do restante" },
-        ]
+        { label: "Muito baixo", description: "Quantidade bem abaixo do restante" },
+        { label: "Na média", description: "Quantidade próxima ao conjunto" },
+        { label: "Muito alto", description: "Quantidade bem acima do restante" },
+      ]
       : [
-          { label: "Crítico", description: "Desempenho baixo" },
-          { label: "Atenção", description: "Zona intermediária" },
-          { label: "Dentro da meta", description: "Desempenho favorável" },
-        ]
+        { label: "Crítico", description: "Desempenho baixo" },
+        { label: "Atenção", description: "Zona intermediária" },
+        { label: "Dentro da meta", description: "Desempenho favorável" },
+      ]
   ).map((band, index) => ({
     ...band,
     color: bandColors[Math.min(index, bandColors.length - 1)],
@@ -72,7 +72,7 @@ export function MapLegend({
   }));
 
   return (
-    <div className="rounded-xl border border-zinc-300/90 bg-white/95 p-3 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90 min-w-[240px] sm:min-w-[280px]">
+    <div className="odin-font-scale-excluded rounded-xl border border-zinc-300/90 bg-white/95 p-3 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90 min-w-[240px] sm:min-w-[280px]">
       <div className="flex items-start justify-between gap-2">
         <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
           {indicatorLabel}

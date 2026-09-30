@@ -41,7 +41,7 @@ export function ObservatorioMapTooltip({
 
   return (
     <div
-      className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full"
+      className="odin-font-scale-excluded pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full"
       style={{ left: x, top: y - 10 }}
       role="status"
       aria-live="polite"

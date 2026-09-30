@@ -11,6 +11,7 @@
 }
 
 :root {
+  --odin-font-scale: 1;
   --background: #f4f4f5;
   --foreground: #18181b;
   --panel: #ffffff;
@@ -25,6 +26,41 @@
   --tour-button-bg: #f4f4f5;
   --tour-button-text: #18181b;
   --tour-button-hover: #e4e4e7;
+}
+
+html[data-font-scale="small"] {
+  --odin-font-scale: 0.8;
+}
+
+html[data-font-scale="default"] {
+  --odin-font-scale: 1;
+}
+
+html[data-font-scale="large"] {
+  --odin-font-scale: 1.2;
+}
+
+html[data-font-scale="extra-large"] {
+  --odin-font-scale: 1.4;
+}
+
+/* Map-rendered labels and hover content intentionally stay at map scale. */
+.odin-font-scale-excluded {
+  font-size: 16px !important;
+}
+
+.odin-font-scale-excluded .text-xs {
+  font-size: 12px !important;
+}
+
+.odin-font-scale-excluded .text-sm {
+  font-size: 14px !important;
+}
+
+@media (min-width: 640px) {
+  .odin-font-scale-excluded .sm\:text-sm {
+    font-size: 14px !important;
+  }
 }
 
 .dark {
@@ -149,6 +185,7 @@
 body {
   color: var(--foreground);
   background: var(--background);
+  font-size: calc(1rem * var(--odin-font-scale));
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
