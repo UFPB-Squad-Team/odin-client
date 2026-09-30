@@ -710,6 +710,7 @@ function ComparePageContent() {
   const [secondaryId, setSecondaryId] = useState<string>("");
   const [searchA, setSearchA] = useState("");
   const [searchB, setSearchB] = useState("");
+  const [radarGroupLabel, setRadarGroupLabel] = useState("");
   const didInitUfs = useRef(false);
   const bairroCacheRef = useRef<Record<string, Bairro[]>>({});
   const municipiosCacheRef = useRef<Record<string, Municipio[]>>({});
@@ -1088,6 +1089,22 @@ function ComparePageContent() {
     }
     return extractComparableMetrics(selectedA, selectedB, compareKind);
   }, [selectedA, selectedB, compareKind, estadoAgg]);
+
+  const radarGroups = useMemo(
+    () => groups.filter((group) => group.metrics.length > 0),
+    [groups],
+  );
+
+  useEffect(() => {
+    if (!radarGroups.some((group) => group.label === radarGroupLabel)) {
+      setRadarGroupLabel(radarGroups[0]?.label ?? "");
+    }
+  }, [radarGroupLabel, radarGroups]);
+
+  const selectedRadarGroup =
+    radarGroups.find((group) => group.label === radarGroupLabel) ??
+    radarGroups[0] ??
+    null;
 
   // Agrega os municípios de cada estado selecionado em props estaduais.
   useEffect(() => {
@@ -1644,15 +1661,47 @@ function ComparePageContent() {
                   <div className="space-y-4">
                     <div className={`rounded-xl border p-4 ${theme.surface}`}>
                       <p className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.15em] ${theme.muted}`}>
-                        Radar
+                        Radar por tema
                       </p>
                       {hasAnyData ? (
-                        <RadarChart
-                          groups={groups}
-                          nameA={selectedA.nome}
-                          nameB={selectedB.nome}
-                          isDark={isDark}
-                        />
+                        <>
+                          <div
+                            className="mb-4 flex flex-wrap gap-1.5"
+                            role="tablist"
+                            aria-label="Tema de indicadores do radar"
+                          >
+                            {radarGroups.map((group) => {
+                              const selected = group.label === selectedRadarGroup?.label;
+                              return (
+                                <button
+                                  key={group.label}
+                                  type="button"
+                                  role="tab"
+                                  aria-selected={selected}
+                                  onClick={() => setRadarGroupLabel(group.label)}
+                                  className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 ${selected
+                                    ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300"
+                                    : `${theme.borderSoft} ${theme.muted} hover:bg-zinc-100 dark:hover:bg-zinc-800/70`}`}
+                                >
+                                  {group.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {selectedRadarGroup ? (
+                            <>
+                              <p className={`mb-2 text-[11px] ${theme.mutedStrong}`}>
+                                {selectedRadarGroup.metrics.length} indicadores neste conjunto
+                              </p>
+                              <RadarChart
+                                groups={[selectedRadarGroup]}
+                                nameA={selectedA.nome}
+                                nameB={selectedB.nome}
+                                isDark={isDark}
+                              />
+                            </>
+                          ) : null}
+                        </>
                       ) : (
                         <div className="flex h-40 items-center justify-center">
                           <p className={`text-xs ${theme.mutedStrong}`}>Sem dados</p>
