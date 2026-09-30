@@ -524,6 +524,25 @@ function formatMetricValue(
   return fmt(v);
 }
 
+function wrapRadarLabel(label: string, maxCharacters = 14): string[] {
+  const lines: string[] = [];
+
+  for (const word of label.split(/\s+/)) {
+    const current = lines[lines.length - 1];
+    if (current && `${current} ${word}`.length <= maxCharacters) {
+      lines[lines.length - 1] = `${current} ${word}`;
+    } else if (word.length <= maxCharacters) {
+      lines.push(word);
+    } else {
+      for (let index = 0; index < word.length; index += maxCharacters) {
+        lines.push(word.slice(index, index + maxCharacters));
+      }
+    }
+  }
+
+  return lines.length > 0 ? lines : [label];
+}
+
 
 function RadarChart({
   groups,
@@ -615,19 +634,24 @@ function RadarChart({
               : Math.cos(angle(i)) > 0
                 ? "start"
                 : "end";
-          const shortLabel =
-            m.label.length > 14 ? m.label.slice(0, 13) + "…" : m.label;
+          const labelLines = wrapRadarLabel(m.label);
+          const labelStartY = ly - ((labelLines.length - 1) * 4);
           return (
             <text
               key={m.key}
               x={lx}
-              y={ly}
-              fontSize={9}
+              y={labelStartY}
+              fontSize={8}
               textAnchor={anchor}
               dominantBaseline="middle"
               className={isDark ? "fill-zinc-400" : "fill-zinc-500"}
             >
-              {shortLabel}
+              <title>{m.label}</title>
+              {labelLines.map((line, lineIndex) => (
+                <tspan key={`${m.key}-${lineIndex}`} x={lx} dy={lineIndex === 0 ? 0 : 9}>
+                  {line}
+                </tspan>
+              ))}
             </text>
           );
         })}

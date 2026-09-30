@@ -200,6 +200,7 @@ export function ObservatorioDetailPanel({
                   <button
                     type="button"
                     disabled={isNavigating}
+                    aria-busy={isNavigating}
                     onClick={handleCompareClick}
                     className="inline-flex items-center gap-1.5 rounded-md border border-cyan-600 bg-cyan-50 px-2 py-1 text-[10px] font-medium text-cyan-700 transition hover:bg-cyan-100 disabled:opacity-60 dark:border-cyan-500/30 dark:bg-cyan-900/30 dark:text-cyan-200 sm:px-3 sm:py-1.5 sm:text-xs"
                     style={
@@ -218,7 +219,7 @@ export function ObservatorioDetailPanel({
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                       </svg>
                     ) : null}
-                    Comparar
+                    {isNavigating ? "Abrindo comparação..." : "Comparar"}
                   </button>
                 ) : isSameAsPrimary ? (
                   <span className="rounded-md border border-zinc-300 px-2 py-1 text-[10px] font-medium text-zinc-400 sm:px-3 sm:py-1.5 sm:text-xs">
@@ -228,6 +229,7 @@ export function ObservatorioDetailPanel({
                   <button
                     type="button"
                     disabled={isNavigating}
+                    aria-busy={isNavigating}
                     onClick={handleCompareWithSelectedClick}
                     className="inline-flex items-center gap-1.5 rounded-md border border-indigo-600 bg-indigo-50 px-2 py-1 text-[10px] font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-600/30 dark:bg-indigo-900/30 dark:text-indigo-200 sm:px-3 sm:py-1.5 sm:text-xs"
                   >
@@ -237,7 +239,9 @@ export function ObservatorioDetailPanel({
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                       </svg>
                     ) : null}
-                    Comparar com selecionado
+                    {isNavigating
+                      ? "Abrindo comparação..."
+                      : "Comparar com selecionado"}
                   </button>
                 )}
               </>
