@@ -14,7 +14,17 @@ type PendingRouteLinkProps = {
   ariaLabel?: string;
   id?: string;
   replace?: boolean;
-  loadingVariant?: "inline" | "corner" | "none";
+  /**
+   * Estilo do feedback de carregamento exibido durante a navegação.
+   * - "inline": spinner antes do conteúdo (ideal para links de texto curto).
+   * - "corner": spinner no canto superior direito (ideal para botões).
+   * - "overlay": glassmorphism com spinner centrado sobre o componente
+   *   (ideal para cards) — não bloqueia clique nem desloca layout.
+   * - "none": sem feedback visual.
+   */
+  loadingVariant?: "inline" | "corner" | "overlay" | "none";
+  /** Texto exibido na variante "overlay". */
+  loadingLabel?: string;
 };
 
 export function PendingRouteLink({
@@ -26,6 +36,7 @@ export function PendingRouteLink({
   id,
   replace = false,
   loadingVariant = "inline",
+  loadingLabel = "Carregando...",
 }: PendingRouteLinkProps) {
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
@@ -84,6 +95,23 @@ export function PendingRouteLink({
               aria-hidden="true"
               className="pointer-events-none absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
             />
+          )}
+        </>
+      ) : loadingVariant === "overlay" ? (
+        <>
+          {children}
+          {isPending && (
+            <span
+              className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-zinc-950/30 ring-1 ring-inset ring-cyan-500/60 backdrop-blur-[2px] transition-opacity duration-300 motion-reduce:transition-none"
+            >
+              <span className="inline-flex items-center gap-2 rounded-full border border-zinc-300/60 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-zinc-700 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900/85 dark:text-zinc-200">
+                <span
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-cyan-500 motion-reduce:animate-none"
+                />
+                {loadingLabel}
+              </span>
+            </span>
           )}
         </>
       ) : (

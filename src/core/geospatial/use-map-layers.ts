@@ -430,5 +430,22 @@ export function useMapLayers({
     setRefreshTick((value) => value + 1);
   };
 
-  return { activeLayer: resolvedLayer, collection, error, features, loading, recorteId, refresh, zoom };
+  // Semântica de carregamento para a UI do mapa (MapLoadingIndicator):
+  // - isInitialLoading: primeira carga, nenhuma geometria na tela.
+  // - isRefetching: já há geometria renderizada, nova request em voo.
+  const isInitialLoading = loading && !collection;
+  const isRefetching = loading && Boolean(collection);
+
+  return {
+    activeLayer: resolvedLayer,
+    collection,
+    error,
+    features,
+    loading,
+    isInitialLoading,
+    isRefetching,
+    recorteId,
+    refresh,
+    zoom,
+  };
 }

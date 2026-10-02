@@ -57,7 +57,8 @@ function SchoolCard({
   return (
     <PendingRouteLink
       href={`/schools/${inepId ?? id}`}
-      loadingVariant="none"
+      loadingVariant="overlay"
+      loadingLabel="Carregando escola"
       className="group rounded-2xl border border-zinc-200 bg-white/90 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950/70"
     >
       <div className="flex items-start justify-between gap-4">

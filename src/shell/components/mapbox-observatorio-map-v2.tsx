@@ -24,6 +24,7 @@ import { aggregateFeaturesInRadius } from "@/shell/components/radius-analysis/ag
 import { registerMarkerImages } from "@/shell/components/map-markers";
 import { ObservatorioMapTooltip } from "@/shell/components/observatorio-map-tooltip";
 import { MapLegend } from "@/shell/components/map-legend";
+import { MapLoadingIndicator } from "@/shell/components/map-loading-indicator";
 import { LAYER_STYLES, type GeoJSONFeature } from "@/core/types/geospatial";
 import type { ModuleIndicator } from "@/core/types/module";
 import type { Escola, ObservatoryLayer } from "@/core/types/territory";
@@ -152,6 +153,13 @@ const EMPTY_COLLECTION = {
   type: "FeatureCollection" as const,
   features: [],
 };
+
+// Janela de "assentamento" da câmera (move/zoom) antes de considerar o
+// viewport estável — dentro da faixa recomendada de 150–300ms.
+const VIEWPORT_SETTLE_MS = 200;
+// "auto": pill na 1ª carga (explícito), bar no refetch (discreta).
+// Force "bar" ou "pill" para usar uma única variante.
+const MAP_LOADING_INDICATOR_VARIANT: "bar" | "pill" | "auto" = "auto";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -476,8 +484,16 @@ export function MapboxObservatorioMap({
   const [mounted, setMounted] = useState(false);
   const [, setMarkersReady] = useState(false);
 
+  // Feedback de carregamento não-bloqueante: `viewportMoving` silencia o
+  // indicador enquanto o usuário está arrastando/zoomando (evita flicker).
+  const [viewportMoving, setViewportMoving] = useState(false);
+  const moveSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     setMounted(true);
+    return () => {
+      if (moveSettleTimerRef.current) clearTimeout(moveSettleTimerRef.current);
+    };
   }, []);
 
   // Register marker images on map load and style changes
@@ -512,6 +528,8 @@ export function MapboxObservatorioMap({
     collection,
     error,
     loading: layerLoading,
+    isInitialLoading,
+    isRefetching,
   } = useMapLayers({
     activeLayer,
     estadoId,
@@ -814,27 +832,55 @@ export function MapboxObservatorioMap({
     setCollapsedCards((current) => ({ ...current, [card]: !current[card] }));
   };
 
+  /**
+   * Sincroniza a câmera do Map controlado e "assenta" o viewport.
+   * Debounce: mantém o indicador oculto durante o gesto contínuo e o exibe
+   * apenas ~VIEWPORT_SETTLE_MS depois que o usuário para de mover/zoomar,
+   * momento em que uma nova request (uf/resolução/camada) pode estar em voo.
+   */
+  const handleViewMove = (next: ViewState) => {
+    onViewStateChange(next);
+    setViewportMoving(true);
+    if (moveSettleTimerRef.current) clearTimeout(moveSettleTimerRef.current);
+    moveSettleTimerRef.current = setTimeout(() => {
+      moveSettleTimerRef.current = null;
+      setViewportMoving(false);
+    }, VIEWPORT_SETTLE_MS);
+  };
+
+  const handleViewMoveEnd = (next: ViewState) => {
+    onViewStateChange(next);
+    if (moveSettleTimerRef.current) {
+      clearTimeout(moveSettleTimerRef.current);
+      moveSettleTimerRef.current = null;
+    }
+    setViewportMoving(false);
+  };
+
+  const dataPending = isLoading || layerLoading;
+  const indicatorVisible = !viewportMoving && dataPending;
+  const resolvedVariant: "bar" | "pill" =
+    MAP_LOADING_INDICATOR_VARIANT === "auto"
+      ? isInitialLoading && !isRefetching
+        ? "pill"
+        : "bar"
+      : MAP_LOADING_INDICATOR_VARIANT;
+
   return (
     <section className="relative h-full overflow-hidden bg-zinc-100 dark:bg-zinc-950/60">
-      {isLoading || layerLoading ? (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-zinc-950/25 backdrop-blur-sm">
-          <div className="rounded-lg border border-zinc-300 bg-white/95 px-6 py-4 text-center shadow-lg dark:border-zinc-700 dark:bg-zinc-900/95">
-            <svg className="mx-auto h-6 w-6 animate-spin text-cyan-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <p className="mt-3 text-sm font-medium text-zinc-700 dark:text-zinc-200">
-              {error ? "Carregando fallback local..." : "Carregando geometrias..."}
-            </p>
-          </div>
-        </div>
-      ) : null}
+      <MapLoadingIndicator
+        visible={indicatorVisible}
+        variant={resolvedVariant}
+        label={error ? "Carregando fallback local..." : "Carregando dados..."}
+        align="top-center"
+      />
 
       <div className="absolute inset-0 z-0">
         <Map
           ref={mapRef}
           {...viewState}
-          onMove={(event) => onViewStateChange(event.viewState)}
+          onMove={(event) => handleViewMove(event.viewState)}
+          onMoveEnd={(event) => handleViewMoveEnd(event.viewState)}
           onLoad={handleMapLoad}
           onStyleData={handleStyleData}
           mapStyle={mapStyleUrl}
