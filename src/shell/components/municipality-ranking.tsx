@@ -78,7 +78,7 @@ export function MunicipalityRanking({
       </button>
 
       {isExpanded && (
-        <div className="max-h-[60vh] overflow-y-auto">{rankedEntities.map(({ entity, value }, index) => {
+        <div className="max-h-[60vh] overflow-y-auto overscroll-contain">{rankedEntities.map(({ entity, value }, index) => {
           const isSelected = entity.data.id === selectedId;
           const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : null;
 
@@ -108,7 +108,7 @@ export function MunicipalityRanking({
               {/* Barra de progresso */}
               <div className="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all"
+                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-[width]"
                   style={{
                     width: `${value !== null ? Math.min(100, (value / (rankedEntities[0]?.value ?? 100)) * 100) : 0}%`,
                   }}

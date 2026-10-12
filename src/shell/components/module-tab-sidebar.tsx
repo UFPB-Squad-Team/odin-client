@@ -122,7 +122,7 @@ export function ModuleTabSidebar({
       </div>
 
       {/* Conteúdo — apenas o SidebarPanel do módulo ativo */}
-      <div className="flex-1 overflow-y-auto" role="tabpanel">
+      <div className="flex-1 overflow-y-auto overscroll-contain" role="tabpanel">
         {currentModule ? (
           <currentModule.SidebarPanel
             shellContext={shellContext}

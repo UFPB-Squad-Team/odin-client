@@ -479,10 +479,10 @@ export function LandingGranularityNav() {
 
             {/* Dropdown */}
             {showEstadoDropdown && (
-              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
                 {loadingEstados ? (
                   <div className="flex items-center justify-center gap-2 px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
                     Carregando estados...
                   </div>
                 ) : filteredEstados.length > 0 ? (
@@ -556,10 +556,10 @@ export function LandingGranularityNav() {
 
             {/* Dropdown */}
             {showMunicipioDropdown && selectedEstado && (
-              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
                 {loadingMunicipios ? (
                   <div className="flex items-center justify-center gap-2 px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
                     Carregando municípios...
                   </div>
                 ) : filteredMunicipios.length > 0 ? (
@@ -630,7 +630,7 @@ export function LandingGranularityNav() {
             </div>
 
             {showBairroDropdown && selectedMunicipio && granularity === "bairro" && (
-              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
                 {filteredBairros.length > 0 ? (
                   filteredBairros.map((bairro) => (
                     <button
@@ -700,10 +700,10 @@ export function LandingGranularityNav() {
 
             {/* Dropdown - max-h-60 ≈ 5 itens visíveis, resto rola por dentro */}
             {showEscolaDropdown && selectedMunicipio && granularity === "escola" && (
-              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
                 {loadingEscolas ? (
                   <div className="flex items-center justify-center gap-2 px-3 py-4 text-sm text-zinc-500 dark:text-zinc-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
                     Carregando escolas...
                   </div>
                 ) : filteredEscolas.length > 0 ? (
@@ -786,11 +786,11 @@ export function LandingGranularityNav() {
               type="button"
               onClick={handleNavigate}
               disabled={!canNavigate || navigating}
-              className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 active:scale-[0.96] motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {navigating ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
                   Redirecionando...
                 </>
               ) : (

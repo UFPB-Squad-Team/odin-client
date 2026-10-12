@@ -169,7 +169,7 @@ export function ObservatorioDetailPanel({
 
       <aside
         aria-label="Painel de detalhes"
-        className={`fixed bottom-0 right-0 top-auto z-[60] max-h-[92dvh] w-full overflow-y-auto border-t border-zinc-300 bg-white/95 p-3 shadow-xl backdrop-blur transition-transform duration-200 dark:border-zinc-700 dark:bg-zinc-900/95 sm:top-0 sm:max-h-[100dvh] sm:w-[22rem] sm:border-l sm:border-t-0 sm:p-4 ${
+        className={`fixed bottom-0 right-0 top-auto z-[60] max-h-[92dvh] w-full overflow-y-auto overscroll-contain border-t border-zinc-300 bg-white/95 p-3 shadow-xl backdrop-blur transition-transform duration-200 dark:border-zinc-700 dark:bg-zinc-900/95 sm:top-0 sm:max-h-[100dvh] sm:w-[22rem] sm:border-l sm:border-t-0 sm:p-4 ${
           isOpen
             ? "translate-y-0 sm:translate-x-0"
             : "translate-y-[105%] sm:translate-x-[105%]"
@@ -214,7 +214,7 @@ export function ObservatorioDetailPanel({
                     }
                   >
                     {isNavigating ? (
-                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <svg className="h-3 w-3 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                       </svg>
@@ -234,7 +234,7 @@ export function ObservatorioDetailPanel({
                     className="inline-flex items-center gap-1.5 rounded-md border border-indigo-600 bg-indigo-50 px-2 py-1 text-[10px] font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60 dark:border-indigo-600/30 dark:bg-indigo-900/30 dark:text-indigo-200 sm:px-3 sm:py-1.5 sm:text-xs"
                   >
                     {isNavigating ? (
-                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <svg className="h-3 w-3 animate-spin motion-reduce:animate-none" viewBox="0 0 24 24" fill="none">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                       </svg>

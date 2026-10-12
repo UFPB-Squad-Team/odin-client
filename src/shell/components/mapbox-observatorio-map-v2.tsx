@@ -1083,7 +1083,7 @@ export function MapboxObservatorioMap({
           </div>
 
           {!collapsedCards.entities ? (
-            <div className="max-h-[min(12.5rem,calc(100vh-20rem))] space-y-1 overflow-y-auto px-2.5 py-2 sm:max-h-[14rem] sm:px-3 odin-entity-scroll">
+            <div className="max-h-[min(12.5rem,calc(100vh-20rem))] space-y-1 overflow-y-auto overscroll-contain px-2.5 py-2 sm:max-h-[14rem] sm:px-3 odin-entity-scroll">
               {filteredEntities.length === 0 ? (
                 <p className="rounded-md border border-dashed border-zinc-300 px-2 py-2 text-[12px] text-zinc-600 dark:border-zinc-700 dark:text-zinc-300 sm:px-3 sm:text-sm">
                   Nenhuma entidade no recorte.

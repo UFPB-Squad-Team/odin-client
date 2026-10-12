@@ -10,8 +10,8 @@ export function LandingCta() {
             Pronto para explorar o ODIN em nível de detalhe real?
           </h2>
           <p className="mt-3 max-w-3xl text-zinc-700 dark:text-zinc-300">
-            Comece com o módulo de Educação na Paraíba e acompanhe a evolução da
-            plataforma para novos estados e novos módulos analíticos.
+            Comece pelos módulos de Educação e Socioeconômico e acompanhe a
+            evolução da plataforma para novos módulos analíticos.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">

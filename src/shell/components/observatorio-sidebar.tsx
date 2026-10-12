@@ -155,7 +155,7 @@ export function ObservatorioSidebar({
             />
           )}
 
-          <aside className="odin-scroll flex-1 overflow-y-auto p-5 flex flex-col gap-5">
+          <aside className="odin-scroll flex-1 overflow-y-auto overscroll-contain p-5 flex flex-col gap-5">
             <div className="shrink-0 rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40 p-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-600 dark:text-cyan-500">
                 Painel de Filtros
@@ -226,7 +226,7 @@ export function ObservatorioSidebar({
                   <button
                     key={layer.id}
                     onClick={() => onLayerChange(layer.id)}
-                    className={`min-h-[44px] rounded-xl border px-3 py-2 text-[10px] font-bold leading-tight transition-all ${
+                    className={`min-h-[44px] rounded-xl border px-3 py-2 text-[10px] font-bold leading-tight transition-colors ${
                       activeLayer === layer.id
                         ? "bg-cyan-600 border-cyan-500 text-white shadow-[0_0_10px_rgba(8,145,178,0.2)]"
                         : "bg-zinc-100 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-500 hover:border-zinc-400 dark:hover:border-zinc-700"
@@ -252,7 +252,7 @@ export function ObservatorioSidebar({
                         key={opt.value}
                         type="button"
                         onClick={() => onToggleDependencia(opt.value)}
-                        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
                           isActive
                             ? "border-cyan-500 bg-cyan-500/10 text-cyan-700 dark:border-cyan-500/60 dark:text-cyan-300"
                             : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-400 dark:hover:border-zinc-600"

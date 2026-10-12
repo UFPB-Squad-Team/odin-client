@@ -79,7 +79,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onComplete }) 
           
           <button
             onClick={handleStartTour}
-            className="flex-1 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-700 active:scale-[0.98]"
+            className="flex-1 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-700 active:scale-[0.96] motion-reduce:active:scale-100"
           >
             Iniciar tour 🚀
           </button>

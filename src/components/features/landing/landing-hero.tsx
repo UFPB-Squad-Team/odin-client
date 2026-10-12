@@ -34,14 +34,14 @@ export function LandingHero() {
             Dados territoriais que transformam políticas públicas.
           </h1>
           <p className="mt-6 max-w-3xl text-base text-zinc-700 dark:text-zinc-300 sm:text-lg">
-            O MVP começa na Paraíba com Educação, mas o ODIN já nasce para
-            escalar para novos estados e novos módulos. Visualize território,
-            compare contextos e priorize ação pública com clareza.
+            O ODIN reúne dados públicos de Educação e Socioeconômico dos 9
+            estados do Nordeste em um só mapa. Visualize o território, compare
+            contextos e priorize ação pública com clareza.
           </p>
 
           <div className="mt-8 grid gap-2 text-sm text-zinc-600 dark:text-zinc-300 sm:grid-cols-3">
-            <p>• MVP operacional: Paraíba</p>
-            <p>• Escalável para o Nordeste</p>
+            <p>• 9 estados do Nordeste</p>
+            <p>• Educação e Socioeconômico</p>
             <p>• Plataforma multi-módulo</p>
           </div>
 
@@ -61,7 +61,7 @@ export function LandingHero() {
             <PendingRouteLink
               href="/observatorio"
               aria-label="Abrir módulo observatório"
-              className="rounded-lg bg-cyan-500 px-6 py-3.5 font-semibold text-zinc-950 transition hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 active:scale-95"
+              className="rounded-lg bg-cyan-500 px-6 py-3.5 font-semibold text-zinc-950 transition hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 active:scale-[0.96] motion-reduce:active:scale-100"
             >
               Acessar Observatório
             </PendingRouteLink>

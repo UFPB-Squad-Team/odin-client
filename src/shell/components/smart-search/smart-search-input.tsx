@@ -66,7 +66,7 @@ export function SmartSearchInput({
     <div ref={containerRef} className="relative">
       <div className="flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 px-3 py-2 transition-colors focus-within:border-cyan-500/60 focus-within:ring-1 focus-within:ring-cyan-500/20">
         {loading ? (
-          <Loader2 className="h-3.5 w-3.5 text-cyan-500 animate-spin shrink-0" />
+          <Loader2 className="h-3.5 w-3.5 text-cyan-500 animate-spin motion-reduce:animate-none shrink-0" />
         ) : (
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         )}
@@ -107,7 +107,7 @@ export function SmartSearchInput({
               Nenhum resultado para &ldquo;{query}&rdquo;
             </p>
           ) : (
-            <div className="max-h-[320px] overflow-y-auto py-1">
+            <div className="max-h-[320px] overflow-y-auto overscroll-contain py-1">
               {results.map((item, index) => (
                 <SearchResultItemRow
                   key={item.id}

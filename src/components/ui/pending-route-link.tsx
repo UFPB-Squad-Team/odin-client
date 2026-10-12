@@ -82,7 +82,7 @@ export function PendingRouteLink({
           {isPending && (
             <span
               aria-hidden="true"
-              className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+              className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none"
             />
           )}
           <span>{children}</span>
@@ -93,7 +93,7 @@ export function PendingRouteLink({
           {isPending && (
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+              className="pointer-events-none absolute right-3 top-3 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none"
             />
           )}
         </>

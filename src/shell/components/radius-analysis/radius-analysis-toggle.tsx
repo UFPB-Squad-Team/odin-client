@@ -17,7 +17,7 @@ export function RadiusAnalysisToggle({ active, darkMapStyle = false, onToggle }:
     <button
       type="button"
       onClick={onToggle}
-      className={`flex items-center gap-2 rounded-xl border px-3 py-2 shadow-lg backdrop-blur-md transition-all ${
+      className={`flex items-center gap-2 rounded-xl border px-3 py-2 shadow-lg backdrop-blur-md transition-[background-color,border-color,color,box-shadow] ${
         active
           ? "border-cyan-500/60 bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/25"
           : `border-border/60 bg-background/90 hover:shadow-xl hover:border-border ${titleTextClass}`

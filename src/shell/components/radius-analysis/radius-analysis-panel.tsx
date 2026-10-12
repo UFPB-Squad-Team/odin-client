@@ -114,7 +114,7 @@ export function RadiusAnalysisPanel({
       </div>
 
       {/* Results */}
-      <div className="max-h-[300px] overflow-y-auto px-4 py-3 flex flex-col gap-3">
+      <div className="max-h-[300px] overflow-y-auto overscroll-contain px-4 py-3 flex flex-col gap-3">
         {/* Educação */}
         {Object.keys(result.educacao).length > 0 && (
           <div>

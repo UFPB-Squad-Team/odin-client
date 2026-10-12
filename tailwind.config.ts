@@ -1,7 +1,13 @@
 import type { Config } from "tailwindcss";
 
+const tokenColor = (name: string) =>
+  `color-mix(in srgb, var(${name}) calc(<alpha-value> * 100%), transparent)`;
+
 const config: Config = {
   darkMode: "class",
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -28,8 +34,13 @@ const config: Config = {
         "9xl": ["calc(8rem * var(--odin-font-scale))", { lineHeight: "1" }],
       },
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        background: tokenColor("--background"),
+        foreground: tokenColor("--foreground"),
+        border: tokenColor("--border"),
+        muted: tokenColor("--muted"),
+        "muted-foreground": tokenColor("--muted-foreground"),
+        primary: tokenColor("--primary"),
+        "primary-foreground": tokenColor("--primary-foreground"),
       },
     },
   },

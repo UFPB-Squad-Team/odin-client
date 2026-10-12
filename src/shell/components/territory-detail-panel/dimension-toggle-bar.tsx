@@ -28,7 +28,7 @@ export function DimensionToggleBar({
               key={dim.moduleId}
               type="button"
               onClick={() => onToggle(dim.moduleId)}
-              className={`inline-flex min-h-6 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium transition-all ${
+              className={`inline-flex min-h-6 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors ${
                 isActive
                   ? "border border-current/20 shadow-sm"
                   : "border border-border/50 opacity-50 hover:opacity-75"

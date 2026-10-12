@@ -36,12 +36,12 @@ export function DossierDownloadButton({
         type="button"
         onClick={handleDownload}
         disabled={loading}
-        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-3 py-2.5 text-sm font-medium text-emerald-700 transition-all hover:border-emerald-500/60 hover:bg-emerald-500/10 disabled:opacity-60 disabled:cursor-wait dark:text-emerald-300"
+        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-3 py-2.5 text-sm font-medium text-emerald-700 transition-[background-color,border-color,color] hover:border-emerald-500/60 hover:bg-emerald-500/10 disabled:opacity-60 disabled:cursor-wait dark:text-emerald-300"
       >
         {loading ? (
           <>
             <svg
-              className="h-4 w-4 animate-spin"
+              className="h-4 w-4 animate-spin motion-reduce:animate-none"
               viewBox="0 0 24 24"
               fill="none"
             >

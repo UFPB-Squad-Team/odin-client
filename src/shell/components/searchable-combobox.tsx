@@ -90,7 +90,7 @@ export function SearchableCombobox({
         <div className="absolute inset-y-0 right-1 flex items-center gap-1">
           {isLoading ? (
             <div className="px-2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent motion-reduce:animate-none" />
             </div>
           ) : value ? (
             <button

@@ -41,7 +41,7 @@ export function LandingTeam() {
           {TEAM_MEMBERS.map((member) => (
             <div
               key={member.name}
-              className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-8 shadow-lg transition-all hover:shadow-xl dark:border-gray-800 dark:bg-gray-900"
+              className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-8 shadow-lg transition-[border-color,box-shadow] hover:shadow-xl dark:border-gray-800 dark:bg-gray-900"
             >
               <div className="absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 blur-3xl transition-transform group-hover:scale-150" />
               

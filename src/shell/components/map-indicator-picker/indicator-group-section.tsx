@@ -66,7 +66,7 @@ export function IndicatorGroupSection({
       </button>
 
       {open && (
-        <div className="odin-indicator-scroll flex max-h-[24vh] flex-col gap-0.5 overflow-y-auto px-1.5 pb-1.5 pr-2 [scrollbar-gutter:stable]">
+        <div className="odin-indicator-scroll flex max-h-[24vh] flex-col gap-0.5 overflow-y-auto overscroll-contain px-1.5 pb-1.5 pr-2 [scrollbar-gutter:stable]">
           {indicators.map((indicator) => {
             const isActive = isActiveModule && activeIndicatorId === indicator.id;
             return (
@@ -76,7 +76,7 @@ export function IndicatorGroupSection({
                 onClick={() =>
                   onSelect(moduleId, isActive ? null : indicator.id)
                 }
-                className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11.5px] transition-all ${
+                className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11.5px] transition-colors ${
                   isActive
                     ? "text-white font-medium shadow-sm"
                     : darkMapStyle

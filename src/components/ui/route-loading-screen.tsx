@@ -9,7 +9,7 @@ export function RouteLoadingScreen({
     <main className="grid h-screen w-screen place-items-center bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.12),_transparent_35%),linear-gradient(180deg,_#fafafa,_#f4f7fb)] text-zinc-900 dark:bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.16),_transparent_35%),linear-gradient(180deg,_#020617,_#0f172a)] dark:text-zinc-100">
       <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-3xl border border-zinc-200/80 bg-white/85 px-6 py-8 text-center shadow-xl shadow-cyan-500/5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80 sm:px-8">
         <div className="flex items-center gap-3 text-cyan-700 dark:text-cyan-300">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-200 border-t-cyan-500 dark:border-cyan-950 dark:border-t-cyan-300" />
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-200 border-t-cyan-500 motion-reduce:animate-none dark:border-cyan-950 dark:border-t-cyan-300" />
           <span className="text-xs font-semibold uppercase tracking-[0.18em]">
             Carregando
           </span>

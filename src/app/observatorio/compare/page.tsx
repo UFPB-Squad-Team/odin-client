@@ -693,11 +693,11 @@ function CompareBar({
     <div className="flex h-1.5 w-full overflow-hidden rounded-full">
       <div
         style={{ width: `${pctA}%` }}
-        className={`transition-all ${aWins && a !== b ? "bg-cyan-400" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
+        className={`transition-colors ${aWins && a !== b ? "bg-cyan-400" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
       />
       <div
         style={{ width: `${pctB}%` }}
-        className={`transition-all ${bWins && a !== b ? "bg-purple-500" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
+        className={`transition-colors ${bWins && a !== b ? "bg-purple-500" : isDark ? "bg-zinc-600" : "bg-zinc-300"}`}
       />
     </div>
   );
@@ -1418,7 +1418,7 @@ function ComparePageContent() {
 
         {isLoading ? (
           <div className="flex h-64 flex-col items-center justify-center gap-3">
-            <svg className="h-5 w-5 animate-spin text-cyan-500" viewBox="0 0 24 24" fill="none">
+            <svg className="h-5 w-5 animate-spin text-cyan-500 motion-reduce:animate-none" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
@@ -1847,8 +1847,8 @@ function ScoreCard({
         <span className="text-purple-400 font-semibold">{nameB.split(" ")[0]}</span>
       </div>
       <div className={`flex h-2 overflow-hidden rounded-full ${isDark ? "bg-zinc-800" : "bg-zinc-200"}`}>
-        <div style={{ width: `${pctA}%` }} className="bg-cyan-500 transition-all" />
-        <div style={{ width: `${pctB}%` }} className="bg-purple-500 transition-all" />
+        <div style={{ width: `${pctA}%` }} className="bg-cyan-500 transition-[width]" />
+        <div style={{ width: `${pctB}%` }} className="bg-purple-500 transition-[width]" />
       </div>
       <div className={`flex justify-between text-xs ${isDark ? "text-zinc-500" : "text-zinc-600"}`}>
         <span>{scoreA} indicador{scoreA !== 1 ? "es" : ""}</span>
@@ -1959,7 +1959,7 @@ export default function ComparePage() {
     <Suspense fallback={
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
         <div className="flex flex-col items-center gap-3">
-          <svg className="h-8 w-8 animate-spin text-cyan-500" viewBox="0 0 24 24" fill="none">
+          <svg className="h-8 w-8 animate-spin text-cyan-500 motion-reduce:animate-none" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
           </svg>

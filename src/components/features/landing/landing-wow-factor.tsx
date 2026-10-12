@@ -16,29 +16,29 @@ export function LandingWowFactor() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <article className="rounded-xl border border-zinc-300/90 bg-white p-5 transition hover:-translate-y-0.5 hover:border-cyan-400/70 dark:border-zinc-800 dark:bg-zinc-900/70">
             <p className="text-xs uppercase tracking-[0.14em] text-cyan-500 dark:text-cyan-400">
-              MVP
+              Cobertura
             </p>
-            <p className="mt-2 font-bold">Paraíba</p>
+            <p className="mt-2 font-bold">Nordeste</p>
             <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">
-              Dados educacionais estruturados, validados e atualizados.
+              Dados estruturados, validados e atualizados em 9 estados.
             </p>
           </article>
 
           <article className="rounded-xl border border-zinc-300/90 bg-white p-5 transition hover:-translate-y-0.5 hover:border-cyan-400/70 dark:border-zinc-800 dark:bg-zinc-900/70">
             <p className="text-xs uppercase tracking-[0.14em] text-cyan-500 dark:text-cyan-400">
-              Escalabilidade
+              Abrangência
             </p>
-            <p className="mt-2 font-bold">Outros estados</p>
+            <p className="mt-2 font-bold">2 módulos ativos</p>
             <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">
-              Arquitetura pronta para integrar PE, CE, RN, BA e demais estados.
+              Educação e Socioeconômico reunidos na mesma plataforma.
             </p>
           </article>
 
           <article className="rounded-xl border border-zinc-300/90 bg-white p-5 transition hover:-translate-y-0.5 hover:border-cyan-400/70 dark:border-zinc-800 dark:bg-zinc-900/70">
             <p className="text-xs uppercase tracking-[0.14em] text-cyan-500 dark:text-cyan-400">
-              Múltiplos módulos
+              Evolução
             </p>
-            <p className="mt-2 font-bold">Além de Educação</p>
+            <p className="mt-2 font-bold">Novos recortes</p>
             <p className="mt-3 text-sm text-zinc-700 dark:text-zinc-300">
               Saúde, Segurança, Infraestrutura: plataforma agnóstica de dados.
             </p>

@@ -55,7 +55,7 @@ export function MapIndicatorPicker({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`flex items-center gap-2 rounded-xl border border-border/60 bg-background/90 backdrop-blur-md px-2.5 py-2 shadow-lg transition-all hover:shadow-xl hover:border-border ${radiusMode ? "max-w-[188px]" : "max-w-[220px]"}`}
+        className={`flex items-center gap-2 rounded-xl border border-border/60 bg-background/90 backdrop-blur-md px-2.5 py-2 shadow-lg transition-[background-color,border-color,color,box-shadow] hover:shadow-xl hover:border-border ${radiusMode ? "max-w-[188px]" : "max-w-[220px]"}`}
       >
         <Layers id="map-indicator-picker" className={`h-3.5 w-3.5 ${titleIconClass}`} />
         {activeIndicatorLabel ? (
@@ -145,7 +145,7 @@ export function MapIndicatorPicker({
       </div>
 
       {/* Indicator groups */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 py-1.5 flex flex-col gap-1 odin-picker-scroll [scrollbar-gutter:stable]">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 py-1.5 flex flex-col gap-1 odin-picker-scroll [scrollbar-gutter:stable]">
         {filteredGroups.length === 0 ? (
           <p className="py-4 text-center text-[11px] text-muted-foreground">
             Nenhum indicador encontrado.
