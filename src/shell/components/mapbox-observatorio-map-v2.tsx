@@ -25,6 +25,7 @@ import { registerMarkerImages } from "@/shell/components/map-markers";
 import { ObservatorioMapTooltip } from "@/shell/components/observatorio-map-tooltip";
 import { MapLegend } from "@/shell/components/map-legend";
 import { MapLoadingIndicator } from "@/shell/components/map-loading-indicator";
+import { SetorDisclaimer } from "@/shell/components/setor-disclaimer";
 import { LAYER_STYLES, type GeoJSONFeature } from "@/core/types/geospatial";
 import type { ModuleIndicator } from "@/core/types/module";
 import type { Escola, ObservatoryLayer } from "@/core/types/territory";
@@ -556,6 +557,9 @@ export function MapboxObservatorioMap({
   const escolaPointColor = accessibleLayerColors?.color ?? "#06b6d4";
   const ids = useMemo(() => buildLayerIds(resolvedLayer), [resolvedLayer]);
   const geojsonData = collection ?? EMPTY_COLLECTION;
+  const hasSectorFallback = resolvedLayer === "bairro" && geojsonData.features.some(
+    ({ properties }) => properties.source === "setor_indicadores" || properties.tem_bairro_oficial === false,
+  );
 
   const filteredEntities = useMemo(() => {
     if (activeLayer !== "escola" || !selectedDependencia || selectedDependencia.length === 0) {
@@ -1053,6 +1057,7 @@ export function MapboxObservatorioMap({
       </div>
 
       <div className="pointer-events-auto absolute left-2 bottom-2 z-30 flex w-[min(18rem,calc(100vw-1rem))] max-w-[18rem] flex-col gap-2 sm:bottom-4 sm:left-4 sm:w-[min(16rem,calc(100vw-1rem))] sm:max-w-[16rem]">
+        {hasSectorFallback && <SetorDisclaimer key={municipioId} />}
         {showLegend && activeIndicator && stats ? (
           <MapLegend
             indicatorLabel={activeIndicator.label}

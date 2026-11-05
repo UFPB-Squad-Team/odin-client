@@ -260,6 +260,21 @@ export function ObservatorioShell() {
     selectEntityAndSyncFilter(entity);
   }
 
+  function handleSetMunicipio(municipioId: string | null) {
+    filters.setMunicipio(municipioId);
+
+    const centroide = municipios.find((municipio) => municipio.id === municipioId)
+      ?.geoProps?._centroide as [number, number] | undefined;
+    if (!centroide) return;
+
+    suppressZoomLayerSync();
+    setMapViewState({
+      longitude: centroide[0],
+      latitude: centroide[1],
+      zoom: activeLayer === "municipio" ? 8 : activeLayer === "bairro" ? 12 : 13,
+    });
+  }
+
   /**
    * Seleção de estado — raiz do filtro em cascata territorial.
    *
@@ -721,29 +736,6 @@ export function ObservatorioShell() {
     }
   }, [filters.municipioId, filters.bairroId, bairros, municipios, selected?.id, selectEntity, activeLayer]);
 
-  // Auto-pan quando município muda via dropdown
-  useEffect(() => {
-    if (!initializedRef.current) return;
-    if (!filters.municipioId) return;
-
-    const municipio = municipios.find((m) => m.id === filters.municipioId);
-    if (!municipio?.geoProps) return;
-
-    const geoProps = municipio.geoProps as Record<string, unknown>;
-    const centroide = geoProps._centroide as [number, number] | undefined;
-
-    const zoomTarget = activeLayer === "municipio" ? 8 : activeLayer === "bairro" ? 12 : 13;
-
-    if (centroide) {
-      suppressZoomLayerSync();
-      setMapViewState({
-        longitude: centroide[0],
-        latitude: centroide[1],
-        zoom: zoomTarget,
-      });
-    }
-  }, [filters.municipioId, municipios, activeLayer]);
-
   // Persiste em localStorage
   useEffect(() => {
     if (!initializedRef.current) return;
@@ -962,11 +954,14 @@ export function ObservatorioShell() {
             onLayerChange={(layer) => {
               suppressZoomLayerSync();
               setActiveLayer(layer);
-              setMapViewState(initialViewForLayer(layer));
+              setMapViewState((current) => ({
+                ...current,
+                zoom: initialViewForLayer(layer).zoom,
+              }));
             }}
             onSetBairro={filters.setBairro}
             onSetEstado={handleSetEstado}
-            onSetMunicipio={filters.setMunicipio}
+            onSetMunicipio={handleSetMunicipio}
             onSearchSelect={handleSearchSelect}
             sidebarCollapsed={sidebarCollapsed}
             selectedDependencia={selectedDependencia}

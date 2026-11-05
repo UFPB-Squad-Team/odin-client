@@ -4,8 +4,6 @@ import { Suspense, useEffect, useState } from "react";
 import { ModuleBootstrap } from "./module-bootstrap";
 import { ObservatorioShell } from "@/shell/components/observatorio-shell";
 import { OnboardingModal } from "@/shell/components/onboarding-modal";
-import { SetorDisclaimer } from "@/shell/components/setor-disclaimer";
-import { useObservatorioShell } from "@/shell/hooks/use-observatorio-shell";
 
 function ObservatorioFallback() {
   return (
@@ -17,11 +15,6 @@ function ObservatorioFallback() {
 
 function ObservatorioContent() {
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const { selected, bairros } = useObservatorioShell();
-
-  const bairroAtual = selected?.kind === "bairro" 
-    ? bairros.find(b => b.id === selected.id)
-    : null;
 
   useEffect(() => {
     const hasCompleted = localStorage.getItem("odin:onboarding:completed");
@@ -40,10 +33,6 @@ function ObservatorioContent() {
         />
       )}
       
-      <SetorDisclaimer 
-        bairroAtual={bairroAtual}
-        onDismiss={() => console.log("Disclaimer closed")}
-      />
     </>
   );
 }

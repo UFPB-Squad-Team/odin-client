@@ -121,6 +121,8 @@ export async function listCamadas(
           geometry,
           properties: {
             ...item,
+            // Preserva a origem antes de normalizar a camada para "bairro".
+            source: item.source ?? (item.nivel === "setor" ? "setor_indicadores" : undefined),
             id: rawId,
             nome,
             nivel: "bairro",
